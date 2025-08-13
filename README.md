@@ -1,7 +1,7 @@
 # WGRelay
 
-An eBPF-based traffic obfuscation system that disguises WireGuard protocol traffic to bypass deep packet inspection (
-DPI) and government censorship
+An eBPF-based traffic obfuscation system that disguises WireGuard protocol traffic to bypass DPI and government
+censorship
 
 ## Overview
 
@@ -116,9 +116,6 @@ consistent environment with all dependencies pre-installed. Specially in non-lin
 ```bash
 
 ### Testing with Network Namespaces
-
-The proxy is designed to work with network namespaces for isolation:
-
 ```bash
 # Create test namespaces
 sudo bash setup-netns.sh
