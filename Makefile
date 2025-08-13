@@ -26,8 +26,6 @@ clean:
 	@echo "Cleaning generated files..."
 	rm -f $(EBPF_DIR)/wgforwardproxy_bpf*.o
 	rm -f $(EBPF_DIR)/wgreverseproxy_bpf*.o
-	rm -f $(EBPF_DIR)/wgforwardproxy_bpf*.go
-	rm -f $(EBPF_DIR)/wgreverseproxy_bpf*.go
 	rm -rf $(BUILD_DIR)
 	@echo "Clean completed"
 
