@@ -24,7 +24,7 @@ type ReverseLoader struct {
 }
 
 // NewReverseLoader creates a new reverse proxy loader
-func NewReverseLoader(cfg config.Config) (*ReverseLoader, error) {
+func NewReverseLoader() (*ReverseLoader, error) {
 	return &ReverseLoader{}, nil
 }
 

@@ -23,7 +23,7 @@ type ForwardLoader struct {
 }
 
 // NewForwardLoader creates a new forward proxy loader
-func NewForwardLoader(cfg config.Config) (*ForwardLoader, error) {
+func NewForwardLoader() (*ForwardLoader, error) {
 	return &ForwardLoader{}, nil
 }
 

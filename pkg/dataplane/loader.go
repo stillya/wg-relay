@@ -2,7 +2,6 @@ package dataplane
 
 import (
 	"context"
-	"fmt"
 	log "log/slog"
 
 	"github.com/cilium/ebpf/rlimit"
@@ -10,7 +9,6 @@ import (
 
 	"github.com/stillya/wg-relay/pkg/dataplane/config"
 	"github.com/stillya/wg-relay/pkg/dataplane/maps"
-	"github.com/stillya/wg-relay/pkg/dataplane/proxy"
 )
 
 // Loader interface for eBPF proxy loaders
@@ -26,42 +24,21 @@ type Manager struct {
 	loader Loader
 }
 
-// ProxyMode defines the operation mode
-type ProxyMode string
-
-const (
-	ModeForward ProxyMode = "forward" // XDP-based forward proxy
-	ModeReverse ProxyMode = "reverse" // TC-based reverse proxy
-)
+// ManagerConfig holds configuration for the dataplane manager
+type ManagerConfig struct {
+	Cfg    config.Config
+	Loader Loader
+}
 
 // NewManager creates a new dataplane manager
-func NewManager(cfg config.Config) (*Manager, error) {
+func NewManager(cfg ManagerConfig) (*Manager, error) {
 	if err := rlimit.RemoveMemlock(); err != nil {
 		return nil, errors.Wrap(err, "failed to remove memlock limit")
 	}
 
-	var loader Loader
-	var err error
-
-	// Initialize appropriate loader based on mode
-	switch ProxyMode(cfg.Mode) {
-	case ModeForward:
-		loader, err = proxy.NewForwardLoader(cfg)
-		if err != nil {
-			return nil, errors.Wrap(err, "failed to create forward proxy loader")
-		}
-	case ModeReverse:
-		loader, err = proxy.NewReverseLoader(cfg)
-		if err != nil {
-			return nil, errors.Wrap(err, "failed to create reverse proxy loader")
-		}
-	default:
-		return nil, fmt.Errorf("unsupported proxy mode: %s", cfg.Mode)
-	}
-
 	return &Manager{
-		cfg:    cfg,
-		loader: loader,
+		cfg:    cfg.Cfg,
+		loader: cfg.Loader,
 	}, nil
 }
 

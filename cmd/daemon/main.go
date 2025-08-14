@@ -12,10 +12,19 @@ import (
 
 	"github.com/jessevdk/go-flags"
 	"github.com/pkg/errors"
+	"github.com/stillya/wg-relay/pkg/dataplane/proxy"
 
 	"github.com/stillya/wg-relay/pkg/dataplane"
 	"github.com/stillya/wg-relay/pkg/dataplane/config"
 	"github.com/stillya/wg-relay/pkg/monitor"
+)
+
+// ProxyMode defines the operation mode
+type ProxyMode string
+
+const (
+	ModeForward ProxyMode = "forward" // XDP-based forward proxy
+	ModeReverse ProxyMode = "reverse" // TC-based reverse proxy
 )
 
 // Opts represents command line options
@@ -78,7 +87,28 @@ func main() {
 	signal.Notify(sigCh, syscall.SIGINT, syscall.SIGTERM)
 
 	// Create and start dataplane manager
-	dataplaneManager, err := dataplane.NewManager(cfg.Dataplane)
+	var loader dataplane.Loader
+
+	switch ProxyMode(cfg.Dataplane.Mode) {
+	case ModeForward:
+		loader, err = proxy.NewForwardLoader()
+	case ModeReverse:
+		loader, err = proxy.NewReverseLoader()
+	default:
+		log.Error("Unsupported proxy mode", "mode", cfg.Dataplane.Mode)
+	}
+
+	if err != nil {
+		log.Error("Failed to create loader", "error", err)
+		os.Exit(1)
+	}
+
+	managerCfg := dataplane.ManagerConfig{
+		Cfg:    cfg.Dataplane,
+		Loader: loader,
+	}
+
+	dataplaneManager, err := dataplane.NewManager(managerCfg)
 	if err != nil {
 		log.Error("Failed to create dataplane manager", "error", err)
 		os.Exit(1)
