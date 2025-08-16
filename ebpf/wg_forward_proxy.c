@@ -190,9 +190,11 @@ int wg_forward_proxy(struct xdp_md *ctx) {
     if ((void *)(eth + 1) > data_end)
         return XDP_PASS;
     
-    if (eth->h_proto != bpf_htons(ETH_P_IP))
+    if (eth->h_proto != bpf_htons(ETH_P_IP)) {
+        DEBUG_PRINTK("eth proto=0x%x\n", bpf_ntohs(eth->h_proto));
         return XDP_PASS;
-    
+    }
+
     struct iphdr *ip = (void *)(eth + 1);
     if ((void *)(ip + 1) > data_end)
         return XDP_PASS;
