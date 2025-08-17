@@ -21,26 +21,11 @@ jobs:
         with:
           go-version: "1.23"
 
-      - name: Install dependencies
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y \
-            llvm \
-            clang \
-            libbpf-dev \
-            linux-headers-$(uname -r) \
-            netcat-traditional
+      - name: Build docker images
+        run: docker build -t local < .devcontainer/Dockerfile
 
-      - name: Build
-        run: |
-          ln -sf /usr/include/x86_64-linux-gnu/asm/ /usr/include/asm
-          make build
-
-      - name: Test
-        run: |
-          sudo -E make test
-          # Also generate coverage for non-eBPF packages for upload
-          go test -race -covermode atomic -coverprofile=covprofile ./pkg/...
+      - name: Build and Test
+        run: docker run -it -v $PWD:/srv -w/srv local sudo -E make build test
 
       - name: Coverage
         run: |
