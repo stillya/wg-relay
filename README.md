@@ -1,9 +1,5 @@
 # WGRelay
 
-[![Build](https://github.com/stillya/wg-relay/actions/workflows/build.yml/badge.svg)](https://github.com/stillya/wg-relay/actions/workflows/build.yml)
-[![Coverage Status](https://coveralls.io/repos/github/stillya/wg-relay/badge.svg?branch=master)](https://coveralls.io/github/stillya/wg-relay?branch=master)
-[![License](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
-
 An eBPF-based traffic obfuscation system that disguises WireGuard protocol traffic to bypass DPI and government
 censorship
 
