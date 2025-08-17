@@ -29,3 +29,7 @@ pwru
 
 # Claude
 .claude
+
+# Golang
+*.out
+*.html

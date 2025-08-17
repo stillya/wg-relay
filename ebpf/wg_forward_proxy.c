@@ -138,7 +138,7 @@ static __always_inline int forward_packet(struct xdp_md *ctx, struct packet_info
     __u32 old_daddr = pkt->ip->daddr;
     __u16 old_sport = pkt->udp->source;
     __u16 old_dport = pkt->udp->dest;
-    
+
     if (new_saddr != 0) {
         pkt->ip->saddr = bpf_htonl(new_saddr);
     }
@@ -151,7 +151,7 @@ static __always_inline int forward_packet(struct xdp_md *ctx, struct packet_info
     if (new_dport != 0) {
         pkt->udp->dest = bpf_htons(new_dport);
     }
-    
+
     struct bpf_fib_lookup params = {0};
     params.family = AF_INET;
     params.tos = pkt->ip->tos;
@@ -174,7 +174,7 @@ static __always_inline int forward_packet(struct xdp_md *ctx, struct packet_info
     pkt->ip->check = iph_csum(pkt->ip);
     pkt->udp->check = 0;
 
-    if (params.ifindex != ctx->ingress_ifindex) {
+    if (fwd == BPF_FIB_LKUP_RET_SUCCESS && params.ifindex != ctx->ingress_ifindex) {
         return bpf_redirect(params.ifindex, 0);
     } else {
         return XDP_TX;
@@ -191,7 +191,6 @@ int wg_forward_proxy(struct xdp_md *ctx) {
         return XDP_PASS;
     
     if (eth->h_proto != bpf_htons(ETH_P_IP)) {
-        DEBUG_PRINTK("eth proto=0x%x\n", bpf_ntohs(eth->h_proto));
         return XDP_PASS;
     }
 

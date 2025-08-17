@@ -1,4 +1,4 @@
-.PHONY: help build clean run-daemon run-forward-proxy run-reverse-proxy test-ebpf
+.PHONY: help build clean run-daemon run-forward-proxy run-reverse-proxy test-ebpf test
 
 # Variables
 DAEMON_BINARY := wg-relay-daemon
@@ -14,6 +14,7 @@ help:
 	@echo "  run-forward-proxy - Run forward proxy in ebpf-proxy namespace"
 	@echo "  run-reverse-proxy - Run reverse proxy in wg-server namespace"
 	@echo "  test-ebpf         - Run eBPF unit tests"
+	@echo "  test              - Run all tests"
 
 build:
 	@echo "Generating eBPF Go bindings..."
@@ -52,3 +53,5 @@ test-ebpf: build
 	@echo "Running eBPF unit tests..."
 	@echo "Note: This requires root privileges for eBPF operations"
 	sudo -E go test -v ./$(EBPF_DIR)/
+
+test: test-ebpf

@@ -4,15 +4,15 @@ import (
 	"encoding/binary"
 	"net"
 	"testing"
-	"unsafe"
 
 	"github.com/cilium/ebpf"
 )
 
 const (
-	wgPort  = 51820
-	xdpPass = 2
-	xdpTx   = 3
+	wgPort      = 51820
+	xdpPass     = 2
+	xdpTx       = 3
+	xdpRedirect = 4 // fib_lookup redirects to default gateway
 
 	// Stats map keys from metrics.h
 	statToWgPackets       = 0
@@ -29,126 +29,113 @@ func TestWgForwardProxy(t *testing.T) {
 	defer objs.Close()
 
 	tests := []struct {
-		name           string
-		packet         []byte
-		obfuscationCfg WgForwardProxyObfuscationConfig
-		expectedResult int
-		expectedStats  map[uint32]uint64 // Expected final stat values
-		description    string
+		name            string
+		packet          []byte
+		obfuscationCfg  WgForwardProxyObfuscationConfig
+		expectedResult  int
+		expectedStats   map[uint32]uint64
+		checkObfuscated bool
+		description     string
 	}{
 		{
-			name:           "non_wg_traffic_http",
-			packet:         createHTTPPacket("192.168.1.1", "192.168.1.2", 8080, 80),
-			obfuscationCfg: createObfuscationConfig(true, "test-key-123", "10.0.0.1"),
-			expectedResult: xdpPass,
-			expectedStats:  map[uint32]uint64{}, // No WG stats should be incremented
-			description:    "HTTP traffic should pass through unchanged",
+			name:            "non_wg_traffic_http",
+			packet:          createHTTPPacket("192.168.1.1", "192.168.1.2", 8080, 80),
+			obfuscationCfg:  createObfuscationConfig(true, "test-key-123", "10.0.0.1"),
+			expectedResult:  xdpPass,
+			expectedStats:   map[uint32]uint64{},
+			checkObfuscated: false,
+			description:     "HTTP traffic should pass through unchanged",
 		},
 		{
-			name:           "wg_traffic_obfuscation_enabled",
-			packet:         createWGPacket("192.168.1.1", "192.168.1.2", 12345, wgPort),
-			obfuscationCfg: createObfuscationConfig(true, "test-key-123", "10.0.0.1"),
-			expectedResult: xdpTx,
-			expectedStats:  map[uint32]uint64{statFromWgPackets: 1, statToWgPackets: 1}, // Should increment TO_WG counter
-			description:    "WG traffic with obfuscation enabled should be processed",
+			name:            "wg_traffic_obfuscation_enabled",
+			packet:          createWGPacket("192.168.1.1", "192.168.1.2", 12345, wgPort),
+			obfuscationCfg:  createObfuscationConfig(true, "test-key-123", "10.0.0.1"),
+			expectedResult:  xdpRedirect,
+			expectedStats:   map[uint32]uint64{statToWgPackets: 1},
+			checkObfuscated: true,
+			description:     "WG traffic with obfuscation enabled should be processed",
 		},
 		{
-			name:           "wg_traffic_obfuscation_disabled",
-			packet:         createWGPacket("192.168.1.1", "192.168.1.2", 12345, wgPort),
-			obfuscationCfg: createObfuscationConfig(false, "test-key-123", "10.0.0.1"),
-			expectedResult: xdpPass,
-			expectedStats:  map[uint32]uint64{}, // No stats when obfuscation disabled
-			description:    "WG traffic with obfuscation disabled should pass through",
+			name:            "wg_traffic_obfuscation_disabled",
+			packet:          createWGPacket("192.168.1.1", "192.168.1.2", 12345, wgPort),
+			obfuscationCfg:  createObfuscationConfig(false, "test-key-123", "10.0.0.1"),
+			expectedResult:  xdpPass,
+			expectedStats:   map[uint32]uint64{},
+			checkObfuscated: false,
+			description:     "WG traffic with obfuscation disabled should pass through",
 		},
 		{
-			name:           "small_packet",
-			packet:         []byte{0x00, 0x01, 0x02}, // Too small to be valid
-			obfuscationCfg: createObfuscationConfig(true, "test-key-123", "10.0.0.1"),
-			expectedResult: xdpPass,
-			expectedStats:  map[uint32]uint64{}, // No stats for invalid packets
-			description:    "Small invalid packets should pass through",
+			name:            "small_packet",
+			packet:          []byte{0x00, 0x01, 0x02}, // Too small to be valid
+			obfuscationCfg:  createObfuscationConfig(true, "test-key-123", "10.0.0.1"),
+			expectedResult:  xdpPass,
+			expectedStats:   map[uint32]uint64{},
+			checkObfuscated: false,
+			description:     "Small invalid packets should pass through",
 		},
 		{
-			name:           "wg_reverse_traffic",
-			packet:         createWGPacket("192.168.1.2", "192.168.1.1", wgPort, 12345),
-			obfuscationCfg: createObfuscationConfig(true, "test-key-123", "10.0.0.1"),
-			expectedResult: xdpPass,
-			expectedStats:  map[uint32]uint64{statFromWgPackets: 1, statNatLookupsFailed: 1}, // FROM_WG packet, NAT lookup fails
-			description:    "Reverse WG traffic without NAT mapping should pass through",
+			name:            "wg_reverse_traffic",
+			packet:          createWGPacket("192.168.1.2", "192.168.1.1", wgPort, 12345),
+			obfuscationCfg:  createObfuscationConfig(true, "test-key-123", "10.0.0.1"),
+			expectedResult:  xdpPass,
+			expectedStats:   map[uint32]uint64{statFromWgPackets: 1, statNatLookupsFailed: 1},
+			checkObfuscated: false,
+			description:     "Reverse WG traffic without NAT mapping should pass through",
 		},
 		{
-			name:           "non_udp_traffic",
-			packet:         createTCPPacket("192.168.1.1", "192.168.1.2", 12345, 80),
-			obfuscationCfg: createObfuscationConfig(true, "test-key-123", "10.0.0.1"),
-			expectedResult: xdpPass,
-			expectedStats:  map[uint32]uint64{}, // No WG stats for TCP traffic
-			description:    "TCP traffic should pass through unchanged",
+			name:            "non_udp_traffic",
+			packet:          createTCPPacket("192.168.1.1", "192.168.1.2", 12345, 80),
+			obfuscationCfg:  createObfuscationConfig(true, "test-key-123", "10.0.0.1"),
+			expectedResult:  xdpPass,
+			expectedStats:   map[uint32]uint64{},
+			checkObfuscated: false,
+			description:     "TCP traffic should pass through unchanged",
 		},
 		{
-			name:           "wg_traffic_with_long_key",
-			packet:         createWGPacket("192.168.1.1", "192.168.1.2", 12345, wgPort),
-			obfuscationCfg: createObfuscationConfig(true, "very-long-obfuscation-key-for-testing", "10.0.0.1"),
-			expectedResult: xdpTx,
-			expectedStats:  map[uint32]uint64{statToWgPackets: 1}, // Should increment TO_WG counter
-			description:    "WG traffic with long key should be processed",
-		},
-		{
-			name:           "wg_traffic_different_target_server",
-			packet:         createWGPacket("192.168.1.1", "192.168.1.2", 12345, wgPort),
-			obfuscationCfg: createObfuscationConfig(true, "test-key-123", "192.168.200.100"),
-			expectedResult: xdpTx,
-			expectedStats:  map[uint32]uint64{statToWgPackets: 1}, // Should increment TO_WG counter
-			description:    "WG traffic with different target server should be processed",
+			name:            "wg_traffic_different_target_server",
+			packet:          createWGPacket("192.168.1.1", "192.168.1.2", 12345, wgPort),
+			obfuscationCfg:  createObfuscationConfig(true, "test-key-123", "192.168.200.100"),
+			expectedResult:  xdpRedirect,
+			expectedStats:   map[uint32]uint64{statToWgPackets: 1},
+			checkObfuscated: true,
+			description:     "WG traffic with different target server should be processed",
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			oldStats := captureStats(objs.StatsMap)
+
 			configKey := uint32(0)
 			if err := objs.ObfuscationConfigMap.Put(&configKey, &tt.obfuscationCfg); err != nil {
 				t.Fatalf("Failed to update config map: %v", err)
 			}
 
-			// Run eBPF program
-			result, err := runXDPProgram(objs.WgForwardProxy, tt.packet)
+			result, outputPacket, err := runXDPProgram(objs.WgForwardProxy, tt.packet)
 			if err != nil {
 				t.Fatalf("Failed to run eBPF program: %v", err)
 			}
 
-			// Verify result
 			if result != tt.expectedResult {
 				t.Errorf("%s: Expected result %d, got %d", tt.description, tt.expectedResult, result)
 			} else {
 				t.Logf("✓ %s: got expected result %d", tt.description, result)
 			}
 
-			// Verify current stats values
+			// Check obfuscation in output buffer if required
+			if tt.checkObfuscated && outputPacket != nil {
+				verifyObfuscation(t, tt.packet, outputPacket, tt.obfuscationCfg, tt.description)
+			}
+
 			currentStats := captureStats(objs.StatsMap)
-			verifyStats(t, currentStats, tt.expectedStats, tt.description)
+			verifyStats(t, oldStats, currentStats, tt.expectedStats, tt.description)
 		})
 	}
 }
 
-func runXDPProgram(prog *ebpf.Program, packet []byte) (int, error) {
-	_ = &xdpContext{
-		data:     uintptr(unsafe.Pointer(&packet[0])),
-		dataEnd:  uintptr(unsafe.Pointer(&packet[len(packet)-1])) + 1,
-		dataSize: uint32(len(packet)),
-	}
-
-	result, _, err := prog.Test(packet)
-	return int(result), err
-}
-
-// xdpContext represents the XDP context structure
-// https://github.com/xdp-project/xdp-tools/blob/main/headers/linux/bpf.h#L5944
-type xdpContext struct {
-	data         uintptr
-	dataEnd      uintptr
-	dataSize     uint32
-	ingressIfidx uint32
-	rxQueueIndex uint32
-	egressIfidx  uint32
+func runXDPProgram(prog *ebpf.Program, packet []byte) (int, []byte, error) {
+	result, out, err := prog.Test(packet)
+	return int(result), out, err
 }
 
 func createWGPacket(srcIP, dstIP string, srcPort, dstPort uint16) []byte {
@@ -184,7 +171,8 @@ func createWGPacket(srcIP, dstIP string, srcPort, dstPort uint16) []byte {
 	packet = append(packet, udp...)
 
 	// WireGuard payload (12 bytes minimal)
-	wgPayload := []byte{0x01, 0x00, 0x00, 0x00, 0x11, 0x22, 0x33, 0x44, 0x55, 0x66, 0x77, 0x88}
+	wgPayload := []byte{0x01, 0x00, 0x00, 0x00, 0x11, 0x22, 0x33, 0x44, 0x55, 0x66, 0x77, 0x88, 0x01, 0x00,
+		0x00, 0x00, 0x11, 0x22, 0x33, 0x44, 0x55, 0x66, 0x77, 0x88}
 	packet = append(packet, wgPayload...)
 
 	return packet
@@ -274,16 +262,94 @@ func captureStats(statsMap *ebpf.Map) map[uint32]uint64 {
 	return stats
 }
 
-func verifyStats(t *testing.T, actual, expected map[uint32]uint64, description string) {
+func verifyStats(t *testing.T, oldStats, actual, expected map[uint32]uint64, description string) {
 	for statKey, expectedValue := range expected {
 		if actualValue, exists := actual[statKey]; !exists {
 			t.Errorf("%s: Expected stat %d to be %d, but stat key not found",
 				description, statKey, expectedValue)
-		} else if actualValue != expectedValue {
+		} else if actualValue-oldStats[statKey] != expectedValue {
 			t.Errorf("%s: Stat %d expected %d, got %d",
 				description, statKey, expectedValue, actualValue)
 		} else {
 			t.Logf("✓ %s: Stat %d correctly has value %d", description, statKey, actualValue)
+		}
+	}
+}
+
+func verifyObfuscation(t *testing.T, inputPacket, outputPacket []byte, cfg WgForwardProxyObfuscationConfig, description string) {
+	if len(inputPacket) < 42 || len(outputPacket) < 42 { // Eth(14) + IP(20) + UDP(8) = 42
+		t.Logf("Packets too small for payload comparison")
+		return
+	}
+
+	inputPayload := inputPacket[42:]
+	outputPayload := outputPacket[42:]
+
+	if len(inputPayload) != len(outputPayload) {
+		t.Errorf("%s: Payload length mismatch - input: %d, output: %d",
+			description, len(inputPayload), len(outputPayload))
+		return
+	}
+
+	if cfg.Method == 1 && cfg.Enabled == 1 { // XOR method enabled
+		key := cfg.Key[:cfg.KeyLen]
+		obfuscatedBytes := int(cfg.KeyLen)
+
+		if obfuscatedBytes > len(inputPayload) {
+			obfuscatedBytes = len(inputPayload)
+		}
+
+		expectedPayload := make([]byte, len(inputPayload))
+
+		for i := 0; i < obfuscatedBytes; i++ {
+			expectedPayload[i] = inputPayload[i] ^ key[i%len(key)]
+		}
+
+		obfuscatedMatches := true
+		for i := 0; i < obfuscatedBytes; i++ {
+			if i < len(outputPayload) && expectedPayload[i] != outputPayload[i] {
+				obfuscatedMatches = false
+				break
+			}
+		}
+
+		// Compare non-obfuscated portion (should be unchanged)
+		unchangedMatches := true
+		for i := obfuscatedBytes; i < len(inputPayload); i++ {
+			if i < len(outputPayload) && inputPayload[i] != outputPayload[i] {
+				unchangedMatches = false
+				break
+			}
+		}
+
+		if obfuscatedMatches && unchangedMatches {
+			t.Logf("✓ %s: Payload correctly obfuscated with XOR (first %d bytes)", description, obfuscatedBytes)
+		} else {
+			t.Errorf("%s: Payload obfuscation mismatch", description)
+			if !obfuscatedMatches {
+				t.Errorf("  Obfuscated portion (first %d bytes) doesn't match expected", obfuscatedBytes)
+			}
+			if !unchangedMatches {
+				t.Errorf("  Non-obfuscated portion (bytes %d+) was unexpectedly changed", obfuscatedBytes)
+			}
+			t.Logf("Input payload:    %x", inputPayload[:min(32, len(inputPayload))])
+			t.Logf("Expected payload: %x", expectedPayload[:min(32, len(expectedPayload))])
+			t.Logf("Output payload:   %x", outputPayload[:min(32, len(outputPayload))])
+			t.Logf("Key: %x, Obfuscated bytes: %d", key, obfuscatedBytes)
+		}
+	} else {
+		payloadUnchanged := true
+		for i := range inputPayload {
+			if i < len(outputPayload) && inputPayload[i] != outputPayload[i] {
+				payloadUnchanged = false
+				break
+			}
+		}
+
+		if payloadUnchanged {
+			t.Logf("✓ %s: Payload correctly unchanged (obfuscation disabled)", description)
+		} else {
+			t.Errorf("%s: Payload unexpectedly changed when obfuscation disabled", description)
 		}
 	}
 }
