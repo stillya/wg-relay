@@ -4,14 +4,11 @@
 #include <linux/types.h>
 #include <bpf/bpf_helpers.h>
 
-// Metrics keys - simplified and focused
+// Metrics keys
 #define STAT_TO_WG_PACKETS        0
 #define STAT_FROM_WG_PACKETS      1
 #define STAT_NAT_LOOKUPS_SUCCESS  2
 #define STAT_NAT_LOOKUPS_FAILED   3
-#define STAT_NAT_KEY_MISMATCH     4
-#define STAT_RETURN_PACKETS       5
-#define STAT_NAT_LOOKUP_ATTEMPTS  6
 
 // Statistics map
 struct {
