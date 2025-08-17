@@ -32,7 +32,9 @@ jobs:
             netcat-traditional
 
       - name: Build
-        run: make build
+        run: |
+          ln -sf /usr/include/x86_64-linux-gnu/asm/ /usr/include/asm
+          make build
 
       - name: Test
         run: |
