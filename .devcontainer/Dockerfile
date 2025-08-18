@@ -23,7 +23,11 @@ RUN apt install -y cmake
 RUN apt install -y libpcap-dev
 RUN apt install -y libcap-ng-dev
 RUN apt install -y libbfd-dev
-RUN ln -sf /usr/include/aarch64-linux-gnu/asm/ /usr/include/asm
+RUN if [ "$(uname -m)" = "aarch64" ]; then \
+        ln -sf /usr/include/aarch64-linux-gnu/asm/ /usr/include/asm; \
+    elif [ "$(uname -m)" = "x86_64" ]; then \
+        ln -sf /usr/include/x86_64-linux-gnu/asm/ /usr/include/asm; \
+    fi \
 RUN apt install -y libcap-dev
 RUN sudo ln -sf /usr/local/go/bin/go /bin/go
 RUN apt install -y xdp-tools
