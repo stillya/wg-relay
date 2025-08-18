@@ -26,7 +26,7 @@ jobs:
         run: docker build -t local - < .devcontainer/Dockerfile
 
       - name: Build and Test
-        run: docker run -it --privileged --cap-add=ALL --ulimit memlock=9223372036854775807 -v $PWD:/srv -w/srv local  sudo -E make build test
+        run: docker run -i --privileged --cap-add=ALL --ulimit memlock=9223372036854775807 -v $PWD:/srv -w /srv local sudo -E make build test
 
       - name: Coverage
         run: |
