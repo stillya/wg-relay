@@ -19,7 +19,7 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@v4
         with:
-          go-version: "1.23"
+          go-version: "1.24"
 
       - name: Build and Test
         run: docker run -i --privileged --cap-add=ALL --ulimit memlock=9223372036854775807 -v $PWD:/srv -w /srv stillya101/ebpf-devcontainer-go:0.0.1 make build test
