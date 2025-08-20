@@ -1,6 +1,6 @@
 # WGRelay
 
-[![Build Status](https://github.com/stillya/wg-relay/actions/workflows/go.yml/badge.svg)](https://github.com/stillya/wg-relay/actions/workflows/go.yml)
+[![Build Status](https://github.com/stillya/wg-relay/actions/workflows/build.yml/badge.svg)](https://github.com/stillya/wg-relay/actions/workflows/build.yml)
 [![Coverage](https://coveralls.io/repos/github/stillya/wg-relay/badge.svg?branch=master)](https://coveralls.io/github/stillya/wg-relay?branch=master)
 
 An eBPF-based traffic obfuscation system that disguises WireGuard protocol traffic to bypass DPI and government
