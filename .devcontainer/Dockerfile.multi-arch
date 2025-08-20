@@ -30,6 +30,8 @@ RUN asm_arch=$(if [ "${TARGETARCH}" = "arm64" ]; then echo "aarch64-linux-gnu"; 
 
 RUN ln -sf /usr/local/go/bin/go /bin/go
 
+ENV GOFLAGS="-buildvcs=false"
+
 RUN mkdir -p /sources
 WORKDIR /sources
 

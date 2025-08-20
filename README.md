@@ -1,5 +1,8 @@
 # WGRelay
 
+[![Build Status](https://github.com/stillya/wg-relay/actions/workflows/go.yml/badge.svg)](https://github.com/stillya/wg-relay/actions/workflows/go.yml)
+[![Coverage](https://coveralls.io/repos/github/stillya/wg-relay/badge.svg?branch=master)](https://coveralls.io/github/stillya/wg-relay?branch=master)
+
 An eBPF-based traffic obfuscation system that disguises WireGuard protocol traffic to bypass DPI and government
 censorship
 
@@ -40,6 +43,16 @@ Client                 Obfuscator Proxy           WireGuard Server
 
 ```bash
 make build
+```
+
+### Testing
+
+```bash
+# Run all tests (requires root privileges)
+make test
+
+# Run only eBPF unit tests
+make test-ebpf
 ```
 
 ### 2. Configuration
