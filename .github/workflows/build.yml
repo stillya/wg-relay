@@ -22,7 +22,7 @@ jobs:
           go-version: "1.23"
 
       - name: Build and Test
-        run: docker run -i --privileged --cap-add=ALL --ulimit memlock=9223372036854775807 -v $PWD:/srv -w /srv stillya101/ebpf-devcontainer-go:0.0.1 make build
+        run: docker run -i --platform linux/amd64 --privileged --cap-add=ALL --ulimit memlock=9223372036854775807 -v $PWD:/srv -w /srv stillya101/ebpf-devcontainer-go:0.0.1 make build
 
       - name: Coverage
         run: |
