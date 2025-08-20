@@ -15,9 +15,9 @@ jobs:
     runs-on: ubuntu-latest
     container: 
       image: stillya101/ebpf-devcontainer-go:0.0.1
-      options: --platform linux/amd64 --privileged --cap-add=ALL --ulimit memlock=9223372036854775807
+      options: --privileged --cap-add=ALL --ulimit memlock=9223372036854775807
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v2.3.2
 
       - name: Set up Go
         uses: actions/setup-go@v4
