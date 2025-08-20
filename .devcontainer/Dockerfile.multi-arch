@@ -1,5 +1,5 @@
-ARG BUILDPLATFORM
-FROM --platform=$BUILDPLATFORM mcr.microsoft.com/devcontainers/go:1.24-bookworm
+ARG TARGETPLATFORM
+FROM --platform=$TARGETPLATFORM mcr.microsoft.com/devcontainers/go:1.24-bookworm
 
 ARG TARGETARCH
 
