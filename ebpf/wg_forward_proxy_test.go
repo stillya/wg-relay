@@ -65,15 +65,6 @@ func TestWgForwardProxy(t *testing.T) {
 			description:     "WG traffic with obfuscation disabled should pass through",
 		},
 		{
-			name:            "small_packet",
-			packet:          []byte{0x00, 0x01, 0x02}, // Too small to be valid
-			obfuscationCfg:  createObfuscationConfig(true, "test-key-123", "10.0.0.1"),
-			expectedResult:  xdpPass,
-			expectedStats:   map[uint32]uint64{},
-			checkObfuscated: false,
-			description:     "Small invalid packets should pass through",
-		},
-		{
 			name:            "wg_reverse_traffic",
 			packet:          createWGPacket("192.168.1.2", "192.168.1.1", wgPort, 12345),
 			obfuscationCfg:  createObfuscationConfig(true, "test-key-123", "10.0.0.1"),

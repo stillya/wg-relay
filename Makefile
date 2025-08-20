@@ -55,3 +55,5 @@ test-ebpf: build
 	sudo -E go test -v ./$(EBPF_DIR)/
 
 test: test-ebpf
+	@echo "Running tests with coverage..."
+	sudo -E go test -v -coverprofile=covprofile ./...

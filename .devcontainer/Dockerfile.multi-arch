@@ -1,0 +1,42 @@
+ARG TARGETPLATFORM
+FROM --platform=$TARGETPLATFORM mcr.microsoft.com/devcontainers/go:1.24-bookworm
+
+ARG TARGETARCH
+
+RUN asm_arch=$(if [ "${TARGETARCH}" = "arm64" ]; then echo "aarch64-linux-gnu"; else echo "x86_64-linux-gnu"; fi) && \
+    echo "wireshark-common wireshark-common/install-setuid boolean true" | debconf-set-selections && \
+    apt-get update && \
+    DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
+    build-essential \
+    pkg-config \
+    clang \
+    llvm \
+    m4 \
+    git \
+    libelf-dev \
+    libpcap-dev \
+    iproute2 \
+    iputils-ping \
+    linux-headers-generic \
+    libbpf-dev \
+    linux-libc-dev \
+    cmake \
+    libcap-ng-dev \
+    libbfd-dev \
+    libcap-dev \
+    xdp-tools \
+    tshark && \
+    ln -sf /usr/include/${asm_arch}/asm/ /usr/include/asm
+
+RUN ln -sf /usr/local/go/bin/go /bin/go
+
+ENV GOFLAGS="-buildvcs=false"
+
+RUN mkdir -p /sources
+WORKDIR /sources
+
+RUN git clone --recurse-submodules --depth 1 https://github.com/libbpf/bpftool.git && \
+    make -C bpftool/src/ install && \
+    rm -rf bpftool
+
+WORKDIR /workspaces
