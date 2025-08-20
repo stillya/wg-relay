@@ -25,8 +25,8 @@ jobs:
         run: docker run -i --privileged --cap-add=ALL --ulimit memlock=9223372036854775807 -v $PWD:/srv -w /srv stillya101/ebpf-devcontainer-go:0.0.1 make build test
 
       - name: Coverage
-        run: |
-          go install github.com/mattn/goveralls@latest
-          goveralls -coverprofile=covprofile -service=github -v -repotoken $COVERALLS_TOKEN
+        run: ls -la
+#          go install github.com/mattn/goveralls@latest
+#          goveralls -coverprofile=covprofile -service=github -v -repotoken $COVERALLS_TOKEN
         env:
           COVERALLS_TOKEN: ${{ secrets.GITHUB_TOKEN }}
