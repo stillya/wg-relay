@@ -64,8 +64,8 @@ func TestStatMonitor_PrintTrafficTable(t *testing.T) {
 
 	expectedStrings := []string{
 		"wg-relay traffic statistics",
-		"rx",
-		"tx",
+		"from_wg",
+		"to_wg",
 		"total",
 		"avg. rate",
 		"traffic",

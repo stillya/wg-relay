@@ -39,7 +39,7 @@ func (tp *TablePrinter) PrintTrafficTable(metricsData []metricsmap.MetricData, e
 	fmt.Printf("\n")
 	fmt.Printf("                         wg-relay traffic statistics\n")
 	fmt.Printf("\n")
-	fmt.Printf(" %-18s | %12s | %12s | %12s | %12s\n", "", "rx", "tx", "total", "avg. rate")
+	fmt.Printf(" %-18s | %12s | %12s | %12s | %12s\n", "", "from_wg", "to_wg", "total", "avg. rate")
 	fmt.Printf(" %s+%s+%s+%s+%s\n",
 		strings.Repeat("-", 18),
 		strings.Repeat("-", 14),
