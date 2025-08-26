@@ -17,7 +17,7 @@ import (
 
 // ReverseLoader manages TC-based reverse proxy
 type ReverseLoader struct {
-	cfg          config.Config
+	cfg          config.ProxyConfig
 	objs         *wgebpf.WgReverseProxyObjects
 	ingressLinks []link.Link
 	egressLinks  []link.Link
@@ -29,7 +29,7 @@ func NewReverseLoader() (*ReverseLoader, error) {
 }
 
 // LoadAndAttach loads the reverse proxy program and attaches it to interfaces
-func (rp *ReverseLoader) LoadAndAttach(ctx context.Context, cfg config.Config) error {
+func (rp *ReverseLoader) LoadAndAttach(ctx context.Context, cfg config.ProxyConfig) error {
 	rp.cfg = cfg
 
 	if err := rp.loadEBPF(); err != nil {
@@ -45,12 +45,12 @@ func (rp *ReverseLoader) LoadAndAttach(ctx context.Context, cfg config.Config) e
 		return errors.Wrap(err, "failed to attach to interfaces")
 	}
 
-	log.Info("Reverse proxy loaded and attached", "interfaces", cfg.Proxy.Interfaces)
+	log.Info("Reverse proxy loaded and attached", "interfaces", cfg.Interfaces)
 	return nil
 }
 
 // configure configures the eBPF maps with the provided configuration
-func (rp *ReverseLoader) configure(cfg config.Config) error {
+func (rp *ReverseLoader) configure(cfg config.ProxyConfig) error {
 	if rp.objs == nil || rp.objs.ObfuscationConfigMap == nil {
 		return errors.New("eBPF objects not loaded")
 	}
@@ -78,7 +78,7 @@ func (rp *ReverseLoader) configure(cfg config.Config) error {
 
 	log.Info("Reverse mode configuration updated",
 		"enabled", cfg.Enabled,
-		"method", cfg.Proxy.Method,
+		"method", cfg.Method,
 		"key_len", len(keyBytes))
 
 	return nil
@@ -106,7 +106,7 @@ func (rp *ReverseLoader) loadEBPF() error {
 
 // attachToInterfaces attaches the TC program to configured interfaces
 func (rp *ReverseLoader) attachToInterfaces() error {
-	for _, interfaceName := range rp.cfg.Proxy.Interfaces {
+	for _, interfaceName := range rp.cfg.Interfaces {
 		if err := rp.attachToInterface(interfaceName); err != nil {
 			rp.cleanupLinks()
 			return errors.Wrapf(err, "failed to attach to interface %s", interfaceName)
@@ -229,6 +229,11 @@ func (rp *ReverseLoader) Maps() *maps.Maps {
 	if rp.objs != nil {
 		if rp.objs.StatsMap != nil {
 			mapsCollection.AddStatsMap("StatsMap", rp.objs.StatsMap)
+		}
+
+		// Set the new metrics map
+		if rp.objs.MetricsMap != nil {
+			mapsCollection.SetMetricsMap(rp.objs.MetricsMap)
 		}
 	}
 

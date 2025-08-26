@@ -12,8 +12,9 @@ type MapInfo struct {
 
 // Maps holds collections of different types of eBPF maps
 type Maps struct {
-	Stats []MapInfo // Statistics maps for metrics collection
-	Other []MapInfo // Other maps (conntrack, etc.)
+	Stats   []MapInfo // Legacy statistics maps
+	Metrics *ebpf.Map // New Cilium-style metrics map
+	Other   []MapInfo // Other maps (conntrack, etc.)
 }
 
 // NewMaps creates a new Maps collection
@@ -24,12 +25,17 @@ func NewMaps() *Maps {
 	}
 }
 
-// AddStatsMap adds a statistics map
+// AddStatsMap adds a legacy statistics map
 func (m *Maps) AddStatsMap(name string, ebpfMap *ebpf.Map) {
 	m.Stats = append(m.Stats, MapInfo{
 		Name: name,
 		Map:  ebpfMap,
 	})
+}
+
+// SetMetricsMap sets the main metrics map
+func (m *Maps) SetMetricsMap(metricsMap *ebpf.Map) {
+	m.Metrics = metricsMap
 }
 
 // AddOtherMap adds other types of maps

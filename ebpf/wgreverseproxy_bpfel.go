@@ -13,6 +13,19 @@ import (
 	"github.com/cilium/ebpf"
 )
 
+type WgReverseProxyMetricsKey struct {
+	_      structs.HostLayout
+	Dir    uint8
+	Reason uint8
+	Pad    uint16
+}
+
+type WgReverseProxyMetricsValue struct {
+	_       structs.HostLayout
+	Packets uint64
+	Bytes   uint64
+}
+
 type WgReverseProxyObfuscationConfig struct {
 	_              structs.HostLayout
 	Enabled        uint32
@@ -71,6 +84,7 @@ type WgReverseProxyProgramSpecs struct {
 //
 // It can be passed ebpf.CollectionSpec.Assign.
 type WgReverseProxyMapSpecs struct {
+	MetricsMap           *ebpf.MapSpec `ebpf:"metrics_map"`
 	ObfuscationConfigMap *ebpf.MapSpec `ebpf:"obfuscation_config_map"`
 	StatsMap             *ebpf.MapSpec `ebpf:"stats_map"`
 }
@@ -101,12 +115,14 @@ func (o *WgReverseProxyObjects) Close() error {
 //
 // It can be passed to LoadWgReverseProxyObjects or ebpf.CollectionSpec.LoadAndAssign.
 type WgReverseProxyMaps struct {
+	MetricsMap           *ebpf.Map `ebpf:"metrics_map"`
 	ObfuscationConfigMap *ebpf.Map `ebpf:"obfuscation_config_map"`
 	StatsMap             *ebpf.Map `ebpf:"stats_map"`
 }
 
 func (m *WgReverseProxyMaps) Close() error {
 	return _WgReverseProxyClose(
+		m.MetricsMap,
 		m.ObfuscationConfigMap,
 		m.StatsMap,
 	)

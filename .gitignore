@@ -33,3 +33,4 @@ pwru
 # Golang
 *.out
 *.html
+covprofile

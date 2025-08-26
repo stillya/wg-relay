@@ -3,6 +3,7 @@ package config
 import (
 	"net"
 	"os"
+	"time"
 
 	"github.com/pkg/errors"
 	"gopkg.in/yaml.v3"
@@ -10,10 +11,9 @@ import (
 
 // Config represents the dataplane configuration
 type Config struct {
-	Mode    string       `yaml:"mode"`    // "forward" or "reverse"
-	Enabled bool         `yaml:"enabled"` // Enable/disable obfuscation
-	Daemon  DaemonConfig `yaml:"daemon"`  // Daemon configuration
-	Proxy   ProxyConfig  `yaml:"proxy"`   // Proxy configuration
+	Daemon     DaemonConfig     `yaml:"daemon"`     // Daemon configuration
+	Proxy      ProxyConfig      `yaml:"proxy"`      // Proxy configuration
+	Monitoring MonitoringConfig `yaml:"monitoring"` // Monitoring configuration
 }
 
 // DaemonConfig represents daemon-specific configuration
@@ -23,6 +23,8 @@ type DaemonConfig struct {
 
 // ProxyConfig represents proxy-specific configuration
 type ProxyConfig struct {
+	Enabled    bool          `yaml:"enabled"`     // Enable/disable obfuscation
+	Mode       string        `yaml:"mode"`        // "forward" or "reverse"
 	Method     string        `yaml:"method"`      // "xor" or "none"
 	Key        string        `yaml:"key"`         // Obfuscation key (string)
 	Interfaces []string      `yaml:"interfaces"`  // Network interfaces to attach to
@@ -33,6 +35,24 @@ type ProxyConfig struct {
 // ForwardConfig represents forward proxy configuration (forward mode)
 type ForwardConfig struct {
 	TargetServerIP string `yaml:"target_server_ip"` // Target WireGuard server IP
+}
+
+// MonitoringConfig represents monitoring configuration
+type MonitoringConfig struct {
+	Prometheus PrometheusConfig `yaml:"prometheus"` // Prometheus HTTP exporter
+	Statistics StatisticsConfig `yaml:"statistics"` // vnstat-style console output
+}
+
+// PrometheusConfig represents Prometheus monitoring configuration
+type PrometheusConfig struct {
+	Enabled bool   `yaml:"enabled"` // Enable/disable Prometheus metrics server
+	Listen  string `yaml:"listen"`  // Address and port for metrics server
+}
+
+// StatisticsConfig represents statistics monitoring configuration
+type StatisticsConfig struct {
+	Enabled  bool          `yaml:"enabled"`  // Enable/disable statistics display
+	Interval time.Duration `yaml:"interval"` // Statistics update interval
 }
 
 // ObfuscationMethod represents the obfuscation method
@@ -49,44 +69,44 @@ const MaxKeySize = 32
 // validate validates the dataplane configuration
 func (cfg *Config) validate() error {
 	// Validate mode
-	if cfg.Mode != "forward" && cfg.Mode != "reverse" {
+	if cfg.Proxy.Mode != "forward" && cfg.Proxy.Mode != "reverse" {
 		return errors.New("mode must be 'forward' or 'reverse'")
 	}
 
 	// Validate proxy configuration
-	return cfg.Proxy.validate(cfg.Mode)
+	return cfg.Proxy.validate(cfg.Proxy.Mode)
 }
 
 // validate validates the proxy configuration
-func (pc *ProxyConfig) validate(mode string) error {
+func (cfg *ProxyConfig) validate(mode string) error {
 	// Validate method
-	if pc.Method != "xor" && pc.Method != "none" {
+	if cfg.Method != "xor" && cfg.Method != "none" {
 		return errors.New("method must be 'xor' or 'none'")
 	}
 
 	// Validate interfaces
-	if len(pc.Interfaces) == 0 {
+	if len(cfg.Interfaces) == 0 {
 		return errors.New("at least one interface must be specified")
 	}
 
 	// Validate key is required
-	if len(pc.Key) == 0 {
+	if len(cfg.Key) == 0 {
 		return errors.New("key is required")
 	}
 
 	// Validate key length
-	if len(pc.Key) > MaxKeySize {
-		return errors.Errorf("key too long: %d bytes, max %d", len(pc.Key), MaxKeySize)
+	if len(cfg.Key) > MaxKeySize {
+		return errors.Errorf("key too long: %d bytes, max %d", len(cfg.Key), MaxKeySize)
 	}
 
 	// Validate driver mode
-	if pc.DriverMode != "" && pc.DriverMode != "driver" && pc.DriverMode != "generic" {
+	if cfg.DriverMode != "" && cfg.DriverMode != "driver" && cfg.DriverMode != "generic" {
 		return errors.New("driver_mode must be 'driver' or 'generic'")
 	}
 
 	// Forward mode specific validations
 	if mode == "forward" {
-		return pc.Forward.validate()
+		return cfg.Forward.validate()
 	}
 
 	return nil
@@ -111,8 +131,8 @@ func (fc *ForwardConfig) validate() error {
 }
 
 // GetMethod returns the obfuscation method as a constant
-func (cfg *Config) GetMethod() ObfuscationMethod {
-	switch cfg.Proxy.Method {
+func (cfg *ProxyConfig) GetMethod() ObfuscationMethod {
+	switch cfg.Method {
 	case "xor":
 		return MethodXOR
 	default:
@@ -121,24 +141,24 @@ func (cfg *Config) GetMethod() ObfuscationMethod {
 }
 
 // GetKeyBytes returns the obfuscation key as bytes
-func (cfg *Config) GetKeyBytes() []byte {
-	return []byte(cfg.Proxy.Key)
+func (cfg *ProxyConfig) GetKeyBytes() []byte {
+	return []byte(cfg.Key)
 }
 
 // GetTargetServerIP returns the target server IP as a uint32 in network byte order
-func (cfg *Config) GetTargetServerIP() (uint32, error) {
-	if cfg.Proxy.Forward.TargetServerIP == "" {
+func (cfg *ProxyConfig) GetTargetServerIP() (uint32, error) {
+	if cfg.Forward.TargetServerIP == "" {
 		return 0, nil
 	}
 
-	targetIP := net.ParseIP(cfg.Proxy.Forward.TargetServerIP)
+	targetIP := net.ParseIP(cfg.Forward.TargetServerIP)
 	if targetIP == nil {
-		return 0, errors.Errorf("invalid target server IP: %s", cfg.Proxy.Forward.TargetServerIP)
+		return 0, errors.Errorf("invalid target server IP: %s", cfg.Forward.TargetServerIP)
 	}
 
 	targetIP = targetIP.To4()
 	if targetIP == nil {
-		return 0, errors.Errorf("target server IP must be IPv4: %s", cfg.Proxy.Forward.TargetServerIP)
+		return 0, errors.Errorf("target server IP must be IPv4: %s", cfg.Forward.TargetServerIP)
 	}
 
 	// Convert to uint32 in network byte order
@@ -148,16 +168,26 @@ func (cfg *Config) GetTargetServerIP() (uint32, error) {
 // NewConfig creates a new dataplane configuration with defaults
 func NewConfig() *Config {
 	return &Config{
-		Mode:    "forward",
-		Enabled: true,
 		Daemon: DaemonConfig{
 			Listen: ":8080",
 		},
 		Proxy: ProxyConfig{
+			Enabled:    true,
+			Mode:       "forward",
 			Method:     "xor",
 			Interfaces: []string{},
 			DriverMode: "driver",
 			Forward:    ForwardConfig{},
+		},
+		Monitoring: MonitoringConfig{
+			Prometheus: PrometheusConfig{
+				Enabled: false,
+				Listen:  ":9090",
+			},
+			Statistics: StatisticsConfig{
+				Enabled:  true,
+				Interval: 30 * time.Second,
+			},
 		},
 	}
 }

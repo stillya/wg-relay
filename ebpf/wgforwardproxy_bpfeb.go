@@ -28,6 +28,19 @@ type WgForwardProxyConnectionValue struct {
 	_         [6]byte
 }
 
+type WgForwardProxyMetricsKey struct {
+	_      structs.HostLayout
+	Dir    uint8
+	Reason uint8
+	Pad    uint16
+}
+
+type WgForwardProxyMetricsValue struct {
+	_       structs.HostLayout
+	Packets uint64
+	Bytes   uint64
+}
+
 type WgForwardProxyNatKey struct {
 	_        structs.HostLayout
 	ServerIp uint32
@@ -93,6 +106,7 @@ type WgForwardProxyProgramSpecs struct {
 // It can be passed ebpf.CollectionSpec.Assign.
 type WgForwardProxyMapSpecs struct {
 	ConnectionMap        *ebpf.MapSpec `ebpf:"connection_map"`
+	MetricsMap           *ebpf.MapSpec `ebpf:"metrics_map"`
 	NatPortCounter       *ebpf.MapSpec `ebpf:"nat_port_counter"`
 	NatReverseMap        *ebpf.MapSpec `ebpf:"nat_reverse_map"`
 	ObfuscationConfigMap *ebpf.MapSpec `ebpf:"obfuscation_config_map"`
@@ -126,6 +140,7 @@ func (o *WgForwardProxyObjects) Close() error {
 // It can be passed to LoadWgForwardProxyObjects or ebpf.CollectionSpec.LoadAndAssign.
 type WgForwardProxyMaps struct {
 	ConnectionMap        *ebpf.Map `ebpf:"connection_map"`
+	MetricsMap           *ebpf.Map `ebpf:"metrics_map"`
 	NatPortCounter       *ebpf.Map `ebpf:"nat_port_counter"`
 	NatReverseMap        *ebpf.Map `ebpf:"nat_reverse_map"`
 	ObfuscationConfigMap *ebpf.Map `ebpf:"obfuscation_config_map"`
@@ -135,6 +150,7 @@ type WgForwardProxyMaps struct {
 func (m *WgForwardProxyMaps) Close() error {
 	return _WgForwardProxyClose(
 		m.ConnectionMap,
+		m.MetricsMap,
 		m.NatPortCounter,
 		m.NatReverseMap,
 		m.ObfuscationConfigMap,
