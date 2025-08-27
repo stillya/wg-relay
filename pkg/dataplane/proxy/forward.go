@@ -9,9 +9,9 @@ import (
 	"github.com/cilium/ebpf"
 	"github.com/cilium/ebpf/link"
 	"github.com/pkg/errors"
+	"github.com/stillya/wg-relay/pkg/dataplane/config"
 
 	wgebpf "github.com/stillya/wg-relay/ebpf"
-	"github.com/stillya/wg-relay/pkg/dataplane/config"
 	"github.com/stillya/wg-relay/pkg/dataplane/maps"
 )
 
@@ -201,10 +201,6 @@ func (fp *ForwardLoader) Maps() *maps.Maps {
 	mapsCollection := maps.NewMaps()
 
 	if fp.objs != nil {
-		if fp.objs.StatsMap != nil {
-			mapsCollection.AddStatsMap("StatsMap", fp.objs.StatsMap)
-		}
-
 		if fp.objs.MetricsMap != nil {
 			mapsCollection.SetMetricsMap(fp.objs.MetricsMap)
 		}

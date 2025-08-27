@@ -13,11 +13,11 @@ import (
 	"github.com/pkg/errors"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
+	"github.com/stillya/wg-relay/pkg/dataplane/config"
 	"github.com/stillya/wg-relay/pkg/dataplane/proxy"
 	"github.com/stillya/wg-relay/pkg/metrics"
 
 	"github.com/stillya/wg-relay/pkg/dataplane"
-	"github.com/stillya/wg-relay/pkg/dataplane/config"
 	"github.com/stillya/wg-relay/pkg/maps/metricsmap"
 	"github.com/stillya/wg-relay/pkg/monitor"
 )
@@ -124,7 +124,7 @@ func main() {
 		metricsSource = metricsmap.NewBPFMapSource("wg-relay-metrics", maps.Metrics)
 
 		if cfg.Monitoring.Prometheus.Enabled {
-			bpfCollector = metrics.NewBpfCollector(metricsSource)
+			bpfCollector = metrics.NewBpfCollector(metricsSource, cfg.Proxy.Mode)
 			prometheus.MustRegister(bpfCollector)
 
 			// Start Prometheus HTTP server

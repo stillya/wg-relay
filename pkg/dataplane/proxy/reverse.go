@@ -9,9 +9,9 @@ import (
 	"github.com/cilium/ebpf"
 	"github.com/cilium/ebpf/link"
 	"github.com/pkg/errors"
+	"github.com/stillya/wg-relay/pkg/dataplane/config"
 
 	wgebpf "github.com/stillya/wg-relay/ebpf"
-	"github.com/stillya/wg-relay/pkg/dataplane/config"
 	"github.com/stillya/wg-relay/pkg/dataplane/maps"
 )
 
@@ -227,11 +227,6 @@ func (rp *ReverseLoader) Maps() *maps.Maps {
 	mapsCollection := maps.NewMaps()
 
 	if rp.objs != nil {
-		if rp.objs.StatsMap != nil {
-			mapsCollection.AddStatsMap("StatsMap", rp.objs.StatsMap)
-		}
-
-		// Set the new metrics map
 		if rp.objs.MetricsMap != nil {
 			mapsCollection.SetMetricsMap(rp.objs.MetricsMap)
 		}

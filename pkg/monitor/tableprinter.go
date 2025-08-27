@@ -17,7 +17,6 @@ func newTablePrinter() *TablePrinter {
 func (tp *TablePrinter) PrintTrafficTable(metricsData []metricsmap.MetricData, elapsed time.Duration) {
 	tp.clearScreen()
 
-	// Calculate totals
 	var rxBytes, txBytes uint64
 	for _, metric := range metricsData {
 		if metric.Key.Dir == metricsmap.MetricFromWg && metric.Key.Reason == metricsmap.MetricForwarded {
@@ -65,7 +64,7 @@ func (tp *TablePrinter) PrintTrafficTable(metricsData []metricsmap.MetricData, e
 }
 
 func (tp *TablePrinter) clearScreen() {
-	fmt.Print("\033[2J\033[H")
+	fmt.Print("\033c")
 }
 
 func formatBytes(bytes uint64) string {

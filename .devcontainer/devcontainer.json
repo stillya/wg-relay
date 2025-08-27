@@ -8,6 +8,7 @@
   //		"ghcr.io/devcontainers/features/go:1": {},
   //	},
   "runArgs": [
+    "--platform=linux/arm64",
     "--privileged",
     "--cap-add=ALL",
     "--ulimit memlock=9223372036854775807"
@@ -17,7 +18,14 @@
   // "features": {},
 
   // Use 'forwardPorts' to make a list of ports inside the container available locally.
-  "forwardPorts": []
+  "forwardPorts": [
+    3000
+  ],
+  "portsAttributes": {
+    "3000": {
+      "visibility": "public"
+    }
+  }
 
   // Use 'postCreateCommand' to run commands after the container is created.
   // "postCreateCommand": "go version",

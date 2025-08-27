@@ -15,24 +15,26 @@ type MetricCollectorSource interface {
 
 type BpfCollector struct {
 	source MetricCollectorSource
+	mode   string
 
 	packetsDesc *prometheus.Desc
 	bytesDesc   *prometheus.Desc
 }
 
-func NewBpfCollector(source MetricCollectorSource) *BpfCollector {
+func NewBpfCollector(source MetricCollectorSource, mode string) *BpfCollector {
 	return &BpfCollector{
 		source: source,
+		mode:   mode,
 		packetsDesc: prometheus.NewDesc(
-			"wg_relay_packets_total",
-			"Total number of WireGuard packets processed",
-			[]string{"direction", "reason"},
+			"wg_relay_packets",
+			"Current total number of WireGuard packets processed",
+			[]string{"mode", "direction", "reason"},
 			nil,
 		),
 		bytesDesc: prometheus.NewDesc(
-			"wg_relay_bytes_total",
-			"Total bytes of WireGuard packets processed",
-			[]string{"direction", "reason"},
+			"wg_relay_bytes",
+			"Current total bytes of WireGuard packets processed",
+			[]string{"mode", "direction", "reason"},
 			nil,
 		),
 	}
@@ -57,16 +59,16 @@ func (c *BpfCollector) Collect(ch chan<- prometheus.Metric) {
 
 		ch <- prometheus.MustNewConstMetric(
 			c.packetsDesc,
-			prometheus.CounterValue,
+			prometheus.GaugeValue,
 			float64(metric.Value.Packets),
-			dirLabel, reasonLabel,
+			c.mode, dirLabel, reasonLabel,
 		)
 
 		ch <- prometheus.MustNewConstMetric(
 			c.bytesDesc,
-			prometheus.CounterValue,
+			prometheus.GaugeValue,
 			float64(metric.Value.Bytes),
-			dirLabel, reasonLabel,
+			c.mode, dirLabel, reasonLabel,
 		)
 	}
 }

@@ -6,8 +6,8 @@ monitoring:                      # Monitoring configuration
     enabled: true                # Enable/disable statistics display
     interval: "5s"              # Statistics update interval
   prometheus:                    # Prometheus HTTP exporter
-    enabled: false               # Enable/disable Prometheus metrics server
-    listen: ":9090"              # Address and port for metrics server
+    enabled: true               # Enable/disable Prometheus metrics server
+    listen: ":8081"              # Address and port for metrics server
 
 proxy:
   enabled: true                    # Enable/disable obfuscation

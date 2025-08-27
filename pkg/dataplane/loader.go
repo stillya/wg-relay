@@ -6,8 +6,8 @@ import (
 
 	"github.com/cilium/ebpf/rlimit"
 	"github.com/pkg/errors"
-
 	"github.com/stillya/wg-relay/pkg/dataplane/config"
+
 	"github.com/stillya/wg-relay/pkg/dataplane/maps"
 )
 
