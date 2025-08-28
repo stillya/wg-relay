@@ -10,10 +10,6 @@ import (
 
 type TablePrinter struct{}
 
-func newTablePrinter() *TablePrinter {
-	return &TablePrinter{}
-}
-
 func (tp *TablePrinter) PrintTrafficTable(metricsData []metricsmap.MetricData, elapsed time.Duration) {
 	tp.clearScreen()
 

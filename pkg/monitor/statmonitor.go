@@ -31,7 +31,7 @@ type StatMonitorParams struct {
 func NewStatMonitor(params StatMonitorParams) *StatMonitor {
 	return &StatMonitor{
 		source:    params.Source,
-		printer:   newTablePrinter(),
+		printer:   &TablePrinter{},
 		interval:  params.Interval,
 		stopCh:    make(chan struct{}),
 		startTime: time.Now(),
@@ -76,4 +76,3 @@ func (sm *StatMonitor) printStats(ctx context.Context) {
 	elapsed := time.Since(sm.startTime)
 	sm.printer.PrintTrafficTable(metricsData, elapsed)
 }
-

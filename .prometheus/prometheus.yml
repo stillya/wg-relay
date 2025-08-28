@@ -9,6 +9,6 @@ scrape_configs:
 
   - job_name: "wg-relay"
     static_configs:
-      - targets: ["192.168.100.2:8081"]  # Adjust port if different
+      - targets: ["192.168.100.2:8081"]
     scrape_interval: 5s
     metrics_path: /metrics
