@@ -222,11 +222,12 @@ int wg_forward_proxy(struct xdp_md *ctx) {
     __u8 is_to_wg = (dst_port == WG_PORT) ? 1 : 0;
     __u8 is_from_wg = (src_port == WG_PORT) ? 1 : 0;
     
-    if (is_from_wg) {
-        increment_stat(STAT_FROM_WG_PACKETS);
+    if (likely(is_from_wg)) {
+        __u32 pkt_len = (void *)(long)ctx->data_end - (void *)(long)ctx->data;
         struct packet_info pkt = {};
         if (parse_xdp_packet(ctx, &pkt) < 0) {
             DEBUG_PRINTK("Failed to parse FROM WG packet");
+            update_metrics(METRIC_FROM_WG, METRIC_DROP, pkt_len);
             return XDP_PASS;
         }
             
@@ -234,6 +235,7 @@ int wg_forward_proxy(struct xdp_md *ctx) {
         if (restore_nat_connection(&pkt, &original_conn) < 0) {
             increment_stat(STAT_NAT_LOOKUPS_FAILED);
             DEBUG_PRINTK("Failed to restore NAT connection for FROM WG packet, passing through");
+            update_metrics(METRIC_FROM_WG, METRIC_DROP, pkt_len);
             return XDP_PASS;
         }
         increment_stat(STAT_NAT_LOOKUPS_SUCCESS);
@@ -242,20 +244,23 @@ int wg_forward_proxy(struct xdp_md *ctx) {
         
         __u32 proxy_ip = bpf_ntohl(pkt.ip->daddr); 
         __u32 client_ip = bpf_ntohl(original_conn.client_ip);
-
+        
+        update_metrics(METRIC_FROM_WG, METRIC_FORWARDED, pkt_len);
         return forward_packet(ctx, &pkt, proxy_ip, original_conn.server_port, client_ip, original_conn.client_port);
     }
     
-    if (is_to_wg) {
-        increment_stat(STAT_TO_WG_PACKETS);
+    if (unlikely(is_to_wg)) {
+        __u32 pkt_len = (void *)(long)ctx->data_end - (void *)(long)ctx->data;
         struct packet_info pkt = {};
         if (parse_xdp_packet(ctx, &pkt) < 0) {
             DEBUG_PRINTK("Failed to parse TO WG packet");
+            update_metrics(METRIC_TO_WG, METRIC_DROP, pkt_len);
             return XDP_PASS;
         }
             
         if (create_nat_connection(&pkt, config) < 0) {
             DEBUG_PRINTK("Failed to create NAT connection for TO WG packet");
+            update_metrics(METRIC_TO_WG, METRIC_DROP, pkt_len);
             return XDP_PASS;
         }
         
@@ -271,6 +276,7 @@ int wg_forward_proxy(struct xdp_md *ctx) {
             DEBUG_PRINTK("No NAT connection found for client %pI4:%d -> server %pI4:%d, passing through",
                          &conn_key.client_ip, conn_key.client_port,
                          &conn_key.server_ip, conn_key.server_port);
+            update_metrics(METRIC_TO_WG, METRIC_DROP, pkt_len);
             return XDP_PASS;
         }
         
@@ -278,7 +284,8 @@ int wg_forward_proxy(struct xdp_md *ctx) {
         
         __u32 proxy_ip = bpf_ntohl(pkt.ip->daddr);
         __u32 server_ip = config->target_server_ip;
-
+        
+        update_metrics(METRIC_TO_WG, METRIC_FORWARDED, pkt_len);
         return forward_packet(ctx, &pkt, proxy_ip, conn_value->nat_port, server_ip, WG_PORT);
     }
     

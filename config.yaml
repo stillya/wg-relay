@@ -1,10 +1,17 @@
-mode: "forward"                  # "forward" for forward proxy, "reverse" for reverse proxy
-enabled: true                    # Enable/disable obfuscation
-
 daemon:                          # Daemon configuration
   listen: ":8080"                # Address and port for daemon to bind to
 
+monitoring:                      # Monitoring configuration
+  statistics:                    # vnstat-style console output
+    enabled: true                # Enable/disable statistics display
+    interval: "5s"              # Statistics update interval
+  prometheus:                    # Prometheus HTTP exporter
+    enabled: true               # Enable/disable Prometheus metrics server
+    listen: ":8081"              # Address and port for metrics server
+
 proxy:
+  enabled: true                    # Enable/disable obfuscation
+  mode: "forward"                  # "forward" for forward proxy, "reverse" for reverse proxy
   method: "xor"                           # "xor" or "none"
   key: "my_secret_key_32_bytes_long_123"  # Obfuscation key (required)
   driver_mode: "generic"                  # "driver" or "generic" for XDP mode

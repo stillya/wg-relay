@@ -104,20 +104,55 @@ sudo make run-reverse-proxy    # wg-server namespace
 - **Driver**: Native XDP mode (better performance, requires driver support)
 - **Generic**: Generic XDP mode (broader compatibility, slightly lower performance)
 
-## Statistics
+## Monitoring & Statistics
 
-The daemon provides real-time eBPF statistics:
+### Console Statistics (vnstat-style)
+
+The daemon provides real-time traffic statistics in a vnstat-style table format:
 
 ```
-Stats: to_wg: 1245, from_wg: 1198, nat_lookup_suc: 1245, nat_lookup_fail: 0
+┌─────────────────────────────────────────────────────┐
+│               wg-relay traffic statistics           │
+├─────────────────────────────────────────────────────┤
+│                   rx      tx    total   avg. rate   │
+│      from_wg   10.5 KB  8.2 KB  18.7 KB   1.2 KB/s  │
+│        to_wg    8.2 KB 10.5 KB  18.7 KB   1.2 KB/s  │
+│        total   18.7 KB 18.7 KB  37.4 KB   2.4 KB/s  │
+│                                                     │
+│   estimated    1.6 MB per day                       │
+└─────────────────────────────────────────────────────┘
 ```
 
-Statistics include:
+Enable statistics monitoring in config:
 
-- `to_wg` - Packets sent to WireGuard
-- `from_wg` - Packets received from WireGuard
-- `nat_lookup_suc` - Successful NAT lookups
-- `nat_lookup_fail` - Failed NAT lookups
+```yaml
+monitoring:
+  statistics:
+    enabled: true
+    interval: 5s
+```
+
+### Prometheus Metrics
+
+Expose Prometheus metrics for monitoring with Grafana dashboards:
+
+```yaml
+monitoring:
+  prometheus:
+    enabled: true
+    listen: ":9090"
+```
+
+Available metrics:
+
+- `wg_relay_packets{mode, direction, reason}` - Total packets processed
+- `wg_relay_bytes{mode, direction, reason}` - Total bytes processed
+
+Labels:
+
+- `mode`: "forward" or "reverse"
+- `direction`: "from_wg" or "to_wg"
+- `reason`: "forwarded", "dropped", etc.
 
 ## Development
 

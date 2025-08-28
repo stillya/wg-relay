@@ -6,27 +6,27 @@ import (
 
 	"github.com/cilium/ebpf/rlimit"
 	"github.com/pkg/errors"
-
 	"github.com/stillya/wg-relay/pkg/dataplane/config"
+
 	"github.com/stillya/wg-relay/pkg/dataplane/maps"
 )
 
 // Loader interface for eBPF proxy loaders
 type Loader interface {
-	LoadAndAttach(ctx context.Context, cfg config.Config) error
+	LoadAndAttach(ctx context.Context, cfg config.ProxyConfig) error
 	Close() error
 	Maps() *maps.Maps
 }
 
 // Manager manages the eBPF dataplane
 type Manager struct {
-	cfg    config.Config
+	cfg    config.ProxyConfig
 	loader Loader
 }
 
 // ManagerConfig holds configuration for the dataplane manager
 type ManagerConfig struct {
-	Cfg    config.Config
+	Cfg    config.ProxyConfig
 	Loader Loader
 }
 

@@ -41,19 +41,19 @@ run-local-forward: build
 	@echo "Running forward proxy daemon in ebpf-proxy namespace..."
 	@echo "Note: This requires root privileges and namespace setup"
 	@echo "Press Ctrl+C to stop"
-	sudo ip netns exec ebpf-proxy ./$(BUILD_DIR)/$(DAEMON_BINARY) -c config.yaml
+	sudo ip netns exec ebpf-proxy ./$(BUILD_DIR)/$(DAEMON_BINARY) -c config.yaml -d
 
 run-local-reverse: build
 	@echo "Running reverse proxy daemon in wg-server namespace..."
 	@echo "Note: This requires root privileges and namespace setup"
 	@echo "Press Ctrl+C to stop"
-	sudo ip netns exec wg-server ./$(BUILD_DIR)/$(DAEMON_BINARY) -c config.yaml
+	sudo ip netns exec wg-server ./$(BUILD_DIR)/$(DAEMON_BINARY) -c config.yaml -d
 
 test-ebpf: build
 	@echo "Running eBPF unit tests..."
 	@echo "Note: This requires root privileges for eBPF operations"
 	sudo -E go test -v ./$(EBPF_DIR)/
 
-test: test-ebpf
+test: build
 	@echo "Running tests with coverage..."
 	sudo -E go test -v -coverprofile=covprofile ./...

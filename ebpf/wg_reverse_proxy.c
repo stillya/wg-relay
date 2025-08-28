@@ -58,30 +58,34 @@ int wg_reverse_proxy(struct __sk_buff *skb) {
     __u8 is_to_wg = (dst_port == WG_PORT) ? 1 : 0;
     __u8 is_from_wg = (src_port == WG_PORT) ? 1 : 0;
         
-    if (is_from_wg) {
-        increment_stat(STAT_FROM_WG_PACKETS);
+    if (likely(is_from_wg)) {
         struct packet_info pkt = {};
         if (parse_tc_packet(skb, &pkt) < 0) {
             DEBUG_PRINTK("Failed to parse client FROM WG packet");
+            update_metrics(METRIC_FROM_WG, METRIC_DROP, skb->len);
             return TC_ACT_OK;
         }
             
         if (config->method != OBFUSCATE_NONE && config->key_len > 0) {
             apply_obfuscation((void *)(long)skb->data_end, &pkt, config);
         }
+        
+        update_metrics(METRIC_FROM_WG, METRIC_FORWARDED, skb->len);
     }
     
-    if (is_to_wg) {
-        increment_stat(STAT_TO_WG_PACKETS);
+    if (unlikely(is_to_wg)) {
         struct packet_info pkt = {};
         if (parse_tc_packet(skb, &pkt) < 0) {
             DEBUG_PRINTK("Failed to parse client TO WG packet");
+            update_metrics(METRIC_TO_WG, METRIC_DROP, skb->len);
             return TC_ACT_OK;
         }
             
         if (config->method != OBFUSCATE_NONE && config->key_len > 0) {
             apply_obfuscation((void *)(long)skb->data_end, &pkt, config);
         }
+        
+        update_metrics(METRIC_TO_WG, METRIC_FORWARDED, skb->len);
     }
     
     return TC_ACT_OK;

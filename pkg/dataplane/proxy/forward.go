@@ -9,15 +9,15 @@ import (
 	"github.com/cilium/ebpf"
 	"github.com/cilium/ebpf/link"
 	"github.com/pkg/errors"
+	"github.com/stillya/wg-relay/pkg/dataplane/config"
 
 	wgebpf "github.com/stillya/wg-relay/ebpf"
-	"github.com/stillya/wg-relay/pkg/dataplane/config"
 	"github.com/stillya/wg-relay/pkg/dataplane/maps"
 )
 
 // ForwardLoader manages XDP-based forward proxy
 type ForwardLoader struct {
-	cfg   config.Config
+	cfg   config.ProxyConfig
 	objs  *wgebpf.WgForwardProxyObjects
 	links []link.Link
 }
@@ -28,7 +28,7 @@ func NewForwardLoader() (*ForwardLoader, error) {
 }
 
 // LoadAndAttach loads the forward proxy program and attaches it to interfaces
-func (fp *ForwardLoader) LoadAndAttach(ctx context.Context, cfg config.Config) error {
+func (fp *ForwardLoader) LoadAndAttach(ctx context.Context, cfg config.ProxyConfig) error {
 	fp.cfg = cfg
 
 	if err := fp.loadEBPF(); err != nil {
@@ -46,14 +46,14 @@ func (fp *ForwardLoader) LoadAndAttach(ctx context.Context, cfg config.Config) e
 
 	log.Info("Forward proxy loaded and attached",
 		"enabled", cfg.Enabled,
-		"method", cfg.Proxy.Method,
-		"target_server_ip", cfg.Proxy.Forward.TargetServerIP)
+		"method", cfg.Method,
+		"target_server_ip", cfg.Forward.TargetServerIP)
 
 	return nil
 }
 
 // configure configures the eBPF maps with the provided configuration
-func (fp *ForwardLoader) configure(cfg config.Config) error {
+func (fp *ForwardLoader) configure(cfg config.ProxyConfig) error {
 	if fp.objs == nil || fp.objs.ObfuscationConfigMap == nil {
 		return errors.New("eBPF objects not loaded")
 	}
@@ -109,7 +109,7 @@ func (fp *ForwardLoader) loadEBPF() error {
 
 // attachToInterfaces attaches the XDP program to configured interfaces
 func (fp *ForwardLoader) attachToInterfaces() error {
-	for _, interfaceName := range fp.cfg.Proxy.Interfaces {
+	for _, interfaceName := range fp.cfg.Interfaces {
 		if err := fp.attachToInterface(interfaceName); err != nil {
 			fp.cleanupLinks()
 			return errors.Wrapf(err, "failed to attach to interface %s", interfaceName)
@@ -127,7 +127,7 @@ func (fp *ForwardLoader) attachToInterface(interfaceName string) error {
 
 	var flags link.XDPAttachFlags
 	var mode string
-	switch fp.cfg.Proxy.DriverMode {
+	switch fp.cfg.DriverMode {
 	case "generic":
 		flags = link.XDPGenericMode
 		mode = "generic"
@@ -201,8 +201,8 @@ func (fp *ForwardLoader) Maps() *maps.Maps {
 	mapsCollection := maps.NewMaps()
 
 	if fp.objs != nil {
-		if fp.objs.StatsMap != nil {
-			mapsCollection.AddStatsMap("StatsMap", fp.objs.StatsMap)
+		if fp.objs.MetricsMap != nil {
+			mapsCollection.SetMetricsMap(fp.objs.MetricsMap)
 		}
 
 		if fp.objs.ConnectionMap != nil {

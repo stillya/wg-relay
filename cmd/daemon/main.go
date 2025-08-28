@@ -3,19 +3,22 @@ package main
 import (
 	"context"
 	"fmt"
+	log "log/slog"
+	"net/http"
 	"os"
 	"os/signal"
 	"syscall"
-	"time"
-
-	log "log/slog"
 
 	"github.com/jessevdk/go-flags"
 	"github.com/pkg/errors"
+	"github.com/prometheus/client_golang/prometheus"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
+	"github.com/stillya/wg-relay/pkg/dataplane/config"
 	"github.com/stillya/wg-relay/pkg/dataplane/proxy"
+	"github.com/stillya/wg-relay/pkg/metrics"
 
 	"github.com/stillya/wg-relay/pkg/dataplane"
-	"github.com/stillya/wg-relay/pkg/dataplane/config"
+	"github.com/stillya/wg-relay/pkg/maps/metricsmap"
 	"github.com/stillya/wg-relay/pkg/monitor"
 )
 
@@ -32,14 +35,6 @@ type Opts struct {
 	ConfigFile string `short:"c" long:"config" description:"Path to configuration file" default:"config.yaml"`
 	Debug      bool   `short:"d" long:"debug" description:"Enable debug logging"`
 	Version    bool   `short:"v" long:"version" description:"Show version information"`
-}
-
-type DaemonConfig struct {
-	Dataplane  config.Config `yaml:"dataplane"`
-	Monitoring struct {
-		Enabled  bool          `yaml:"enabled"`
-		Interval time.Duration `yaml:"interval"`
-	} `yaml:"monitoring"`
 }
 
 const version = "0.0.1"
@@ -89,13 +84,13 @@ func main() {
 	// Create and start dataplane manager
 	var loader dataplane.Loader
 
-	switch ProxyMode(cfg.Dataplane.Mode) {
+	switch ProxyMode(cfg.Proxy.Mode) {
 	case ModeForward:
 		loader, err = proxy.NewForwardLoader()
 	case ModeReverse:
 		loader, err = proxy.NewReverseLoader()
 	default:
-		log.Error("Unsupported proxy mode", "mode", cfg.Dataplane.Mode)
+		log.Error("Unsupported proxy mode", "mode", cfg.Proxy.Mode)
 	}
 
 	if err != nil {
@@ -104,7 +99,7 @@ func main() {
 	}
 
 	managerCfg := dataplane.ManagerConfig{
-		Cfg:    cfg.Dataplane,
+		Cfg:    cfg.Proxy,
 		Loader: loader,
 	}
 
@@ -120,19 +115,46 @@ func main() {
 	}
 	defer dataplaneManager.Stop()
 
-	// Start statistics monitoring
-	var statsMonitor *monitor.StatsMonitor
-	if cfg.Monitoring.Enabled {
-		statsMonitor = monitor.NewStatsMonitor(dataplaneManager, cfg.Monitoring.Interval)
-		go statsMonitor.Start(ctx)
-		defer statsMonitor.Stop()
+	var metricsSource *metricsmap.BPFMapSource
+	var bpfCollector *metrics.BpfCollector
+	var statsMonitor *monitor.StatMonitor
+
+	maps := dataplaneManager.Maps()
+	if maps != nil && maps.Metrics != nil {
+		metricsSource = metricsmap.NewBPFMapSource("wg-relay-metrics", maps.Metrics)
+
+		if cfg.Monitoring.Prometheus.Enabled {
+			bpfCollector = metrics.NewBpfCollector(metricsSource, cfg.Proxy.Mode)
+			prometheus.MustRegister(bpfCollector)
+
+			// Start Prometheus HTTP server
+			go func() {
+				mux := http.NewServeMux()
+				mux.Handle("/metrics", promhttp.Handler())
+
+				log.Info("Starting Prometheus metrics server", "listen", cfg.Monitoring.Prometheus.Listen)
+				if err := http.ListenAndServe(cfg.Monitoring.Prometheus.Listen, mux); err != nil {
+					log.Error("Prometheus metrics server failed", "error", err)
+				}
+			}()
+		}
+
+		if cfg.Monitoring.Statistics.Enabled {
+			statsMonitor = monitor.NewStatMonitor(monitor.StatMonitorParams{
+				Source:   metricsSource,
+				Interval: cfg.Monitoring.Statistics.Interval,
+			})
+			go statsMonitor.Start(ctx)
+			defer statsMonitor.Stop()
+		}
 	}
 
 	log.Info("Daemon started successfully",
-		"mode", cfg.Dataplane.Mode,
-		"interfaces", cfg.Dataplane.Proxy.Interfaces,
-		"listen", cfg.Dataplane.Daemon.Listen,
-		"monitoring", cfg.Monitoring.Enabled)
+		"mode", cfg.Proxy.Mode,
+		"interfaces", cfg.Proxy.Interfaces,
+		"listen", cfg.Daemon.Listen,
+		"statistics", cfg.Monitoring.Statistics.Enabled,
+		"prometheus", cfg.Monitoring.Prometheus.Enabled)
 
 	<-sigCh
 	log.Info("Received shutdown signal, stopping daemon...")
@@ -142,23 +164,11 @@ func main() {
 	log.Info("Daemon stopped")
 }
 
-func loadConfig(opts Opts) (*DaemonConfig, error) {
-	cfg := &DaemonConfig{
-		Dataplane: *config.NewConfig(),
-		Monitoring: struct {
-			Enabled  bool          `yaml:"enabled"`
-			Interval time.Duration `yaml:"interval"`
-		}{
-			Enabled:  true,
-			Interval: 30 * time.Second,
-		},
-	}
-
-	dataplaneConfig, err := config.Load(opts.ConfigFile)
+func loadConfig(opts Opts) (*config.Config, error) {
+	configData, err := config.Load(opts.ConfigFile)
 	if err != nil {
 		return nil, fmt.Errorf("failed to load config: %w", err)
 	}
-	cfg.Dataplane = *dataplaneConfig
 
-	return cfg, nil
+	return configData, nil
 }
