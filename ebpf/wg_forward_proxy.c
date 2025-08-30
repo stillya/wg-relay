@@ -9,11 +9,9 @@
 #include <bpf/bpf_helpers.h>
 #include <bpf/bpf_endian.h>
 #include "common.h"
-#include "types.h"
 #include "csum.h"
 #include "nat.h"
 #include "packet.h"
-#include "maps.h"
 #include "metrics.h"
 #include "obfuscation.h"
 
@@ -209,6 +207,12 @@ int wg_forward_proxy(struct xdp_md *ctx) {
     __u16 dst_port = bpf_ntohs(udp->dest);
     
     if (dst_port != WG_PORT && src_port != WG_PORT) {
+        DEBUG_PRINTK("Not a WireGuard packet, passing through (src_port=%d, dst_port=%d)", src_port, dst_port);
+        return XDP_PASS;
+    }
+
+    if (ip->frag_off & bpf_htons(IP_MF | IP_OFFSET)) {
+        DEBUG_PRINTK("Fragmented packet detected, passing through (src_port=%d, dst_port=%d)", src_port, dst_port);
         return XDP_PASS;
     }
 

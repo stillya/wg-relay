@@ -49,10 +49,11 @@ type WgForwardProxyNatKey struct {
 
 type WgForwardProxyObfuscationConfig struct {
 	_              structs.HostLayout
-	Enabled        uint32
-	Method         uint32
+	Enabled        bool
+	Method         uint8
 	Key            [32]uint8
-	KeyLen         uint32
+	KeyLen         uint8
+	_              [1]byte
 	TargetServerIp uint32
 }
 

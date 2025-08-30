@@ -8,13 +8,11 @@
 #include <linux/pkt_cls.h>
 #include <bpf/bpf_helpers.h>
 #include <bpf/bpf_endian.h>
-#include "include/common.h"
-#include "include/types.h"
-#include "include/csum.h"
-#include "include/packet.h"
-#include "include/maps.h"
-#include "include/metrics.h"
-#include "include/obfuscation.h"
+#include "common.h"
+#include "csum.h"
+#include "packet.h"
+#include "metrics.h"
+#include "obfuscation.h"
 
 SEC("tc")
 int wg_reverse_proxy(struct __sk_buff *skb) {
@@ -43,10 +41,14 @@ int wg_reverse_proxy(struct __sk_buff *skb) {
     __u16 dst_port = bpf_ntohs(udp->dest);
     
     if (dst_port != WG_PORT && src_port != WG_PORT) {
-        DEBUG_PRINTK("Not a WireGuard packet, passing through");
+        DEBUG_PRINTK("Not a WireGuard packet, passing through, src_port: %d, dst_port: %d", src_port, dst_port);
         return TC_ACT_OK;
     }
-    DEBUG_PRINTK("WireGuard packet detected: src_port=%u, dst_port=%u", src_port, dst_port);
+  
+    if (ip->frag_off & bpf_htons(IP_MF | IP_OFFSET)) {
+        DEBUG_PRINTK("Fragmented packet detected, passing through, src_port: %d, dst_port: %d", src_port, dst_port);
+        return TC_ACT_OK;
+    }
     
     __u32 config_key = 0;
     struct obfuscation_config *config = bpf_map_lookup_elem(&obfuscation_config_map, &config_key);
@@ -80,14 +82,14 @@ int wg_reverse_proxy(struct __sk_buff *skb) {
             update_metrics(METRIC_TO_WG, METRIC_DROP, skb->len);
             return TC_ACT_OK;
         }
-            
+     
         if (config->method != OBFUSCATE_NONE && config->key_len > 0) {
             apply_obfuscation((void *)(long)skb->data_end, &pkt, config);
         }
-        
+
         update_metrics(METRIC_TO_WG, METRIC_FORWARDED, skb->len);
     }
-    
+
     return TC_ACT_OK;
 }
 

@@ -24,8 +24,8 @@ struct packet_info {
     struct udphdr *udp;
     void *payload;
     __u32 payload_len;
-    __u16 src_port;
-    __u16 dst_port;
+    __u32 src_port;
+    __u32 dst_port;
     __u8 message_type;
 };
 

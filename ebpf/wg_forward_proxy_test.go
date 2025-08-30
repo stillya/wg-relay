@@ -254,16 +254,16 @@ func createObfuscationConfig(enabled bool, key, targetServerIP string) WgForward
 	}
 
 	if enabled {
-		cfg.Enabled = 1
+		cfg.Enabled = true
 	} else {
-		cfg.Enabled = 0
+		cfg.Enabled = false
 	}
 
 	keyBytes := []byte(key)
 	if len(keyBytes) > 32 {
 		keyBytes = keyBytes[:32]
 	}
-	cfg.KeyLen = uint32(len(keyBytes))
+	cfg.KeyLen = uint8(len(keyBytes))
 	copy(cfg.Key[:], keyBytes)
 
 	return cfg
@@ -363,7 +363,7 @@ func verifyObfuscation(t *testing.T, inputPacket, outputPacket []byte, cfg WgFor
 		return
 	}
 
-	if cfg.Method == 1 && cfg.Enabled == 1 { // XOR method enabled
+	if cfg.Method == 1 && cfg.Enabled == true { // XOR method enabled
 		key := cfg.Key[:cfg.KeyLen]
 		obfuscatedBytes := int(cfg.KeyLen)
 
