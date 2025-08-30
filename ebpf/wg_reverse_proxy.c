@@ -35,6 +35,11 @@ int wg_reverse_proxy(struct __sk_buff *skb) {
     if (ip->protocol != IPPROTO_UDP)
         return TC_ACT_OK;
     
+    if (ip->frag_off & bpf_htons(IP_MF | IP_OFFSET)) {
+        DEBUG_PRINTK("Fragmented packet detected, passing through");
+        return TC_ACT_OK;
+    }
+    
     struct udphdr *udp = (void *)ip + (ip->ihl << 2);
     if ((void *)(udp + 1) > data_end)
         return TC_ACT_OK;
@@ -46,7 +51,6 @@ int wg_reverse_proxy(struct __sk_buff *skb) {
         DEBUG_PRINTK("Not a WireGuard packet, passing through");
         return TC_ACT_OK;
     }
-    DEBUG_PRINTK("WireGuard packet detected: src_port=%u, dst_port=%u", src_port, dst_port);
     
     __u32 config_key = 0;
     struct obfuscation_config *config = bpf_map_lookup_elem(&obfuscation_config_map, &config_key);
@@ -80,14 +84,14 @@ int wg_reverse_proxy(struct __sk_buff *skb) {
             update_metrics(METRIC_TO_WG, METRIC_DROP, skb->len);
             return TC_ACT_OK;
         }
-            
+     
         if (config->method != OBFUSCATE_NONE && config->key_len > 0) {
             apply_obfuscation((void *)(long)skb->data_end, &pkt, config);
         }
-        
+
         update_metrics(METRIC_TO_WG, METRIC_FORWARDED, skb->len);
     }
-    
+
     return TC_ACT_OK;
 }
 
