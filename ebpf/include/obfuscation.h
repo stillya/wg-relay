@@ -33,6 +33,7 @@ static __always_inline int apply_obfuscation(void *data_end, struct packet_info 
     
     __u8 *payload = pkt->payload;
     if (payload + 16 > (__u8*)data_end)
+        DEBUG_PRINTK("Payload exceeds data_end\n");
         return -1;
     
     __u32 process_len = config->key_len < 16 ? config->key_len : 16;

@@ -232,6 +232,7 @@ int wg_forward_proxy(struct xdp_md *ctx) {
         if (parse_xdp_packet(ctx, &pkt) < 0) {
             DEBUG_PRINTK("Failed to parse FROM WG packet");
             update_metrics(METRIC_FROM_WG, METRIC_DROP, pkt_len);
+            
             return XDP_PASS;
         }
             
@@ -240,6 +241,7 @@ int wg_forward_proxy(struct xdp_md *ctx) {
             increment_stat(STAT_NAT_LOOKUPS_FAILED);
             DEBUG_PRINTK("Failed to restore NAT connection for FROM WG packet, passing through");
             update_metrics(METRIC_FROM_WG, METRIC_DROP, pkt_len);
+            
             return XDP_PASS;
         }
         increment_stat(STAT_NAT_LOOKUPS_SUCCESS);
@@ -259,6 +261,7 @@ int wg_forward_proxy(struct xdp_md *ctx) {
         if (parse_xdp_packet(ctx, &pkt) < 0) {
             DEBUG_PRINTK("Failed to parse TO WG packet");
             update_metrics(METRIC_TO_WG, METRIC_DROP, pkt_len);
+            
             return XDP_PASS;
         }
             
