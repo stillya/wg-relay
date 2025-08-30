@@ -35,11 +35,6 @@ int wg_reverse_proxy(struct __sk_buff *skb) {
     if (ip->protocol != IPPROTO_UDP)
         return TC_ACT_OK;
     
-    if (ip->frag_off & bpf_htons(IP_MF | IP_OFFSET)) {
-        DEBUG_PRINTK("Fragmented packet detected, passing through");
-        return TC_ACT_OK;
-    }
-    
     struct udphdr *udp = (void *)ip + (ip->ihl << 2);
     if ((void *)(udp + 1) > data_end)
         return TC_ACT_OK;
@@ -49,6 +44,11 @@ int wg_reverse_proxy(struct __sk_buff *skb) {
     
     if (dst_port != WG_PORT && src_port != WG_PORT) {
         DEBUG_PRINTK("Not a WireGuard packet, passing through");
+        return TC_ACT_OK;
+    }
+  
+    if (ip->frag_off & bpf_htons(IP_MF | IP_OFFSET)) {
+        DEBUG_PRINTK("Fragmented packet detected, passing through");
         return TC_ACT_OK;
     }
     

@@ -201,11 +201,6 @@ int wg_forward_proxy(struct xdp_md *ctx) {
     if (ip->protocol != IPPROTO_UDP)
         return XDP_PASS;
     
-    if (ip->frag_off & bpf_htons(IP_MF | IP_OFFSET)) {
-        DEBUG_PRINTK("Fragmented packet detected, passing through");
-        return XDP_PASS;
-    }
-    
     struct udphdr *udp = (void *)ip + (ip->ihl << 2);
     if ((void *)(udp + 1) > data_end)
         return XDP_PASS;
@@ -215,6 +210,11 @@ int wg_forward_proxy(struct xdp_md *ctx) {
     
     if (dst_port != WG_PORT && src_port != WG_PORT) {
         DEBUG_PRINTK("Not a WireGuard packet, passing through");
+        return XDP_PASS;
+    }
+
+    if (ip->frag_off & bpf_htons(IP_MF | IP_OFFSET)) {
+        DEBUG_PRINTK("Fragmented packet detected, passing through");
         return XDP_PASS;
     }
 
