@@ -119,6 +119,10 @@ static __always_inline int parse_tc_packet(struct __sk_buff *skb, struct packet_
     return 0;
 }
 
+static __always_inline bool ip_is_fragment(struct iphdr *iph) {
+	return (iph->frag_off & bpf_htons(IP_MF | IP_OFFSET)) != 0;
+}
+
 static __always_inline int is_wireguard_packet(struct packet_info *pkt) {
     return (pkt->dst_port == WG_PORT || pkt->src_port == WG_PORT);
 }

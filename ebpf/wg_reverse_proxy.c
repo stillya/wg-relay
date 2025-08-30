@@ -26,7 +26,6 @@ int wg_reverse_proxy(struct __sk_buff *skb) {
     }
     
     if (eth->h_proto != bpf_htons(ETH_P_IP)) {
-        DEBUG_PRINTK("Not an IP packet, passing through");
         return TC_ACT_OK;
     }
     
@@ -35,9 +34,13 @@ int wg_reverse_proxy(struct __sk_buff *skb) {
         DEBUG_PRINTK("Packet too short for IP header, passing through");
         return TC_ACT_OK;
     }
+
+    if (ip_is_fragment(ip)) {
+        DEBUG_PRINTK("Fragmented packet detected, passing through");
+        return TC_ACT_OK;
+    }
     
     if (ip->protocol != IPPROTO_UDP) {
-        DEBUG_PRINTK("Not a UDP packet, passing through");
         return TC_ACT_OK;
     }
     
@@ -52,11 +55,6 @@ int wg_reverse_proxy(struct __sk_buff *skb) {
     
     if (dst_port != WG_PORT && src_port != WG_PORT) {
         DEBUG_PRINTK("Not a WireGuard packet, passing through, src_port: %d, dst_port: %d", src_port, dst_port);
-        return TC_ACT_OK;
-    }
-  
-    if (ip->frag_off & bpf_htons(IP_MF | IP_OFFSET)) {
-        DEBUG_PRINTK("Fragmented packet detected, passing through, src_port: %d, dst_port: %d", src_port, dst_port);
         return TC_ACT_OK;
     }
     
