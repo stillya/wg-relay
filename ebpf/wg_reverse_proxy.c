@@ -20,22 +20,32 @@ int wg_reverse_proxy(struct __sk_buff *skb) {
     void *data_end = (void *)(long)skb->data_end;
 
     struct ethhdr *eth = data;
-    if ((void *)(eth + 1) > data_end)
+    if ((void *)(eth + 1) > data_end) {
+        DEBUG_PRINTK("Packet too short for Ethernet header, passing through");
         return TC_ACT_OK;
+    }
     
-    if (eth->h_proto != bpf_htons(ETH_P_IP))
+    if (eth->h_proto != bpf_htons(ETH_P_IP)) {
+        DEBUG_PRINTK("Not an IP packet, passing through");
         return TC_ACT_OK;
+    }
     
     struct iphdr *ip = (void *)(eth + 1);
-    if ((void *)(ip + 1) > data_end)
+    if ((void *)(ip + 1) > data_end) {
+        DEBUG_PRINTK("Packet too short for IP header, passing through");
         return TC_ACT_OK;
+    }
     
-    if (ip->protocol != IPPROTO_UDP)
+    if (ip->protocol != IPPROTO_UDP) {
+        DEBUG_PRINTK("Not a UDP packet, passing through");
         return TC_ACT_OK;
+    }
     
     struct udphdr *udp = (void *)ip + (ip->ihl << 2);
-    if ((void *)(udp + 1) > data_end)
+    if ((void *)(udp + 1) > data_end) {
+        DEBUG_PRINTK("Packet too short for UDP header, passing through");
         return TC_ACT_OK;
+    }
     
     __u16 src_port = bpf_ntohs(udp->source);
     __u16 dst_port = bpf_ntohs(udp->dest);
