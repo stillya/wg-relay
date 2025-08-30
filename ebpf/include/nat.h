@@ -4,7 +4,6 @@
 #include <linux/types.h>
 #include <linux/if_ether.h>
 #include <bpf/bpf_helpers.h>
-#include "types.h"
 
 #ifndef memcpy
 #define memcpy(dest, src, n) __builtin_memcpy((dest), (src), (n))

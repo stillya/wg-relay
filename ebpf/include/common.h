@@ -5,6 +5,13 @@
 #define EEXIST 17  // File exists error code, used for BPF map updates
 #endif
 
+#define bool _Bool
+
+enum {
+	false	= 0,
+	true	= 1,
+};
+
 #ifndef likely
 # define likely(X)		__builtin_expect(!!(X), 1)
 #endif

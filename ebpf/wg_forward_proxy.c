@@ -9,11 +9,9 @@
 #include <bpf/bpf_helpers.h>
 #include <bpf/bpf_endian.h>
 #include "common.h"
-#include "types.h"
 #include "csum.h"
 #include "nat.h"
 #include "packet.h"
-#include "maps.h"
 #include "metrics.h"
 #include "obfuscation.h"
 

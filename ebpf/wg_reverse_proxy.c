@@ -8,13 +8,11 @@
 #include <linux/pkt_cls.h>
 #include <bpf/bpf_helpers.h>
 #include <bpf/bpf_endian.h>
-#include "include/common.h"
-#include "include/types.h"
-#include "include/csum.h"
-#include "include/packet.h"
-#include "include/maps.h"
-#include "include/metrics.h"
-#include "include/obfuscation.h"
+#include "common.h"
+#include "csum.h"
+#include "packet.h"
+#include "metrics.h"
+#include "obfuscation.h"
 
 SEC("tc")
 int wg_reverse_proxy(struct __sk_buff *skb) {
