@@ -43,12 +43,12 @@ int wg_reverse_proxy(struct __sk_buff *skb) {
     __u16 dst_port = bpf_ntohs(udp->dest);
     
     if (dst_port != WG_PORT && src_port != WG_PORT) {
-        DEBUG_PRINTK("Not a WireGuard packet, passing through");
+        DEBUG_PRINTK("Not a WireGuard packet, passing through, src_port: %d, dst_port: %d", src_port, dst_port);
         return TC_ACT_OK;
     }
   
     if (ip->frag_off & bpf_htons(IP_MF | IP_OFFSET)) {
-        DEBUG_PRINTK("Fragmented packet detected, passing through");
+        DEBUG_PRINTK("Fragmented packet detected, passing through, src_port: %d, dst_port: %d", src_port, dst_port);
         return TC_ACT_OK;
     }
     
