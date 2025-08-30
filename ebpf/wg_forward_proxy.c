@@ -214,6 +214,7 @@ int wg_forward_proxy(struct xdp_md *ctx) {
     __u16 dst_port = bpf_ntohs(udp->dest);
     
     if (dst_port != WG_PORT && src_port != WG_PORT) {
+        DEBUG_PRINTK("Not a WireGuard packet, passing through");
         return XDP_PASS;
     }
 
