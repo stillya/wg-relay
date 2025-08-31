@@ -26,13 +26,13 @@ struct {
     __type(value, struct obfuscation_config);
 } obfuscation_config_map SEC(".maps");
 
-static __always_inline int apply_obfuscation(void *data_end, struct packet_info *pkt, struct obfuscation_config *config) {
+static __always_inline int apply_obfuscation(struct packet_info *pkt, struct obfuscation_config *config) {
     if (!config || config->method == OBFUSCATE_NONE || config->key_len == 0) {
         return 0;
     }
     
     __u8 *payload = pkt->payload;
-    if (payload + 16 > (__u8*)data_end) {
+    if (payload + 16 > (__u8*)pkt->payload_end) {
         DEBUG_PRINTK("Payload exceeds data_end\n");
         return -1;
     }

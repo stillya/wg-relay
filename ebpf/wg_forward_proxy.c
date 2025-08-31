@@ -169,7 +169,9 @@ static __always_inline int forward_packet(struct xdp_md *ctx, struct packet_info
         memcpy(pkt->eth->h_dest, params.dmac, ETH_ALEN);
     }
     
+    // disable fragmentation for now 
     pkt->ip->frag_off |= bpf_htons(IP_DF);
+
     pkt->ip->check = iph_csum(pkt->ip);
     pkt->udp->check = 0;
 
@@ -182,40 +184,14 @@ static __always_inline int forward_packet(struct xdp_md *ctx, struct packet_info
 
 SEC("xdp")
 int wg_forward_proxy(struct xdp_md *ctx) {
-    void *data = (void *)(long)ctx->data;
-    void *data_end = (void *)(long)ctx->data_end;
-
-    struct ethhdr *eth = data;
-    if ((void *)(eth + 1) > data_end)
+    struct packet_info pkt = {};
+    if (parse_xdp_packet(ctx, &pkt) < 0)
         return XDP_PASS;
     
-    if (eth->h_proto != bpf_htons(ETH_P_IP)) {
+    __u16 src_port = bpf_ntohs(pkt.udp->source);
+    __u16 dst_port = bpf_ntohs(pkt.udp->dest);
+    if (dst_port != WG_PORT && src_port != WG_PORT)
         return XDP_PASS;
-    }
-
-    struct iphdr *ip = (void *)(eth + 1);
-    if ((void *)(ip + 1) > data_end)
-        return XDP_PASS;
-  
-    if (ip_is_fragment(ip)) {
-        DEBUG_PRINTK("Fragmented packet detected, passing through");
-        return XDP_PASS;
-    }
-    
-    if (ip->protocol != IPPROTO_UDP)
-        return XDP_PASS;
-    
-    struct udphdr *udp = (void *)ip + (ip->ihl << 2);
-    if ((void *)(udp + 1) > data_end)
-        return XDP_PASS;
-    
-    __u16 src_port = bpf_ntohs(udp->source);
-    __u16 dst_port = bpf_ntohs(udp->dest);
-    
-    if (dst_port != WG_PORT && src_port != WG_PORT) {
-        DEBUG_PRINTK("Not a WireGuard packet, passing through (src_port=%d, dst_port=%d)", src_port, dst_port);
-        return XDP_PASS;
-    }
 
     __u32 config_key = 0;
     struct obfuscation_config *config = bpf_map_lookup_elem(&obfuscation_config_map, &config_key);
@@ -227,16 +203,9 @@ int wg_forward_proxy(struct xdp_md *ctx) {
     __u8 is_to_wg = (dst_port == WG_PORT) ? 1 : 0;
     __u8 is_from_wg = (src_port == WG_PORT) ? 1 : 0;
     
+     __u32 pkt_len = (void *)(long)ctx->data_end - (void *)(long)ctx->data;
+    
     if (likely(is_from_wg)) {
-        __u32 pkt_len = (void *)(long)ctx->data_end - (void *)(long)ctx->data;
-        struct packet_info pkt = {};
-        if (parse_xdp_packet(ctx, &pkt) < 0) {
-            DEBUG_PRINTK("Failed to parse FROM WG packet");
-            update_metrics(METRIC_FROM_WG, METRIC_DROP, pkt_len);
-            
-            return XDP_PASS;
-        }
-            
         struct connection_key original_conn = {0};
         if (restore_nat_connection(&pkt, &original_conn) < 0) {
             increment_stat(STAT_NAT_LOOKUPS_FAILED);
@@ -247,7 +216,7 @@ int wg_forward_proxy(struct xdp_md *ctx) {
         }
         increment_stat(STAT_NAT_LOOKUPS_SUCCESS);
         
-        apply_obfuscation((void *)(long)ctx->data_end, &pkt, config);
+        apply_obfuscation(&pkt, config);
         
         __u32 proxy_ip = bpf_ntohl(pkt.ip->daddr); 
         __u32 client_ip = bpf_ntohl(original_conn.client_ip);
@@ -257,15 +226,6 @@ int wg_forward_proxy(struct xdp_md *ctx) {
     }
     
     if (unlikely(is_to_wg)) {
-        __u32 pkt_len = (void *)(long)ctx->data_end - (void *)(long)ctx->data;
-        struct packet_info pkt = {};
-        if (parse_xdp_packet(ctx, &pkt) < 0) {
-            DEBUG_PRINTK("Failed to parse TO WG packet");
-            update_metrics(METRIC_TO_WG, METRIC_DROP, pkt_len);
-            
-            return XDP_PASS;
-        }
-            
         if (create_nat_connection(&pkt, config) < 0) {
             DEBUG_PRINTK("Failed to create NAT connection for TO WG packet");
             update_metrics(METRIC_TO_WG, METRIC_DROP, pkt_len);
@@ -273,9 +233,9 @@ int wg_forward_proxy(struct xdp_md *ctx) {
         }
         
         struct connection_key conn_key = {
-            .client_ip = ip->saddr,
+            .client_ip = pkt.ip->saddr,
             .client_port = src_port,
-            .server_ip = ip->daddr,
+            .server_ip = pkt.ip->daddr,
             .server_port = dst_port
         };
         
@@ -288,11 +248,11 @@ int wg_forward_proxy(struct xdp_md *ctx) {
             return XDP_PASS;
         }
         
-        apply_obfuscation((void *)(long)ctx->data_end, &pkt, config);
+        apply_obfuscation(&pkt, config);
         
         __u32 proxy_ip = bpf_ntohl(pkt.ip->daddr);
         __u32 server_ip = config->target_server_ip;
-        
+
         update_metrics(METRIC_TO_WG, METRIC_FORWARDED, pkt_len);
         return forward_packet(ctx, &pkt, proxy_ip, conn_value->nat_port, server_ip, WG_PORT);
     }
