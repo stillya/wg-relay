@@ -57,13 +57,13 @@ func (rp *ReverseLoader) configure(cfg config.ProxyConfig) error {
 
 	keyBytes := cfg.GetKeyBytes()
 	ebpfConfig := wgebpf.WgReverseProxyObfuscationConfig{
-		Enabled: 1,
-		Method:  uint32(cfg.GetMethod()),
-		KeyLen:  uint32(len(keyBytes)),
+		Enabled: true,
+		Method:  uint8(cfg.GetMethod()),
+		KeyLen:  uint8(len(keyBytes)),
 	}
 
 	if !cfg.Enabled {
-		ebpfConfig.Enabled = 0
+		ebpfConfig.Enabled = false
 	}
 
 	if len(keyBytes) > len(ebpfConfig.Key) {

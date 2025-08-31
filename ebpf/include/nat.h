@@ -4,7 +4,6 @@
 #include <linux/types.h>
 #include <linux/if_ether.h>
 #include <bpf/bpf_helpers.h>
-#include "types.h"
 
 #ifndef memcpy
 #define memcpy(dest, src, n) __builtin_memcpy((dest), (src), (n))
@@ -25,6 +24,7 @@ struct connection_key {
 struct connection_value {
     __u64 timestamp;
     __u16 nat_port;
+    __u16 pad; // Padding for alignment
 };
 
 // Reverse lookup key for return traffic
@@ -32,6 +32,31 @@ struct nat_key {
     __u32 server_ip;
     __u32 nat_port;
 };
+
+// Counter for generating unique NAT ports
+struct {
+    __uint(type, BPF_MAP_TYPE_ARRAY);
+    __uint(max_entries, 1);
+    __type(key, __u32);
+    __type(value, __u32);
+} nat_port_counter SEC(".maps");
+
+static __always_inline __u16 generate_nat_port() {
+    __u32 counter_key = 0;
+    __u32 *counter = bpf_map_lookup_elem(&nat_port_counter, &counter_key);
+    
+    __u32 port = NAT_PORT_START;
+    if (counter) {
+        __sync_fetch_and_add(counter, 1);
+        port = NAT_PORT_START + (*counter % NAT_PORT_RANGE);
+    } else {
+        __u32 initial = 1;
+        bpf_map_update_elem(&nat_port_counter, &counter_key, &initial, BPF_NOEXIST);
+        port = NAT_PORT_START;
+    }
+    
+    return (__u16)port;
+}
 
 static __always_inline void swap_eth(struct ethhdr* eth) {
     __u8 tmp[ETH_ALEN];

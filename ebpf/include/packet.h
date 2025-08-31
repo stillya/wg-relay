@@ -23,11 +23,17 @@ struct packet_info {
     struct iphdr *ip;
     struct udphdr *udp;
     void *payload;
+    void *payload_end;
     __u32 payload_len;
     __u16 src_port;
     __u16 dst_port;
     __u8 message_type;
 };
+
+// Check if the IP packet is a fragment
+static __always_inline bool ip_is_fragment(struct iphdr *iph) {
+	return (iph->frag_off & bpf_htons(IP_MF | IP_OFFSET)) != 0;
+}
 
 // Parse XDP packet
 static __always_inline int parse_xdp_packet(struct xdp_md *ctx, struct packet_info *pkt) {
@@ -51,6 +57,9 @@ static __always_inline int parse_xdp_packet(struct xdp_md *ctx, struct packet_in
     pkt->udp = (void *)pkt->ip + (pkt->ip->ihl * 4);
     if ((void *)(pkt->udp + 1) > data_end)
         return -1;
+        
+    if (ip_is_fragment(pkt->ip))
+        return -1;
     
     pkt->src_port = bpf_ntohs(pkt->udp->source);
     pkt->dst_port = bpf_ntohs(pkt->udp->dest);
@@ -59,6 +68,7 @@ static __always_inline int parse_xdp_packet(struct xdp_md *ctx, struct packet_in
     if (pkt->payload > data_end)
         return -1;
     
+    pkt->payload_end = data_end;
     pkt->payload_len = data_end - pkt->payload;
     if (pkt->payload_len > MAX_PAYLOAD_SIZE)
         pkt->payload_len = MAX_PAYLOAD_SIZE;
@@ -76,8 +86,11 @@ static __always_inline int parse_xdp_packet(struct xdp_md *ctx, struct packet_in
 
 // Parse TC packet
 static __always_inline int parse_tc_packet(struct __sk_buff *skb, struct packet_info *pkt) {
+    if (bpf_skb_pull_data(skb, skb->len) < 0)
+        return -1;
+
     void *data = (void *)(long)skb->data;
-    void *data_end = (void *)(long)skb->data_end;    
+    void *data_end = (void *)(long)skb->data_end;
     
     pkt->eth = data;
     if ((void *)(pkt->eth + 1) > data_end)
@@ -88,6 +101,9 @@ static __always_inline int parse_tc_packet(struct __sk_buff *skb, struct packet_
     
     pkt->ip = (void *)(pkt->eth + 1);
     if ((void *)(pkt->ip + 1) > data_end)
+        return -1;
+
+    if (ip_is_fragment(pkt->ip))
         return -1;
     
     if (pkt->ip->protocol != IPPROTO_UDP)
@@ -104,6 +120,7 @@ static __always_inline int parse_tc_packet(struct __sk_buff *skb, struct packet_
     if (pkt->payload > data_end)
         return -1;
     
+    pkt->payload_end = data_end;
     pkt->payload_len = data_end - pkt->payload;
     if (pkt->payload_len > MAX_PAYLOAD_SIZE)
         pkt->payload_len = MAX_PAYLOAD_SIZE;
@@ -117,10 +134,6 @@ static __always_inline int parse_tc_packet(struct __sk_buff *skb, struct packet_
     }
     
     return 0;
-}
-
-static __always_inline int is_wireguard_packet(struct packet_info *pkt) {
-    return (pkt->dst_port == WG_PORT || pkt->src_port == WG_PORT);
 }
 
 #endif // __PACKET_H__

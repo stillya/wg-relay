@@ -25,7 +25,8 @@ type WgForwardProxyConnectionValue struct {
 	_         structs.HostLayout
 	Timestamp uint64
 	NatPort   uint16
-	_         [6]byte
+	Pad       uint16
+	_         [4]byte
 }
 
 type WgForwardProxyMetricsKey struct {
@@ -49,10 +50,11 @@ type WgForwardProxyNatKey struct {
 
 type WgForwardProxyObfuscationConfig struct {
 	_              structs.HostLayout
-	Enabled        uint32
-	Method         uint32
+	Enabled        bool
+	Method         uint8
 	Key            [32]uint8
-	KeyLen         uint32
+	KeyLen         uint8
+	_              [1]byte
 	TargetServerIp uint32
 }
 

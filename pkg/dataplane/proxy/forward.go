@@ -65,14 +65,14 @@ func (fp *ForwardLoader) configure(cfg config.ProxyConfig) error {
 
 	keyBytes := cfg.GetKeyBytes()
 	epbfConfig := wgebpf.WgForwardProxyObfuscationConfig{
-		Enabled:        1,
-		Method:         uint32(cfg.GetMethod()),
-		KeyLen:         uint32(len(keyBytes)),
+		Enabled:        true,
+		Method:         uint8(cfg.GetMethod()),
+		KeyLen:         uint8(len(keyBytes)),
 		TargetServerIp: targetServerIP,
 	}
 
 	if !cfg.Enabled {
-		epbfConfig.Enabled = 0
+		epbfConfig.Enabled = false
 	}
 
 	if len(keyBytes) > len(epbfConfig.Key) {
