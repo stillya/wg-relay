@@ -29,6 +29,27 @@ struct packet_info {
     __u8 message_type;
 };
 
+
+static __always_inline void *ctx_data(struct __sk_buff *ctx) {
+    void *data;
+
+    asm("%[res] = *(u32 *)(%[base] + %[offset])"
+        : [res] "=r"(data)
+        : [base] "r"(ctx), [offset] "i"(offsetof(struct __sk_buff, data)), "m"(*ctx));
+
+    return data;
+}
+
+static __always_inline void *ctx_data_end(struct __sk_buff *ctx) {
+    void *data_end;
+
+    asm("%[res] = *(u32 *)(%[base] + %[offset])"
+        : [res] "=r"(data_end)
+        : [base] "r"(ctx), [offset] "i"(offsetof(struct __sk_buff, data_end)), "m"(*ctx));
+
+    return data_end;
+}
+
 // Parse XDP packet
 static __always_inline int parse_xdp_packet(struct xdp_md *ctx, struct packet_info *pkt) {
     void *data = (void *)(long)ctx->data;
@@ -76,8 +97,8 @@ static __always_inline int parse_xdp_packet(struct xdp_md *ctx, struct packet_in
 
 // Parse TC packet
 static __always_inline int parse_tc_packet(struct __sk_buff *skb, struct packet_info *pkt) {
-    void *data = (void *)(long)skb->data;
-    void *data_end = (void *)(long)skb->data_end;    
+    void *data = (void *)(long)ctx_data(skb);
+    void *data_end = (void *)(long)ctx_data_end(skb);
     
     pkt->eth = data;
     if ((void *)(pkt->eth + 1) > data_end)

@@ -22,8 +22,8 @@ int wg_reverse_proxy(struct __sk_buff *skb) {
         return TC_ACT_OK;
     }
 
-    void *data = (void *)(long)skb->data;
-    void *data_end = (void *)(long)skb->data_end;
+    void *data = (void *)(long)ctx_data(skb);
+    void *data_end = (void *)(long)ctx_data_end(skb);
 
     struct ethhdr *eth = data;
     if ((void *)(eth + 1) > data_end) {
