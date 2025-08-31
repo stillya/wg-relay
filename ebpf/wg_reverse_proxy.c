@@ -16,6 +16,12 @@
 
 SEC("tc")
 int wg_reverse_proxy(struct __sk_buff *skb) {
+    // Ensure we have at least Ethernet + IP + UDP headers available (42 bytes)
+    if (bpf_skb_pull_data(skb, 42) < 0) {
+        DEBUG_PRINTK("Failed to pull packet data, passing through");
+        return TC_ACT_OK;
+    }
+
     void *data = (void *)(long)skb->data;
     void *data_end = (void *)(long)skb->data_end;
 
@@ -31,7 +37,13 @@ int wg_reverse_proxy(struct __sk_buff *skb) {
     
     struct iphdr *ip = (void *)(eth + 1);
     if ((void *)(ip + 1) > data_end) {
-        DEBUG_PRINTK("Packet too short for IP header, passing through");
+        __u32 available_bytes = (__u32)((void *)data_end - (void *)ip);
+        __u32 packet_len = skb->len;
+        __u32 eth_proto = bpf_ntohs(eth->h_proto);
+        __u32 data_len = (__u32)((void *)data_end - (void *)data);
+        __u32 eth_len = (__u32)((void *)ip - (void *)data);
+        DEBUG_PRINTK("Packet too short for IP header: available=%d bytes, needed=20 bytes, total_len=%d, eth_proto=0x%x, data_len=%d, eth_len=%d", 
+                    available_bytes, packet_len, eth_proto, data_len, eth_len);
         return TC_ACT_OK;
     }
 
