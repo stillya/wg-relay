@@ -31,31 +31,6 @@ struct {
     __type(value, struct connection_key);
 } nat_reverse_map SEC(".maps");
 
-// Counter for generating unique NAT ports
-struct {
-    __uint(type, BPF_MAP_TYPE_ARRAY);
-    __uint(max_entries, 1);
-    __type(key, __u32);
-    __type(value, __u32);
-} nat_port_counter SEC(".maps");
-
-static __always_inline __u16 generate_nat_port() {
-    __u32 counter_key = 0;
-    __u32 *counter = bpf_map_lookup_elem(&nat_port_counter, &counter_key);
-    
-    __u32 port = NAT_PORT_START;
-    if (counter) {
-        __sync_fetch_and_add(counter, 1);
-        port = NAT_PORT_START + (*counter % NAT_PORT_RANGE);
-    } else {
-        __u32 initial = 1;
-        bpf_map_update_elem(&nat_port_counter, &counter_key, &initial, BPF_NOEXIST);
-        port = NAT_PORT_START;
-    }
-    
-    return (__u16)port;
-}
-
 // Create NAT connection for outgoing packets (client -> server)
 static __always_inline int create_nat_connection(struct packet_info *pkt, struct obfuscation_config *config) {
     struct connection_key conn_key = {
