@@ -144,7 +144,7 @@ static __always_inline int forward_packet(struct xdp_md *ctx, struct packet_info
         memcpy(pkt->eth->h_dest, params.dmac, ETH_ALEN);
     }
     
-    // disable fragmentation for now 
+    // Disable fragmentation for now 
     pkt->ip->frag_off |= bpf_htons(IP_DF);
 
     pkt->ip->check = iph_csum(pkt->ip);
