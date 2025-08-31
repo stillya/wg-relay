@@ -30,32 +30,9 @@ struct packet_info {
     __u8 message_type;
 };
 
-static __always_inline void *ctx_data(struct __sk_buff *ctx) {
-    void *data;
-
-    asm("%[res] = *(u32 *)(%[base] + %[offset])"
-        : [res] "=r"(data)
-        : [base] "r"(ctx), [offset] "i"(offsetof(struct __sk_buff, data)), "m"(*ctx));
-
-    return data;
-}
-
-static __always_inline void *ctx_data_end(struct __sk_buff *ctx) {
-    void *data_end;
-
-    asm("%[res] = *(u32 *)(%[base] + %[offset])"
-        : [res] "=r"(data_end)
-        : [base] "r"(ctx), [offset] "i"(offsetof(struct __sk_buff, data_end)), "m"(*ctx));
-
-    return data_end;
-}
-
+// Check if the IP packet is a fragment
 static __always_inline bool ip_is_fragment(struct iphdr *iph) {
 	return (iph->frag_off & bpf_htons(IP_MF | IP_OFFSET)) != 0;
-}
-
-static __always_inline int is_wireguard_packet(struct packet_info *pkt) {
-    return (pkt->dst_port == WG_PORT || pkt->src_port == WG_PORT);
 }
 
 // Parse XDP packet
@@ -112,8 +89,8 @@ static __always_inline int parse_tc_packet(struct __sk_buff *skb, struct packet_
     if (bpf_skb_pull_data(skb, skb->len) < 0)
         return -1;
 
-    void *data = (void *)(long)ctx_data(skb);
-    void *data_end = (void *)(long)ctx_data_end(skb);
+    void *data = (void *)(long)skb->data;
+    void *data_end = (void *)(long)skb->data_end;
     
     pkt->eth = data;
     if ((void *)(pkt->eth + 1) > data_end)
