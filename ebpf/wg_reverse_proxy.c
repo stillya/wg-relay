@@ -89,7 +89,7 @@ int wg_reverse_proxy(struct __sk_buff *skb) {
         }
             
         if (config->method != OBFUSCATE_NONE && config->key_len > 0) {
-            apply_obfuscation((void *)(long)skb->data_end, &pkt, config);
+            apply_obfuscation(data_end, &pkt, config);
         }
         
         update_metrics(METRIC_FROM_WG, METRIC_FORWARDED, skb->len);
