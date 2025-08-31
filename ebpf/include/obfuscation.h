@@ -39,7 +39,7 @@ static __always_inline int apply_obfuscation(struct packet_info *pkt, struct obf
     
     // Apply XOR operation using key from config map (same for obfuscate/deobfuscate)
     #pragma clang loop unroll(full)
-    for (int i = 0; i < process_len; i++) {
+    for (int i = 0; i < 16; i++) {
         payload[i] ^= config->key[i];
     }
     
