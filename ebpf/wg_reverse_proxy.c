@@ -17,7 +17,7 @@
 SEC("tc")
 int wg_reverse_proxy(struct __sk_buff *skb) {
     // Ensure we have at least Ethernet + IP + UDP headers available (42 bytes)
-    if (bpf_skb_pull_data(skb, 42) < 0) {
+    if (bpf_skb_pull_data(skb, skb->len) < 0) {
         DEBUG_PRINTK("Failed to pull packet data, passing through");
         return TC_ACT_OK;
     }
