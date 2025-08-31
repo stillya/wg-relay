@@ -121,7 +121,7 @@ static __always_inline int parse_tc_packet(struct __sk_buff *skb, struct packet_
         return -1;
     
     pkt->payload_end = data_end;
-    pkt->payload_len = data_end - data;
+    pkt->payload_len = data_end - pkt->payload;
     if (pkt->payload_len > MAX_PAYLOAD_SIZE)
         pkt->payload_len = MAX_PAYLOAD_SIZE;
     
