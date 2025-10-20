@@ -32,9 +32,9 @@ Client                 Obfuscator Proxy           WireGuard Server
 
 ## Requirements
 
-- Linux kernel 5.4+ with eBPF support
+- Linux kernel 6.6+ with eBPF support
 - Root privileges for eBPF operations
-- Go 1.21+
+- Go 1.23+
 - WireGuard tools
 
 ## Quick Start
@@ -60,20 +60,20 @@ make test-ebpf
 Create a `config.yaml` file:
 
 ```yaml
-mode: "forward"                  # "forward" or "reverse"
-enabled: true                    # Enable/disable obfuscation
+mode: "forward"                           # "forward" or "reverse"
+enabled: true                             # Enable/disable obfuscation
 
 daemon:
-  listen: ":8080"                # Daemon bind address
+  listen: ":8080"                         # Daemon bind address
 
 proxy:
-  method: "xor"                           # Obfuscation method(Currently only "xor" is supported)
+  method: "xor"                           # Obfuscation method (Currently only "xor" is supported)
   key: "my_secret_key_32_bytes_long_123"  # Obfuscation key
-  driver_mode: "driver"                    # use generic if you at containerized environment
+  driver_mode: "driver"                   # use generic if you at containerized environment
   interfaces:
-    - "eth0"                # Main interface to intercept
+  - "eth0"                                # Main interface to intercept
   forward:
-    target_server_ip: "192.168.200.2" # Target WireGuard server IP
+    target_server_ip: "192.168.200.2"     # Target WireGuard server IP
 ```
 
 ### 3. Run
@@ -159,7 +159,7 @@ Labels:
 ### Devcontainer Setup
 
 For development, you can use the provided devcontainer setup in `.devcontainer` directory. This allows you to work in a
-consistent environment with all dependencies pre-installed. Specially in non-linux environments.
+consistent environment with all dependencies pre-installed. Especially in non-linux environments.
 
 ```bash
 
