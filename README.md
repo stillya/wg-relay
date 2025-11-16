@@ -145,8 +145,8 @@ monitoring:
 
 Available metrics:
 
-- `wg_relay_packets{mode, direction, reason}` - Total packets processed
-- `wg_relay_bytes{mode, direction, reason}` - Total bytes processed
+- `wg_relay_packets_total{mode, direction, reason}` - Total packets processed
+- `wg_relay_bytes_total{mode, direction, reason}` - Total bytes processed
 
 Labels:
 
@@ -162,9 +162,8 @@ For development, you can use the provided devcontainer setup in `.devcontainer` 
 consistent environment with all dependencies pre-installed. Especially in non-linux environments.
 
 ```bash
-
 ### Testing with Network Namespaces
-```bash
+
 # Create test namespaces
 sudo bash setup-netns.sh
 

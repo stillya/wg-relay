@@ -17,15 +17,11 @@ type Maps struct {
 }
 
 // NewMaps creates a new Maps collection
-func NewMaps() *Maps {
+func NewMaps(metricsMap *ebpf.Map) *Maps {
 	return &Maps{
-		Other: make([]MapInfo, 0),
+		Metrics: metricsMap,
+		Other:   make([]MapInfo, 0),
 	}
-}
-
-// SetMetricsMap sets the main metrics map
-func (m *Maps) SetMetricsMap(metricsMap *ebpf.Map) {
-	m.Metrics = metricsMap
 }
 
 // AddOtherMap adds other types of maps

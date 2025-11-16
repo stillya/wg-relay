@@ -26,14 +26,14 @@ func NewBpfCollector(source MetricCollectorSource, mode string) *BpfCollector {
 		source: source,
 		mode:   mode,
 		packetsDesc: prometheus.NewDesc(
-			"wg_relay_packets",
-			"Current total number of WireGuard packets processed",
+			"wg_relay_packets_total",
+			"Total number of WireGuard packets processed",
 			[]string{"mode", "direction", "reason"},
 			nil,
 		),
 		bytesDesc: prometheus.NewDesc(
-			"wg_relay_bytes",
-			"Current total bytes of WireGuard packets processed",
+			"wg_relay_bytes_total",
+			"Total bytes of WireGuard packets processed",
 			[]string{"mode", "direction", "reason"},
 			nil,
 		),

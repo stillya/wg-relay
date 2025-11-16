@@ -2,7 +2,6 @@ package metricsmap
 
 import (
 	"context"
-	"fmt"
 
 	"github.com/cilium/ebpf"
 	"github.com/pkg/errors"
@@ -104,8 +103,4 @@ func ReasonToString(reason uint8) string {
 	default:
 		return "unknown"
 	}
-}
-
-func FormatMetricKey(key MetricsKey) string {
-	return fmt.Sprintf("%s_%s", DirectionToString(key.Dir), ReasonToString(key.Reason))
 }

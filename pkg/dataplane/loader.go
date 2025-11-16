@@ -71,5 +71,6 @@ func (dm *Manager) Maps() *maps.Maps {
 	if dm.loader != nil {
 		return dm.loader.Maps()
 	}
-	return maps.NewMaps()
+
+	return nil
 }

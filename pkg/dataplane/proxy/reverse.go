@@ -224,13 +224,10 @@ func (rp *ReverseLoader) Close() error {
 
 // Maps returns all eBPF maps used by the reverse proxy
 func (rp *ReverseLoader) Maps() *maps.Maps {
-	mapsCollection := maps.NewMaps()
-
+	var metricsMap *ebpf.Map
 	if rp.objs != nil {
-		if rp.objs.MetricsMap != nil {
-			mapsCollection.SetMetricsMap(rp.objs.MetricsMap)
-		}
+		metricsMap = rp.objs.MetricsMap
 	}
 
-	return mapsCollection
+	return maps.NewMaps(metricsMap)
 }

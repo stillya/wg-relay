@@ -198,13 +198,14 @@ func (fp *ForwardLoader) Close() error {
 
 // Maps returns all eBPF maps used by the forward proxy
 func (fp *ForwardLoader) Maps() *maps.Maps {
-	mapsCollection := maps.NewMaps()
+	var metricsMap *ebpf.Map
+	if fp.objs != nil {
+		metricsMap = fp.objs.MetricsMap
+	}
+
+	mapsCollection := maps.NewMaps(metricsMap)
 
 	if fp.objs != nil {
-		if fp.objs.MetricsMap != nil {
-			mapsCollection.SetMetricsMap(fp.objs.MetricsMap)
-		}
-
 		if fp.objs.ConnectionMap != nil {
 			mapsCollection.AddOtherMap("ConnectionMap", fp.objs.ConnectionMap)
 		}
