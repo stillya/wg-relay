@@ -14,10 +14,11 @@ import (
 )
 
 type WgReverseProxyMetricsKey struct {
-	_      structs.HostLayout
-	Dir    uint8
-	Reason uint8
-	Pad    uint16
+	_       structs.HostLayout
+	Dir     uint8
+	Reason  uint8
+	Pad     uint16
+	SrcAddr uint32
 }
 
 type WgReverseProxyMetricsValue struct {

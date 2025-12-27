@@ -18,6 +18,7 @@ struct metrics_key {
     __u8 dir;
     __u8 reason;
     __u16 pad;
+    __u32 src_addr;
 };
 
 struct metrics_value {
@@ -46,11 +47,12 @@ struct {
 #define STAT_NAT_LOOKUPS_FAILED   3
 
 // Update metrics with packet count and bytes
-static __always_inline void update_metrics(__u8 dir, __u8 reason, __u64 bytes) {
+static __always_inline void update_metrics(__u8 dir, __u8 reason, __u64 bytes, __u32 src_addr) {
     struct metrics_key key = {
         .dir = dir,
         .reason = reason,
-        .pad = 0
+        .pad = 0,
+        .src_addr = src_addr
     };
     
     struct metrics_value *value = bpf_map_lookup_elem(&metrics_map, &key);

@@ -28,13 +28,13 @@ func NewBpfCollector(source MetricCollectorSource, mode string) *BpfCollector {
 		packetsDesc: prometheus.NewDesc(
 			"wg_relay_packets_total",
 			"Total number of WireGuard packets processed",
-			[]string{"mode", "direction", "reason"},
+			[]string{"mode", "direction", "reason", "src_addr"},
 			nil,
 		),
 		bytesDesc: prometheus.NewDesc(
 			"wg_relay_bytes_total",
 			"Total bytes of WireGuard packets processed",
-			[]string{"mode", "direction", "reason"},
+			[]string{"mode", "direction", "reason", "src_addr"},
 			nil,
 		),
 	}
@@ -56,19 +56,20 @@ func (c *BpfCollector) Collect(ch chan<- prometheus.Metric) {
 	for _, metric := range metricsData {
 		dirLabel := metricsmap.DirectionToString(metric.Key.Dir)
 		reasonLabel := metricsmap.ReasonToString(metric.Key.Reason)
+		srcAddrLabel := metricsmap.SrcAddrToString(metric.Key.SrcAddr)
 
 		ch <- prometheus.MustNewConstMetric(
 			c.packetsDesc,
 			prometheus.GaugeValue,
 			float64(metric.Value.Packets),
-			c.mode, dirLabel, reasonLabel,
+			c.mode, dirLabel, reasonLabel, srcAddrLabel,
 		)
 
 		ch <- prometheus.MustNewConstMetric(
 			c.bytesDesc,
 			prometheus.GaugeValue,
 			float64(metric.Value.Bytes),
-			c.mode, dirLabel, reasonLabel,
+			c.mode, dirLabel, reasonLabel, srcAddrLabel,
 		)
 	}
 }

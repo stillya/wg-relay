@@ -26,9 +26,10 @@ const (
 
 // MetricsKey matches the eBPF struct metrics_key
 type MetricsKey struct {
-	Dir    uint8
-	Reason uint8
-	Pad    uint16
+	Dir     uint8
+	Reason  uint8
+	Pad     uint16
+	SrcAddr uint32
 }
 
 // MetricsValue matches the eBPF struct metrics_value
@@ -139,8 +140,6 @@ func TestWgForwardProxy(t *testing.T) {
 
 			if result != tt.expectedResult {
 				t.Errorf("%s: Expected result %d, got %d", tt.description, tt.expectedResult, result)
-			} else {
-				t.Logf("✓ %s: got expected result %d", tt.description, result)
 			}
 
 			// Check obfuscation in output buffer if required
@@ -292,23 +291,34 @@ func captureMetrics(metricsMap *ebpf.Map) map[MetricsKey]uint64 {
 
 	directions := []uint8{metricToWg, metricFromWg}
 	reasons := []uint8{metricForwarded, metricDrop}
+	srcAddrs := []uint32{
+		ipToUint32("192.168.1.1"),
+		ipToUint32("192.168.1.2"),
+		0, // unknown/any
+	}
 
 	for _, dir := range directions {
 		for _, reason := range reasons {
+			var dirTotal uint64
+
+			for _, srcAddr := range srcAddrs {
+				key := MetricsKey{Dir: dir, Reason: reason, SrcAddr: srcAddr}
+
+				var perCPUValues []MetricsValue
+				err := metricsMap.Lookup(unsafe.Pointer(&key), &perCPUValues)
+				if err != nil {
+					continue
+				}
+
+				var totalPackets uint64
+				for _, cpuValue := range perCPUValues {
+					totalPackets += cpuValue.Packets
+				}
+				dirTotal += totalPackets
+			}
+
 			key := MetricsKey{Dir: dir, Reason: reason}
-
-			var perCPUValues []MetricsValue
-			err := metricsMap.Lookup(unsafe.Pointer(&key), &perCPUValues)
-			if err != nil {
-				metrics[key] = 0
-				continue
-			}
-
-			var totalPackets uint64
-			for _, cpuValue := range perCPUValues {
-				totalPackets += cpuValue.Packets
-			}
-			metrics[key] = totalPackets
+			metrics[key] = dirTotal
 		}
 	}
 
@@ -323,8 +333,6 @@ func verifyStats(t *testing.T, oldStats, actual, expected map[uint32]uint64, des
 		} else if actualValue-oldStats[statKey] != expectedValue {
 			t.Errorf("%s: Stat %d expected %d, got %d",
 				description, statKey, expectedValue, actualValue)
-		} else {
-			t.Logf("✓ %s: Stat %d correctly has value %d", description, statKey, actualValue)
 		}
 	}
 }
@@ -340,9 +348,6 @@ func verifyMetrics(t *testing.T, oldMetrics, actual, expected map[MetricsKey]uin
 			if deltaValue != expectedValue {
 				t.Errorf("%s: Metric {Dir: %d, Reason: %d} expected delta %d, got %d (old: %d, new: %d)",
 					description, metricKey.Dir, metricKey.Reason, expectedValue, deltaValue, oldValue, actualValue)
-			} else {
-				t.Logf("✓ %s: Metric {Dir: %d, Reason: %d} correctly incremented by %d (old: %d, new: %d)",
-					description, metricKey.Dir, metricKey.Reason, deltaValue, oldValue, actualValue)
 			}
 		}
 	}
@@ -394,9 +399,7 @@ func verifyObfuscation(t *testing.T, inputPacket, outputPacket []byte, cfg WgFor
 			}
 		}
 
-		if obfuscatedMatches && unchangedMatches {
-			t.Logf("✓ %s: Payload correctly obfuscated with XOR (first %d bytes)", description, obfuscatedBytes)
-		} else {
+		if !obfuscatedMatches || !unchangedMatches {
 			t.Errorf("%s: Payload obfuscation mismatch", description)
 			if !obfuscatedMatches {
 				t.Errorf("  Obfuscated portion (first %d bytes) doesn't match expected", obfuscatedBytes)
@@ -418,9 +421,7 @@ func verifyObfuscation(t *testing.T, inputPacket, outputPacket []byte, cfg WgFor
 			}
 		}
 
-		if payloadUnchanged {
-			t.Logf("✓ %s: Payload correctly unchanged (obfuscation disabled)", description)
-		} else {
+		if !payloadUnchanged {
 			t.Errorf("%s: Payload unexpectedly changed when obfuscation disabled", description)
 		}
 	}

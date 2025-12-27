@@ -33,11 +33,11 @@ func TestStatMonitor_PrintTrafficTable(t *testing.T) {
 		name: "test",
 		data: []metricsmap.MetricData{
 			{
-				Key:   metricsmap.MetricsKey{Dir: metricsmap.MetricFromWg, Reason: metricsmap.MetricForwarded, Pad: 0},
+				Key:   metricsmap.MetricsKey{Dir: metricsmap.MetricFromWg, Reason: metricsmap.MetricForwarded, Pad: 0, SrcAddr: 0xC0A80A01},
 				Value: metricsmap.MetricsValue{Packets: 1234, Bytes: 56789},
 			},
 			{
-				Key:   metricsmap.MetricsKey{Dir: metricsmap.MetricToWg, Reason: metricsmap.MetricForwarded, Pad: 0},
+				Key:   metricsmap.MetricsKey{Dir: metricsmap.MetricToWg, Reason: metricsmap.MetricForwarded, Pad: 0, SrcAddr: 0xC0A80A01},
 				Value: metricsmap.MetricsValue{Packets: 987, Bytes: 43210},
 			},
 		},
@@ -70,6 +70,9 @@ func TestStatMonitor_PrintTrafficTable(t *testing.T) {
 		"avg. rate",
 		"traffic",
 		"estimated",
+		"Per-source statistics",
+		"src_addr",
+		"192.168.10.1",
 	}
 
 	for _, expected := range expectedStrings {
