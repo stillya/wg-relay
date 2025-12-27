@@ -21,7 +21,7 @@ import (
 
 type Opts struct {
 	SocketPath string `short:"s" long:"socket" description:"Unix socket path for control API" default:"/var/run/wg-relay/control.sock"`
-	ConfigPath string `short:"c" long:"config" description:"Default config path (used when CLI doesn't specify one)" default:"/etc/wg-relay/config.yaml"`
+	ConfigPath string `short:"c" long:"config" description:"Default config path" default:"/etc/wg-relay/config.yaml"`
 	Debug      bool   `short:"d" long:"debug" description:"Enable debug logging"`
 	Version    bool   `short:"v" long:"version" description:"Show version information"`
 }

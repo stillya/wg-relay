@@ -12,18 +12,6 @@ The WireGuard eBPF Proxy intercepts WireGuard packets at the kernel level, appli
 transparently routes them through a proxy server before reaching the actual WireGuard endpoint. This helps circumvent
 network restrictions while maintaining the security and performance benefits of WireGuard.
 
-## Architecture
-
-### System Design
-
-WireGuard Relay uses an **agent + CLI** architecture:
-
-- **wg-relay-agent** - Background daemon/agent managing eBPF programs and dataplane
-- **wg-relay** - CLI client for controlling the agent
-
-The agent runs as a systemd service in the background. The CLI communicates with it via Unix socket at
-`/var/run/wg-relay/control.sock`.
-
 ### Traffic Flow
 
 ```
@@ -88,8 +76,6 @@ Client                 Obfuscator Proxy           WireGuard Server
 **From Source:**
 
 ```bash
-git clone https://github.com/stillya/wg-relay.git
-cd wg-relay
 make build
 sudo cp .bin/wg-relay-agent /usr/local/bin/
 sudo cp .bin/wg-relay /usr/local/bin/
