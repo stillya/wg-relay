@@ -1,28 +1,40 @@
-.PHONY: help build clean run-daemon run-forward-proxy run-reverse-proxy test-ebpf test
+.PHONY: help build build-agent build-cli clean run-agent test-ebpf test
 
 # Variables
-DAEMON_BINARY := wg-relay-daemon
+AGENT_BINARY := wg-relay-agent
+CLI_BINARY := wg-relay
 BUILD_DIR := .bin
 EBPF_DIR := ebpf
 REV := $(shell git rev-parse --short HEAD 2>/dev/null || echo "unknown")
 
 help:
 	@echo "WireGuard Relay - Available targets:"
-	@echo "  build             - Generate eBPF bindings and build the daemon"
+	@echo "  build             - Build agent and CLI binaries"
+	@echo "  build-agent       - Generate eBPF bindings and build the agent"
+	@echo "  build-cli         - Build the CLI client"
+	@echo "  generate          - Generate all code (eBPF bindings, mocks)"
 	@echo "  clean             - Clean generated files and build artifacts"
-	@echo "  run-daemon        - Build and run the daemon with default config"
-	@echo "  run-forward-proxy - Run forward proxy in ebpf-proxy namespace"
-	@echo "  run-reverse-proxy - Run reverse proxy in wg-server namespace"
+	@echo "  run-agent         - Build and run the agent"
+	@echo "  run-forward-proxy - Run forward proxy in ebpf-proxy namespace (legacy testing)"
+	@echo "  run-reverse-proxy - Run reverse proxy in wg-server namespace (legacy testing)"
 	@echo "  test-ebpf         - Run eBPF unit tests"
 	@echo "  test              - Run all tests"
 
-build:
+build: build-agent build-cli
+
+build-agent:
 	@echo "Generating eBPF Go bindings..."
 	go generate ./$(EBPF_DIR)
-	@echo "Building $(DAEMON_BINARY)..."
+	@echo "Building $(AGENT_BINARY)..."
 	mkdir -p $(BUILD_DIR)
-	go build -ldflags "-X main.version=$(REV) -s -w" -o $(BUILD_DIR)/$(DAEMON_BINARY) ./cmd/daemon
-	@echo "Build completed: $(BUILD_DIR)/$(DAEMON_BINARY)"
+	go build -o $(BUILD_DIR)/$(AGENT_BINARY) ./cmd/agent
+	@echo "Build completed: $(BUILD_DIR)/$(AGENT_BINARY)"
+
+build-cli:
+	@echo "Building $(CLI_BINARY)..."
+	mkdir -p $(BUILD_DIR)
+	go build -o $(BUILD_DIR)/$(CLI_BINARY) ./cmd/cli
+	@echo "Build completed: $(BUILD_DIR)/$(CLI_BINARY)"
 
 clean:
 	@echo "Cleaning generated files..."
@@ -31,23 +43,12 @@ clean:
 	rm -rf $(BUILD_DIR)
 	@echo "Clean completed"
 
-run-daemon: build
-	@echo "Running wg-proxy daemon..."
+run-agent: build-agent
+	@echo "Running wg-relay-agent..."
 	@echo "Note: This requires root privileges for eBPF operations"
+	@echo "Agent will start in disabled state - use 'wg-relay enable' to activate"
 	@echo "Press Ctrl+C to stop"
-	sudo ./$(BUILD_DIR)/$(DAEMON_BINARY) -c config.yaml
-
-run-local-forward: build
-	@echo "Running forward proxy daemon in ebpf-proxy namespace..."
-	@echo "Note: This requires root privileges and namespace setup"
-	@echo "Press Ctrl+C to stop"
-	sudo ip netns exec ebpf-proxy ./$(BUILD_DIR)/$(DAEMON_BINARY) -c config.yaml -d
-
-run-local-reverse: build
-	@echo "Running reverse proxy daemon in wg-server namespace..."
-	@echo "Note: This requires root privileges and namespace setup"
-	@echo "Press Ctrl+C to stop"
-	sudo ip netns exec wg-server ./$(BUILD_DIR)/$(DAEMON_BINARY) -c config.yaml -d
+	sudo ./$(BUILD_DIR)/$(AGENT_BINARY)
 
 test-ebpf: build
 	@echo "Running eBPF unit tests..."

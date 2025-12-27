@@ -12,7 +12,7 @@ The WireGuard eBPF Proxy intercepts WireGuard packets at the kernel level, appli
 transparently routes them through a proxy server before reaching the actual WireGuard endpoint. This helps circumvent
 network restrictions while maintaining the security and performance benefits of WireGuard.
 
-## Architecture
+### Traffic Flow
 
 ```
 Client                 Obfuscator Proxy           WireGuard Server
@@ -30,6 +30,38 @@ Client                 Obfuscator Proxy           WireGuard Server
   |<-------------------------|                          |
 ```
 
+### Component Interaction
+
+```
+┌─────────────────┐
+│   wg-relay CLI  │  (user commands)
+└────────┬────────┘
+         │ Unix Socket
+         │ /var/run/wg-relay/control.sock
+         ▼
+┌─────────────────┐
+│ wg-relay-agent  │  (systemd service)
+│   ┌─────────┐   │
+│   │ Control │   │
+│   │   API   │   │
+│   └────┬────┘   │
+│        │        │
+│   ┌────▼────┐   │
+│   │Dataplane│   │
+│   │ Manager │   │
+│   └────┬────┘   │
+│        │        │
+│   ┌────▼────┐   │
+│   │  eBPF   │   │
+│   │Programs │   │
+│   └─────────┘   │
+└─────────────────┘
+         │
+         ▼
+    Linux Kernel
+    (XDP/TC hooks)
+```
+
 ## Requirements
 
 - Linux kernel 6.6+ with eBPF support
@@ -39,52 +71,70 @@ Client                 Obfuscator Proxy           WireGuard Server
 
 ## Quick Start
 
-### 1. Build
+### Installation
+
+**From Source:**
 
 ```bash
 make build
+sudo cp .bin/wg-relay-agent /usr/local/bin/
+sudo cp .bin/wg-relay /usr/local/bin/
 ```
 
-### Testing
+### Usage
+
+**1. Start the agent:**
 
 ```bash
-# Run all tests (requires root privileges)
-make test
-
-# Run only eBPF unit tests
-make test-ebpf
+sudo systemctl start wg-relay-agent
 ```
 
-### 2. Configuration
+**2. Create configuration:**
 
-Create a `config.yaml` file:
+```bash
+sudo nano /etc/wg-relay/config.yaml
+```
 
 ```yaml
-mode: "forward"                           # "forward" or "reverse"
-enabled: true                             # Enable/disable obfuscation
-
-daemon:
-  listen: ":8080"                         # Daemon bind address
-
 proxy:
-  method: "xor"                           # Obfuscation method (Currently only "xor" is supported)
-  key: "my_secret_key_32_bytes_long_123"  # Obfuscation key
-  driver_mode: "driver"                   # use generic if you at containerized environment
+  mode: "forward"                           # "forward" or "reverse"
+  method: "xor"                             # Obfuscation method
+  key: "my_secret_key_32_bytes_long_123"   # Obfuscation key
+  driver_mode: "driver"                     # "driver" or "generic"
   interfaces:
-  - "eth0"                                # Main interface to intercept
+    - "eth0"                                # Interface to intercept
   forward:
-    target_server_ip: "192.168.200.2"     # Target WireGuard server IP
+    target_server_ip: "192.168.200.2"      # Target WireGuard server
 ```
 
-### 3. Run
+**3. Enable dataplane:**
 
 ```bash
-# Run daemon
-sudo make run-daemon
+sudo wg-relay enable -c /etc/wg-relay/config.yaml
+```
 
-# Or run in specific network namespace
-sudo make run-forward-proxy    # ebpf-proxy namespace
-sudo make run-reverse-proxy    # wg-server namespace
+**4. Check status:**
+
+```bash
+wg-relay status
+wg-relay stats
+```
+
+### Development
+
+```bash
+# Build from source
+make build
+
+# Run agent locally
+sudo make run-agent
+
+# In another terminal, use CLI
+sudo .bin/wg-relay enable -c config.yaml
+
+# Run tests
+make test
+make test-ebpf
 ```
 
 ## Configuration
@@ -106,35 +156,30 @@ sudo make run-reverse-proxy    # wg-server namespace
 
 ## Monitoring & Statistics
 
-### Console Statistics (vnstat-style)
+### CLI Statistics
 
-The daemon provides real-time traffic statistics in a vnstat-style table format:
+View traffic statistics using the CLI:
 
-```
-┌─────────────────────────────────────────────────────┐
-│               wg-relay traffic statistics           │
-├─────────────────────────────────────────────────────┤
-│                   rx      tx    total   avg. rate   │
-│      from_wg   10.5 KB  8.2 KB  18.7 KB   1.2 KB/s  │
-│        to_wg    8.2 KB 10.5 KB  18.7 KB   1.2 KB/s  │
-│        total   18.7 KB 18.7 KB  37.4 KB   2.4 KB/s  │
-│                                                     │
-│   estimated    1.6 MB per day                       │
-└─────────────────────────────────────────────────────┘
+```bash
+# One-time snapshot
+wg-relay stats
+
+# Live monitoring (updates every 5s)
+wg-relay stats --watch --interval 5s
 ```
 
-Enable statistics monitoring in config:
+Output format:
 
-```yaml
-monitoring:
-  statistics:
-    enabled: true
-    interval: 5s
+```
+DIRECTION  REASON     SOURCE         PACKETS  BYTES
+---------  ------     ------         -------  -----
+from_wg    forwarded  192.168.1.10   1234     55.5 KB
+to_wg      forwarded  192.168.1.10   987      43.2 KB
 ```
 
 ### Prometheus Metrics
 
-Expose Prometheus metrics for monitoring with Grafana dashboards:
+The agent automatically exposes Prometheus metrics when enabled in configuration:
 
 ```yaml
 monitoring:
@@ -143,16 +188,29 @@ monitoring:
     listen: ":9090"
 ```
 
-Available metrics:
+**Behavior:**
 
-- `wg_relay_packets_total{mode, direction, reason}` - Total packets processed
-- `wg_relay_bytes_total{mode, direction, reason}` - Total bytes processed
+- Metrics server starts automatically when dataplane is enabled with Prometheus config
+- Stops when dataplane is disabled
+- Automatically reconfigures on reload
 
-Labels:
+**Access metrics:**
+
+```bash
+curl http://localhost:9090/metrics
+```
+
+**Available metrics:**
+
+- `wg_relay_packets_total{mode, direction, reason, src_addr}` - Total packets processed
+- `wg_relay_bytes_total{mode, direction, reason, src_addr}` - Total bytes processed
+
+**Labels:**
 
 - `mode`: "forward" or "reverse"
 - `direction`: "from_wg" or "to_wg"
-- `reason`: "forwarded", "dropped", etc.
+- `reason`: "forwarded", "drop"
+- `src_addr`: Source IP address
 
 ## Development
 
