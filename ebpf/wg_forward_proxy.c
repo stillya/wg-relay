@@ -185,50 +185,50 @@ int wg_forward_proxy(struct xdp_md *ctx) {
         if (restore_nat_connection(&pkt, &original_conn) < 0) {
             increment_stat(STAT_NAT_LOOKUPS_FAILED);
             DEBUG_PRINTK("Failed to restore NAT connection for FROM WG packet, passing through");
-            update_metrics(METRIC_FROM_WG, METRIC_DROP, pkt_len);
-            
+            update_metrics(METRIC_FROM_WG, METRIC_DROP, pkt_len, bpf_ntohl(pkt.ip->saddr));
+
             return XDP_PASS;
         }
         increment_stat(STAT_NAT_LOOKUPS_SUCCESS);
-        
+
         apply_obfuscation(&pkt, config);
-        
-        __u32 proxy_ip = bpf_ntohl(pkt.ip->daddr); 
+
+        __u32 proxy_ip = bpf_ntohl(pkt.ip->daddr);
         __u32 client_ip = bpf_ntohl(original_conn.client_ip);
-        
-        update_metrics(METRIC_FROM_WG, METRIC_FORWARDED, pkt_len);
+
+        update_metrics(METRIC_FROM_WG, METRIC_FORWARDED, pkt_len, bpf_ntohl(pkt.ip->saddr));
         return forward_packet(ctx, &pkt, proxy_ip, original_conn.server_port, client_ip, original_conn.client_port);
     }
     
     if (unlikely(is_to_wg)) {
         if (create_nat_connection(&pkt, config) < 0) {
             DEBUG_PRINTK("Failed to create NAT connection for TO WG packet");
-            update_metrics(METRIC_TO_WG, METRIC_DROP, pkt_len);
+            update_metrics(METRIC_TO_WG, METRIC_DROP, pkt_len, bpf_ntohl(pkt.ip->saddr));
             return XDP_PASS;
         }
-        
+
         struct connection_key conn_key = {
             .client_ip = pkt.ip->saddr,
             .client_port = src_port,
             .server_ip = pkt.ip->daddr,
             .server_port = dst_port
         };
-        
+
         struct connection_value *conn_value = bpf_map_lookup_elem(&connection_map, &conn_key);
         if (!conn_value) {
             DEBUG_PRINTK("No NAT connection found for client %pI4:%d -> server %pI4:%d, passing through",
                          &conn_key.client_ip, conn_key.client_port,
                          &conn_key.server_ip, conn_key.server_port);
-            update_metrics(METRIC_TO_WG, METRIC_DROP, pkt_len);
+            update_metrics(METRIC_TO_WG, METRIC_DROP, pkt_len, bpf_ntohl(pkt.ip->saddr));
             return XDP_PASS;
         }
-        
+
         apply_obfuscation(&pkt, config);
-        
+
         __u32 proxy_ip = bpf_ntohl(pkt.ip->daddr);
         __u32 server_ip = config->target_server_ip;
 
-        update_metrics(METRIC_TO_WG, METRIC_FORWARDED, pkt_len);
+        update_metrics(METRIC_TO_WG, METRIC_FORWARDED, pkt_len, bpf_ntohl(pkt.ip->saddr));
         return forward_packet(ctx, &pkt, proxy_ip, conn_value->nat_port, server_ip, WG_PORT);
     }
     

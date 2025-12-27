@@ -2,6 +2,8 @@ package metricsmap
 
 import (
 	"context"
+	"fmt"
+	"net"
 
 	"github.com/cilium/ebpf"
 	"github.com/pkg/errors"
@@ -16,9 +18,10 @@ const (
 )
 
 type MetricsKey struct {
-	Dir    uint8
-	Reason uint8
-	Pad    uint16
+	Dir     uint8
+	Reason  uint8
+	Pad     uint16
+	SrcAddr uint32
 }
 
 type MetricsValue struct {
@@ -103,4 +106,17 @@ func ReasonToString(reason uint8) string {
 	default:
 		return "unknown"
 	}
+}
+
+func SrcAddrToString(srcAddr uint32) string {
+	if srcAddr == 0 {
+		return "unknown"
+	}
+	ip := net.IPv4(
+		byte(srcAddr>>24),
+		byte(srcAddr>>16),
+		byte(srcAddr>>8),
+		byte(srcAddr),
+	)
+	return fmt.Sprintf("%s", ip)
 }

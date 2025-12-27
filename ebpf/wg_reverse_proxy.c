@@ -35,20 +35,20 @@ int wg_reverse_proxy(struct __sk_buff *skb) {
     __u8 is_to_wg = (dst_port == WG_PORT) ? 1 : 0;
     __u8 is_from_wg = (src_port == WG_PORT) ? 1 : 0;
         
-    if (likely(is_from_wg)) {          
+    if (likely(is_from_wg)) {
         if (config->method != OBFUSCATE_NONE && config->key_len > 0) {
             apply_obfuscation(&pkt, config);
         }
-        
-        update_metrics(METRIC_FROM_WG, METRIC_FORWARDED, skb->len);
+
+        update_metrics(METRIC_FROM_WG, METRIC_FORWARDED, skb->len, bpf_ntohl(pkt.ip->saddr));
     }
-    
+
     if (unlikely(is_to_wg)) {
         if (config->method != OBFUSCATE_NONE && config->key_len > 0) {
             apply_obfuscation(&pkt, config);
         }
 
-        update_metrics(METRIC_TO_WG, METRIC_FORWARDED, skb->len);
+        update_metrics(METRIC_TO_WG, METRIC_FORWARDED, skb->len, bpf_ntohl(pkt.ip->saddr));
     }
 
     return TC_ACT_OK;
