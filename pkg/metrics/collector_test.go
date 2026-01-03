@@ -149,8 +149,8 @@ func TestBpfCollector_Collect(t *testing.T) {
 					t.Fatalf("Failed to write metric: %v", err)
 				}
 
-				if m.Gauge == nil {
-					t.Error("Expected gauge metric")
+				if m.Counter == nil {
+					t.Error("Expected counter metric")
 					continue
 				}
 

@@ -60,14 +60,14 @@ func (c *BpfCollector) Collect(ch chan<- prometheus.Metric) {
 
 		ch <- prometheus.MustNewConstMetric(
 			c.packetsDesc,
-			prometheus.GaugeValue,
+			prometheus.CounterValue,
 			float64(metric.Value.Packets),
 			c.mode, dirLabel, reasonLabel, srcAddrLabel,
 		)
 
 		ch <- prometheus.MustNewConstMetric(
 			c.bytesDesc,
-			prometheus.GaugeValue,
+			prometheus.CounterValue,
 			float64(metric.Value.Bytes),
 			c.mode, dirLabel, reasonLabel, srcAddrLabel,
 		)
