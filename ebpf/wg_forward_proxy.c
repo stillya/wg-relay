@@ -185,7 +185,7 @@ int wg_forward_proxy(struct xdp_md *ctx) {
         if (restore_nat_connection(&pkt, &original_conn) < 0) {
             increment_stat(STAT_NAT_LOOKUPS_FAILED);
             DEBUG_PRINTK("Failed to restore NAT connection for FROM WG packet, passing through");
-            update_metrics(METRIC_FROM_WG, METRIC_DROP, pkt_len, bpf_ntohl(pkt.ip->saddr));
+            update_metrics(METRIC_FROM_WG, METRIC_DROP, pkt_len, 0);
 
             return XDP_PASS;
         }
@@ -196,7 +196,7 @@ int wg_forward_proxy(struct xdp_md *ctx) {
         __u32 proxy_ip = bpf_ntohl(pkt.ip->daddr);
         __u32 client_ip = bpf_ntohl(original_conn.client_ip);
 
-        update_metrics(METRIC_FROM_WG, METRIC_FORWARDED, pkt_len, bpf_ntohl(pkt.ip->saddr));
+        update_metrics(METRIC_FROM_WG, METRIC_FORWARDED, pkt_len, client_ip);
         return forward_packet(ctx, &pkt, proxy_ip, original_conn.server_port, client_ip, original_conn.client_port);
     }
     

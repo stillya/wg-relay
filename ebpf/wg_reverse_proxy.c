@@ -40,7 +40,7 @@ int wg_reverse_proxy(struct __sk_buff *skb) {
             apply_obfuscation(&pkt, config);
         }
 
-        update_metrics(METRIC_FROM_WG, METRIC_FORWARDED, skb->len, bpf_ntohl(pkt.ip->saddr));
+        update_metrics(METRIC_FROM_WG, METRIC_FORWARDED, skb->len, bpf_ntohl(pkt.ip->daddr));
     }
 
     if (unlikely(is_to_wg)) {
