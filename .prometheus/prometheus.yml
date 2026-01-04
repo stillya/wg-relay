@@ -5,10 +5,10 @@ global:
 scrape_configs:
   - job_name: "prometheus"
     static_configs:
-      - targets: ["localhost:9090"]
+      - targets: [ "localhost:9090" ]
 
   - job_name: "wg-relay"
     static_configs:
-      - targets: ["192.168.100.2:8081"]
+      - targets: [ "192.168.100.2:8081" ]
     scrape_interval: 5s
     metrics_path: /metrics
