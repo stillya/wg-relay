@@ -71,7 +71,7 @@ proxy:
   key: "my_secret_key_32_bytes_long_123"  # Obfuscation key
   driver_mode: "driver"                   # use generic if you at containerized environment
   interfaces:
-  - "eth0"                                # Main interface to intercept
+    - "eth0"                                # Main interface to intercept
   forward:
     target_server_ip: "192.168.200.2"     # Target WireGuard server IP
 ```
@@ -145,14 +145,16 @@ monitoring:
 
 Available metrics:
 
-- `wg_relay_packets_total{mode, direction, reason}` - Total packets processed
-- `wg_relay_bytes_total{mode, direction, reason}` - Total bytes processed
+- `wg_relay_rx_packets_total{mode, reason, src_addr}` - Total packets received
+- `wg_relay_tx_packets_total{mode, reason, src_addr}` - Total packets transmitted
+- `wg_relay_rx_bytes_total{mode, reason, src_addr}` - Total bytes received
+- `wg_relay_tx_bytes_total{mode, reason, src_addr}` - Total bytes transmitted
 
 Labels:
 
 - `mode`: "forward" or "reverse"
-- `direction`: "from_wg" or "to_wg"
-- `reason`: "forwarded", "dropped", etc.
+- `reason`: "forwarded" or "drop"
+- `src_addr`: Source IP address (e.g., "192.168.1.100")
 
 ## Development
 

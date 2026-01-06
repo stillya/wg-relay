@@ -17,32 +17,48 @@ type BpfCollector struct {
 	source MetricCollectorSource
 	mode   string
 
-	packetsDesc *prometheus.Desc
-	bytesDesc   *prometheus.Desc
+	rxPacketsDesc *prometheus.Desc
+	txPacketsDesc *prometheus.Desc
+	rxBytesDesc   *prometheus.Desc
+	txBytesDesc   *prometheus.Desc
 }
 
 func NewBpfCollector(source MetricCollectorSource, mode string) *BpfCollector {
 	return &BpfCollector{
 		source: source,
 		mode:   mode,
-		packetsDesc: prometheus.NewDesc(
-			"wg_relay_packets_total",
-			"Total number of WireGuard packets processed",
-			[]string{"mode", "direction", "reason", "src_addr"},
+		rxPacketsDesc: prometheus.NewDesc(
+			"wg_relay_rx_packets_total",
+			"Total number of WireGuard packets received",
+			[]string{"mode", "reason", "src_addr"},
 			nil,
 		),
-		bytesDesc: prometheus.NewDesc(
-			"wg_relay_bytes_total",
-			"Total bytes of WireGuard packets processed",
-			[]string{"mode", "direction", "reason", "src_addr"},
+		txPacketsDesc: prometheus.NewDesc(
+			"wg_relay_tx_packets_total",
+			"Total number of WireGuard packets transmitted",
+			[]string{"mode", "reason", "src_addr"},
+			nil,
+		),
+		rxBytesDesc: prometheus.NewDesc(
+			"wg_relay_rx_bytes_total",
+			"Total bytes of WireGuard packets received",
+			[]string{"mode", "reason", "src_addr"},
+			nil,
+		),
+		txBytesDesc: prometheus.NewDesc(
+			"wg_relay_tx_bytes_total",
+			"Total bytes of WireGuard packets transmitted",
+			[]string{"mode", "reason", "src_addr"},
 			nil,
 		),
 	}
 }
 
 func (c *BpfCollector) Describe(ch chan<- *prometheus.Desc) {
-	ch <- c.packetsDesc
-	ch <- c.bytesDesc
+	ch <- c.rxPacketsDesc
+	ch <- c.txPacketsDesc
+	ch <- c.rxBytesDesc
+	ch <- c.txBytesDesc
 }
 
 func (c *BpfCollector) Collect(ch chan<- prometheus.Metric) {
@@ -54,22 +70,30 @@ func (c *BpfCollector) Collect(ch chan<- prometheus.Metric) {
 	}
 
 	for _, metric := range metricsData {
-		dirLabel := metricsmap.DirectionToString(metric.Key.Dir)
 		reasonLabel := metricsmap.ReasonToString(metric.Key.Reason)
 		srcAddrLabel := metricsmap.SrcAddrToString(metric.Key.SrcAddr)
 
+		var packetsDesc, bytesDesc *prometheus.Desc
+		if metric.Key.Dir == metricsmap.MetricFromWg {
+			packetsDesc = c.txPacketsDesc
+			bytesDesc = c.txBytesDesc
+		} else {
+			packetsDesc = c.rxPacketsDesc
+			bytesDesc = c.rxBytesDesc
+		}
+
 		ch <- prometheus.MustNewConstMetric(
-			c.packetsDesc,
+			packetsDesc,
 			prometheus.CounterValue,
 			float64(metric.Value.Packets),
-			c.mode, dirLabel, reasonLabel, srcAddrLabel,
+			c.mode, reasonLabel, srcAddrLabel,
 		)
 
 		ch <- prometheus.MustNewConstMetric(
-			c.bytesDesc,
+			bytesDesc,
 			prometheus.CounterValue,
 			float64(metric.Value.Bytes),
-			c.mode, dirLabel, reasonLabel, srcAddrLabel,
+			c.mode, reasonLabel, srcAddrLabel,
 		)
 	}
 }

@@ -14,7 +14,7 @@ proxy:
   mode: "forward"                  # "forward" for forward proxy, "reverse" for reverse proxy
   method: "xor"                           # "xor" or "none"
   key: "my_secret_key_32_bytes_long_123"  # Obfuscation key (required)
-  driver_mode: "generic"                  # "driver" or "generic" for XDP mode
+  driver_mode: "generic"                  # "driver", "generic" or "offload" for XDP mode
   interfaces: # Network interfaces to attach to
     - "veth-ebpf@2"
     - "veth-wg@1"

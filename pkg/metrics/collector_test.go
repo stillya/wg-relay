@@ -30,7 +30,7 @@ func TestBpfCollector_Describe(t *testing.T) {
 	source := &mockMetricSource{name: "test"}
 	collector := NewBpfCollector(source, "forward")
 
-	ch := make(chan *prometheus.Desc, 2)
+	ch := make(chan *prometheus.Desc, 4)
 	collector.Describe(ch)
 	close(ch)
 
@@ -39,8 +39,8 @@ func TestBpfCollector_Describe(t *testing.T) {
 		count++
 	}
 
-	if count != 2 {
-		t.Errorf("Expected 2 descriptors, got %d", count)
+	if count != 4 {
+		t.Errorf("Expected 4 descriptors, got %d", count)
 	}
 }
 
@@ -156,7 +156,6 @@ func TestBpfCollector_Collect(t *testing.T) {
 
 				labels := m.GetLabel()
 				foundMode := false
-				foundDirection := false
 				foundReason := false
 				foundSrcAddr := false
 
@@ -167,8 +166,6 @@ func TestBpfCollector_Collect(t *testing.T) {
 							t.Errorf("Expected mode %s, got %s", tc.mode, label.GetValue())
 						}
 						foundMode = true
-					case "direction":
-						foundDirection = true
 					case "reason":
 						foundReason = true
 					case "src_addr":
@@ -178,9 +175,6 @@ func TestBpfCollector_Collect(t *testing.T) {
 
 				if !foundMode {
 					t.Error("Missing mode label")
-				}
-				if !foundDirection {
-					t.Error("Missing direction label")
 				}
 				if !foundReason {
 					t.Error("Missing reason label")
