@@ -28,7 +28,7 @@ type ProxyConfig struct {
 	Method     string        `yaml:"method"`      // "xor" or "none"
 	Key        string        `yaml:"key"`         // Obfuscation key (string)
 	Interfaces []string      `yaml:"interfaces"`  // Network interfaces to attach to
-	DriverMode string        `yaml:"driver_mode"` // "driver" or "generic" for XDP mode
+	DriverMode string        `yaml:"driver_mode"` // "driver", "generic" and "offload" for XDP mode
 	Forward    ForwardConfig `yaml:"forward"`     // Forward proxy configuration
 }
 
@@ -100,8 +100,8 @@ func (cfg *ProxyConfig) validate(mode string) error {
 	}
 
 	// Validate driver mode
-	if cfg.DriverMode != "" && cfg.DriverMode != "driver" && cfg.DriverMode != "generic" {
-		return errors.New("driver_mode must be 'driver' or 'generic'")
+	if cfg.DriverMode != "" && cfg.DriverMode != "driver" && cfg.DriverMode != "generic" && cfg.DriverMode != "offload" {
+		return errors.New("driver_mode must be 'driver', 'generic' or 'offload'")
 	}
 
 	// Forward mode specific validations

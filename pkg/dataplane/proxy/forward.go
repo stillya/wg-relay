@@ -134,6 +134,9 @@ func (fp *ForwardLoader) attachToInterface(interfaceName string) error {
 	case "driver":
 		flags = link.XDPDriverMode
 		mode = "driver"
+	case "offload":
+		flags = link.XDPOffloadMode
+		mode = "offload"
 	default:
 		// Default to driver mode
 		flags = link.XDPDriverMode
