@@ -34,7 +34,7 @@ Client                 Obfuscator Proxy           WireGuard Server
 
 - Linux kernel 6.6+ with eBPF support
 - Root privileges for eBPF operations
-- Go 1.23+
+- Go 1.25+
 - WireGuard tools
 
 ## Quick Start
