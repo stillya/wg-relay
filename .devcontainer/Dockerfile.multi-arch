@@ -1,9 +1,14 @@
-ARG TARGETPLATFORM
-FROM --platform=$TARGETPLATFORM mcr.microsoft.com/devcontainers/go:1.24-bookworm
+ARG GO_VARIANT=1.24-bookworm
+FROM mcr.microsoft.com/devcontainers/go:${GO_VARIANT}
 
 ARG TARGETARCH
+ARG PWRU_VERSION=v1.0.9
+
+ENV GOFLAGS="-buildvcs=false"
 
 RUN asm_arch=$(if [ "${TARGETARCH}" = "arm64" ]; then echo "aarch64-linux-gnu"; else echo "x86_64-linux-gnu"; fi) && \
+    kernel_arch=$(if [ "${TARGETARCH}" = "arm64" ]; then echo "arm64"; else echo "amd64"; fi) && \
+    pwru_arch=$(if [ "${TARGETARCH}" = "arm64" ]; then echo "arm64"; else echo "amd64"; fi) && \
     echo "wireshark-common wireshark-common/install-setuid boolean true" | debconf-set-selections && \
     apt-get update && \
     DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
@@ -17,7 +22,7 @@ RUN asm_arch=$(if [ "${TARGETARCH}" = "arm64" ]; then echo "aarch64-linux-gnu"; 
     libpcap-dev \
     iproute2 \
     iputils-ping \
-    linux-headers-generic \
+    linux-headers-${kernel_arch} \
     libbpf-dev \
     linux-libc-dev \
     cmake \
@@ -25,18 +30,18 @@ RUN asm_arch=$(if [ "${TARGETARCH}" = "arm64" ]; then echo "aarch64-linux-gnu"; 
     libbfd-dev \
     libcap-dev \
     xdp-tools \
-    tshark && \
-    ln -sf /usr/include/${asm_arch}/asm/ /usr/include/asm
-
-RUN ln -sf /usr/local/go/bin/go /bin/go
-
-ENV GOFLAGS="-buildvcs=false"
-
-RUN mkdir -p /sources
-WORKDIR /sources
-
-RUN git clone --recurse-submodules --depth 1 https://github.com/libbpf/bpftool.git && \
-    make -C bpftool/src/ install && \
-    rm -rf bpftool
+    tshark \
+    ca-certificates \
+    wget && \
+    ln -sf /usr/include/${asm_arch}/asm/ /usr/include/asm && \
+    ln -sf /usr/local/go/bin/go /bin/go && \
+    git clone --recurse-submodules --depth 1 https://github.com/libbpf/bpftool.git /tmp/bpftool && \
+    make -C /tmp/bpftool/src/ install && \
+    rm -rf /tmp/bpftool && \
+    wget -O /tmp/pwru.tar.gz "https://github.com/cilium/pwru/releases/download/${PWRU_VERSION}/pwru-linux-${pwru_arch}.tar.gz" && \
+    tar -xzf /tmp/pwru.tar.gz -C /usr/local/bin && \
+    chmod +x /usr/local/bin/pwru && \
+    rm -rf /tmp/pwru.tar.gz && \
+    rm -rf /var/lib/apt/lists/*
 
 WORKDIR /workspaces

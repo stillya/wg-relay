@@ -71,7 +71,7 @@ proxy:
   key: "my_secret_key_32_bytes_long_123"  # Obfuscation key
   driver_mode: "driver"                   # use generic if you at containerized environment
   interfaces:
-    - "eth0"                                # Main interface to intercept
+  - "eth0"                                # Main interface to intercept
   forward:
     target_server_ip: "192.168.200.2"     # Target WireGuard server IP
 ```
@@ -96,12 +96,13 @@ sudo make run-reverse-proxy    # wg-server namespace
 
 ### Obfuscation Methods
 
-- **XOR**: Simple XOR-based obfuscation with configurable key
+- **XOR**: Simple XOR-based obfuscation with a configurable key
 - **None**: Pass-through mode for testing
 
 ### XDP Driver Modes
 
 - **Driver**: Native XDP mode (better performance, requires driver support)
+- **Offload**: Offload XDP mode (hardware offload, requires NIC support)
 - **Generic**: Generic XDP mode (broader compatibility, slightly lower performance)
 
 ## Monitoring & Statistics
@@ -111,16 +112,21 @@ sudo make run-reverse-proxy    # wg-server namespace
 The daemon provides real-time traffic statistics in a vnstat-style table format:
 
 ```
-┌─────────────────────────────────────────────────────┐
-│               wg-relay traffic statistics           │
-├─────────────────────────────────────────────────────┤
-│                   rx      tx    total   avg. rate   │
-│      from_wg   10.5 KB  8.2 KB  18.7 KB   1.2 KB/s  │
-│        to_wg    8.2 KB 10.5 KB  18.7 KB   1.2 KB/s  │
-│        total   18.7 KB 18.7 KB  37.4 KB   2.4 KB/s  │
-│                                                     │
-│   estimated    1.6 MB per day                       │
-└─────────────────────────────────────────────────────┘
+                         wg-relay traffic statistics
+
+                    |      from_wg |        to_wg |        total |    avg. rate
+ ------------------+--------------+--------------+--------------+--------------
+ traffic            |       7.4 GB |     480.9 MB |       7.9 GB |   68.1 KB/s
+ ------------------+--------------+--------------+--------------+--------------
+ estimated          |       5.3 GB |     341.6 MB |       5.6 GB |
+
+ Per-source statistics:
+ src_addr           |      from_wg |        to_wg |        total
+ ------------------+--------------+--------------+--------------
+ 192.0.2.10         |      35.3 KB |      12.5 KB |      47.8 KB
+ 192.0.2.20         |      29.0 KB |       7.1 KB |      36.1 KB
+ 192.0.2.30         |      33.1 KB |       8.4 KB |      41.5 KB
+ 203.0.113.100      |       5.1 GB |      73.9 MB |       5.2 GB
 ```
 
 Enable statistics monitoring in config:

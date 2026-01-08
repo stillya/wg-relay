@@ -24,9 +24,6 @@ tcvenv
 build/
 dist/
 
-# pwru
-pwru
-
 # Claude
 .claude
 
