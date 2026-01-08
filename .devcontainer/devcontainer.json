@@ -10,7 +10,8 @@
   "runArgs": [
     "--privileged",
     "--cap-add=ALL",
-    "--ulimit memlock=9223372036854775807"
+    "--ulimit",
+    "memlock=-1:-1"
   ],
   "privileged": true,
   // Features to add to the dev container. More info: https://containers.dev/features.
@@ -25,8 +26,7 @@
     }
   },
   "postCreateCommand": [
-    "go version",
-    "uname -r"
+    "go version && uname -r",
   ],
   "remoteUser": "root"
 }
