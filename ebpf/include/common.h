@@ -1,6 +1,10 @@
 #ifndef __COMMON_H__
 #define __COMMON_H__
 
+#ifndef __maybe_unused
+#define __maybe_unused		__attribute__((__unused__))
+#endif
+
 #ifndef EEXIST
 #define EEXIST 17  // File exists error code, used for BPF map updates
 #endif

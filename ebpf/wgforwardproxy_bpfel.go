@@ -113,7 +113,6 @@ type WgForwardProxyMapSpecs struct {
 	NatPortCounter       *ebpf.MapSpec `ebpf:"nat_port_counter"`
 	NatReverseMap        *ebpf.MapSpec `ebpf:"nat_reverse_map"`
 	ObfuscationConfigMap *ebpf.MapSpec `ebpf:"obfuscation_config_map"`
-	StatsMap             *ebpf.MapSpec `ebpf:"stats_map"`
 }
 
 // WgForwardProxyVariableSpecs contains global variables before they are loaded into the kernel.
@@ -147,7 +146,6 @@ type WgForwardProxyMaps struct {
 	NatPortCounter       *ebpf.Map `ebpf:"nat_port_counter"`
 	NatReverseMap        *ebpf.Map `ebpf:"nat_reverse_map"`
 	ObfuscationConfigMap *ebpf.Map `ebpf:"obfuscation_config_map"`
-	StatsMap             *ebpf.Map `ebpf:"stats_map"`
 }
 
 func (m *WgForwardProxyMaps) Close() error {
@@ -157,7 +155,6 @@ func (m *WgForwardProxyMaps) Close() error {
 		m.NatPortCounter,
 		m.NatReverseMap,
 		m.ObfuscationConfigMap,
-		m.StatsMap,
 	)
 }
 

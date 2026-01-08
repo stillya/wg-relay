@@ -1,0 +1,21 @@
+{
+  "file_types": {
+    "C": ["c", "h"]
+  },
+  "lsp": {
+    "clangd": {
+      "binary": {
+        "path": "clangd"
+      }
+    }
+  },
+  "file_scan_exclusions": [
+    "**/.bin",
+    "**/.clangd",
+    "**/.claude",
+    "**/.git",
+    "**/.idea",
+    "**/.vscode",
+    "**/node_modules",
+  ]
+}

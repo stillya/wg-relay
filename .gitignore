@@ -24,9 +24,6 @@ tcvenv
 build/
 dist/
 
-# pwru
-pwru
-
 # Claude
 .claude
 
@@ -34,3 +31,12 @@ pwru
 *.out
 *.html
 covprofile
+
+# eBPF build artifacts
+ebpf/*.o
+ebpf/*.ll
+
+# IDE support
+compile_commands.json
+.clangd/
+.cache/

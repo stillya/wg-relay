@@ -8,7 +8,6 @@
 #include <linux/pkt_cls.h>
 #include <bpf/bpf_helpers.h>
 #include <bpf/bpf_endian.h>
-#include "common.h"
 #include "csum.h"
 #include "nat.h"
 #include "packet.h"
@@ -39,25 +38,25 @@ static __always_inline int create_nat_connection(struct packet_info *pkt, struct
         .server_ip = pkt->ip->daddr,
         .server_port = pkt->dst_port
     };
-    
+
     // Check if connection already exists first
     struct connection_value *existing = bpf_map_lookup_elem(&connection_map, &conn_key);
     if (existing) {
         existing->timestamp = get_timestamp();
         return 0;
     }
-    
+
     __u16 nat_port = generate_nat_port();
-    
+
     struct connection_value conn_value = {
         .timestamp = get_timestamp(),
         .nat_port = nat_port
     };
-    
+
     struct nat_key nat_key = {0};
     nat_key.server_ip = bpf_htonl(config->target_server_ip);
     nat_key.nat_port = nat_port;
-    
+
     int conn_updated = bpf_map_update_elem(&connection_map, &conn_key, &conn_value, BPF_NOEXIST);
     if (conn_updated == -EEXIST) {
         existing = bpf_map_lookup_elem(&connection_map, &conn_key);
@@ -70,14 +69,14 @@ static __always_inline int create_nat_connection(struct packet_info *pkt, struct
     } else if (conn_updated != 0) {
         return -1;
     }
-    
+
     int reverse_updated = bpf_map_update_elem(&nat_reverse_map, &nat_key, &conn_key, BPF_ANY);
     if (reverse_updated != 0) {
         // cleanup if reverse mapping fails
         bpf_map_delete_elem(&connection_map, &conn_key);
         return -1;
     }
-    
+
     return 0;
 }
 
@@ -86,7 +85,7 @@ static __always_inline int restore_nat_connection(struct packet_info *pkt, struc
     struct nat_key nat_key = {0};
     nat_key.server_ip = pkt->ip->saddr;
     nat_key.nat_port = pkt->dst_port;
-    
+
     struct connection_key *conn_key = bpf_map_lookup_elem(&nat_reverse_map, &nat_key);
     if (!conn_key) {
         return -1;
@@ -96,22 +95,17 @@ static __always_inline int restore_nat_connection(struct packet_info *pkt, struc
     original_conn->client_port = conn_key->client_port;
     original_conn->server_ip = conn_key->server_ip;
     original_conn->server_port = conn_key->server_port;
-    
+
     struct connection_value *conn_value = bpf_map_lookup_elem(&connection_map, conn_key);
     if (conn_value) {
         conn_value->timestamp = get_timestamp();
     }
-    
+
     return 0;
 }
 
 // Forward packet using XDP-Proxy style forwarding
 static __always_inline int forward_packet(struct xdp_md *ctx, struct packet_info *pkt, __u32 new_saddr, __u16 new_sport, __u32 new_daddr, __u16 new_dport) {
-    __u32 old_saddr = pkt->ip->saddr;
-    __u32 old_daddr = pkt->ip->daddr;
-    __u16 old_sport = pkt->udp->source;
-    __u16 old_dport = pkt->udp->dest;
-
     if (new_saddr != 0) {
         pkt->ip->saddr = bpf_htonl(new_saddr);
     }
@@ -143,7 +137,7 @@ static __always_inline int forward_packet(struct xdp_md *ctx, struct packet_info
         memcpy(pkt->eth->h_source, params.smac, ETH_ALEN);
         memcpy(pkt->eth->h_dest, params.dmac, ETH_ALEN);
     }
-    
+
     // TODO: Disabled fragmentation for now, fix it later
     pkt->ip->frag_off |= bpf_htons(IP_DF);
 
@@ -162,7 +156,7 @@ int wg_forward_proxy(struct xdp_md *ctx) {
     struct packet_info pkt = {};
     if (parse_xdp_packet(ctx, &pkt) < 0)
         return XDP_PASS;
-    
+
     __u16 src_port = bpf_ntohs(pkt.udp->source);
     __u16 dst_port = bpf_ntohs(pkt.udp->dest);
     if (dst_port != WG_PORT && src_port != WG_PORT)
@@ -174,22 +168,20 @@ int wg_forward_proxy(struct xdp_md *ctx) {
         DEBUG_PRINTK("Config disabled or missing, passing through WG packet");
         return XDP_PASS;
     }
-    
+
     __u8 is_to_wg = (dst_port == WG_PORT) ? 1 : 0;
     __u8 is_from_wg = (src_port == WG_PORT) ? 1 : 0;
-    
+
      __u32 pkt_len = (void *)(long)ctx->data_end - (void *)(long)ctx->data;
-    
+
     if (likely(is_from_wg)) {
         struct connection_key original_conn = {0};
         if (restore_nat_connection(&pkt, &original_conn) < 0) {
-            increment_stat(STAT_NAT_LOOKUPS_FAILED);
             DEBUG_PRINTK("Failed to restore NAT connection for FROM WG packet, passing through");
             update_metrics(METRIC_FROM_WG, METRIC_DROP, pkt_len, 0);
 
             return XDP_PASS;
         }
-        increment_stat(STAT_NAT_LOOKUPS_SUCCESS);
 
         apply_obfuscation(&pkt, config);
 
@@ -199,7 +191,7 @@ int wg_forward_proxy(struct xdp_md *ctx) {
         update_metrics(METRIC_FROM_WG, METRIC_FORWARDED, pkt_len, client_ip);
         return forward_packet(ctx, &pkt, proxy_ip, original_conn.server_port, client_ip, original_conn.client_port);
     }
-    
+
     if (unlikely(is_to_wg)) {
         if (create_nat_connection(&pkt, config) < 0) {
             DEBUG_PRINTK("Failed to create NAT connection for TO WG packet");
@@ -231,7 +223,7 @@ int wg_forward_proxy(struct xdp_md *ctx) {
         update_metrics(METRIC_TO_WG, METRIC_FORWARDED, pkt_len, bpf_ntohl(pkt.ip->saddr));
         return forward_packet(ctx, &pkt, proxy_ip, conn_value->nat_port, server_ip, WG_PORT);
     }
-    
+
     DEBUG_PRINTK("No matching handler for WG packet, passing through");
     return XDP_PASS;
 }

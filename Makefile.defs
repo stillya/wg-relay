@@ -1,0 +1,15 @@
+GO ?= go
+GO_BUILD = $(GO) build
+GO_GENERATE = $(GO) generate
+
+# Quiet build
+ifeq ($(V),1)
+QUIET =
+else
+QUIET = @
+endif
+
+ECHO_GEN = echo "  GEN     $@"
+ECHO_CLEAN = echo "Cleaning..."
+ECHO_CC = echo "  CC      $@"
+ECHO_LLC = echo "  LLC     $@"

@@ -1,0 +1,42 @@
+[
+  {
+    "label": "Build All",
+    "command": "make all",
+    "tags": ["build"]
+  },
+  {
+    "label": "Build Daemon",
+    "command": "make build",
+    "tags": ["build"]
+  },
+  {
+    "label": "Clean",
+    "command": "make clean",
+    "tags": ["build"]
+  },
+  {
+    "label": "Test All",
+    "command": "make test",
+    "tags": ["test"]
+  },
+  {
+    "label": "Test eBPF",
+    "command": "make test-ebpf",
+    "tags": ["test"]
+  },
+  {
+    "label": "Generate compile_commands.json",
+    "command": "make -C ebpf gen_compile_commands",
+    "tags": ["dev"]
+  },
+  {
+    "label": "Build eBPF (verbose)",
+    "command": "make -C ebpf all V=1",
+    "tags": ["build", "dev"]
+  },
+  {
+    "label": "Run Daemon",
+    "command": "make run-daemon",
+    "tags": ["run"]
+  }
+]

@@ -15,9 +15,6 @@ const (
 	xdpTx       = 3
 	xdpRedirect = 4 // fib_lookup redirects to default gateway
 
-	statNatLookupsSuccess = 2
-	statNatLookupsFailed  = 3
-
 	metricToWg      = 1
 	metricFromWg    = 2
 	metricForwarded = 1
@@ -50,7 +47,6 @@ func TestWgForwardProxy(t *testing.T) {
 		packet          []byte
 		obfuscationCfg  WgForwardProxyObfuscationConfig
 		expectedResult  int
-		expectedStats   map[uint32]uint64
 		expectedMetrics map[MetricsKey]uint64
 		checkObfuscated bool
 		description     string
@@ -60,7 +56,6 @@ func TestWgForwardProxy(t *testing.T) {
 			packet:          createHTTPPacket("192.168.1.1", "192.168.1.2", 8080, 80),
 			obfuscationCfg:  createObfuscationConfig(true, "test-key-123", "10.0.0.1"),
 			expectedResult:  xdpPass,
-			expectedStats:   map[uint32]uint64{},
 			expectedMetrics: map[MetricsKey]uint64{},
 			checkObfuscated: false,
 			description:     "HTTP traffic should pass through unchanged",
@@ -70,7 +65,6 @@ func TestWgForwardProxy(t *testing.T) {
 			packet:         createWGPacket("192.168.1.1", "192.168.1.2", 12345, wgPort),
 			obfuscationCfg: createObfuscationConfig(true, "test-key-123", "10.0.0.1"),
 			expectedResult: xdpRedirect,
-			expectedStats:  map[uint32]uint64{},
 			expectedMetrics: map[MetricsKey]uint64{
 				{Dir: metricToWg, Reason: metricForwarded}: 1,
 			},
@@ -82,7 +76,6 @@ func TestWgForwardProxy(t *testing.T) {
 			packet:          createWGPacket("192.168.1.1", "192.168.1.2", 12345, wgPort),
 			obfuscationCfg:  createObfuscationConfig(false, "test-key-123", "10.0.0.1"),
 			expectedResult:  xdpPass,
-			expectedStats:   map[uint32]uint64{},
 			expectedMetrics: map[MetricsKey]uint64{},
 			checkObfuscated: false,
 			description:     "WG traffic with obfuscation disabled should pass through",
@@ -92,7 +85,6 @@ func TestWgForwardProxy(t *testing.T) {
 			packet:         createWGPacket("192.168.1.2", "192.168.1.1", wgPort, 12345),
 			obfuscationCfg: createObfuscationConfig(true, "test-key-123", "10.0.0.1"),
 			expectedResult: xdpPass,
-			expectedStats:  map[uint32]uint64{statNatLookupsFailed: 1},
 			expectedMetrics: map[MetricsKey]uint64{
 				{Dir: metricFromWg, Reason: metricDrop}: 1,
 			},
@@ -104,7 +96,6 @@ func TestWgForwardProxy(t *testing.T) {
 			packet:          createTCPPacket("192.168.1.1", "192.168.1.2", 12345, 80),
 			obfuscationCfg:  createObfuscationConfig(true, "test-key-123", "10.0.0.1"),
 			expectedResult:  xdpPass,
-			expectedStats:   map[uint32]uint64{},
 			expectedMetrics: map[MetricsKey]uint64{},
 			checkObfuscated: false,
 			description:     "TCP traffic should pass through unchanged",
@@ -114,7 +105,6 @@ func TestWgForwardProxy(t *testing.T) {
 			packet:         createWGPacket("192.168.1.1", "192.168.1.2", 12345, wgPort),
 			obfuscationCfg: createObfuscationConfig(true, "test-key-123", "192.168.200.100"),
 			expectedResult: xdpRedirect,
-			expectedStats:  map[uint32]uint64{},
 			expectedMetrics: map[MetricsKey]uint64{
 				{Dir: metricToWg, Reason: metricForwarded}: 1,
 			},
@@ -125,7 +115,6 @@ func TestWgForwardProxy(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			oldStats := captureStats(objs.StatsMap)
 			oldMetrics := captureMetrics(objs.MetricsMap)
 
 			configKey := uint32(0)
@@ -146,9 +135,6 @@ func TestWgForwardProxy(t *testing.T) {
 			if tt.checkObfuscated && outputPacket != nil {
 				verifyObfuscation(t, tt.packet, outputPacket, tt.obfuscationCfg, tt.description)
 			}
-
-			currentStats := captureStats(objs.StatsMap)
-			verifyStats(t, oldStats, currentStats, tt.expectedStats, tt.description)
 
 			currentMetrics := captureMetrics(objs.MetricsMap)
 			verifyMetrics(t, oldMetrics, currentMetrics, tt.expectedMetrics, tt.description)
@@ -268,24 +254,6 @@ func createObfuscationConfig(enabled bool, key, targetServerIP string) WgForward
 	return cfg
 }
 
-func captureStats(statsMap *ebpf.Map) map[uint32]uint64 {
-	stats := make(map[uint32]uint64)
-
-	// Only capture legacy NAT stats that are still used
-	statKeys := []uint32{statNatLookupsSuccess, statNatLookupsFailed}
-
-	for _, key := range statKeys {
-		var value uint64
-		err := statsMap.Lookup(&key, &value)
-		if err != nil {
-			value = 0
-		}
-		stats[key] = value
-	}
-
-	return stats
-}
-
 func captureMetrics(metricsMap *ebpf.Map) map[MetricsKey]uint64 {
 	metrics := make(map[MetricsKey]uint64)
 
@@ -323,18 +291,6 @@ func captureMetrics(metricsMap *ebpf.Map) map[MetricsKey]uint64 {
 	}
 
 	return metrics
-}
-
-func verifyStats(t *testing.T, oldStats, actual, expected map[uint32]uint64, description string) {
-	for statKey, expectedValue := range expected {
-		if actualValue, exists := actual[statKey]; !exists {
-			t.Errorf("%s: Expected stat %d to be %d, but stat key not found",
-				description, statKey, expectedValue)
-		} else if actualValue-oldStats[statKey] != expectedValue {
-			t.Errorf("%s: Stat %d expected %d, got %d",
-				description, statKey, expectedValue, actualValue)
-		}
-	}
 }
 
 func verifyMetrics(t *testing.T, oldMetrics, actual, expected map[MetricsKey]uint64, description string) {

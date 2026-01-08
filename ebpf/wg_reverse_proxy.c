@@ -8,7 +8,6 @@
 #include <linux/pkt_cls.h>
 #include <bpf/bpf_helpers.h>
 #include <bpf/bpf_endian.h>
-#include "common.h"
 #include "csum.h"
 #include "packet.h"
 #include "metrics.h"
@@ -24,17 +23,17 @@ int wg_reverse_proxy(struct __sk_buff *skb) {
     __u16 dst_port = bpf_ntohs(pkt.udp->dest);
     if (dst_port != WG_PORT && src_port != WG_PORT)
         return TC_ACT_OK;
-    
+
     __u32 config_key = 0;
     struct obfuscation_config *config = bpf_map_lookup_elem(&obfuscation_config_map, &config_key);
     if (!config || !config->enabled) {
         DEBUG_PRINTK("Config disabled or missing, passing through WG packet");
         return TC_ACT_OK;
     }
-    
+
     __u8 is_to_wg = (dst_port == WG_PORT) ? 1 : 0;
     __u8 is_from_wg = (src_port == WG_PORT) ? 1 : 0;
-        
+
     if (likely(is_from_wg)) {
         if (config->method != OBFUSCATE_NONE && config->key_len > 0) {
             apply_obfuscation(&pkt, config);
