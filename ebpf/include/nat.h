@@ -4,6 +4,8 @@
 #include <linux/types.h>
 #include <linux/if_ether.h>
 #include <bpf/bpf_helpers.h>
+#include <linux/bpf.h>
+#include "common.h"
 
 #ifndef memcpy
 #define memcpy(dest, src, n) __builtin_memcpy((dest), (src), (n))
@@ -41,10 +43,10 @@ struct {
     __type(value, __u32);
 } nat_port_counter SEC(".maps");
 
-static __always_inline __u16 generate_nat_port() {
+static __always_inline __maybe_unused __u16 generate_nat_port() {
     __u32 counter_key = 0;
     __u32 *counter = bpf_map_lookup_elem(&nat_port_counter, &counter_key);
-    
+
     __u32 port = NAT_PORT_START;
     if (counter) {
         __sync_fetch_and_add(counter, 1);
@@ -54,18 +56,18 @@ static __always_inline __u16 generate_nat_port() {
         bpf_map_update_elem(&nat_port_counter, &counter_key, &initial, BPF_NOEXIST);
         port = NAT_PORT_START;
     }
-    
+
     return (__u16)port;
 }
 
-static __always_inline void swap_eth(struct ethhdr* eth) {
+static __always_inline __maybe_unused void swap_eth(struct ethhdr* eth) {
     __u8 tmp[ETH_ALEN];
     memcpy(&tmp, eth->h_source, ETH_ALEN);
     memcpy(eth->h_source, eth->h_dest, ETH_ALEN);
     memcpy(eth->h_dest, &tmp, ETH_ALEN);
 }
 
-static __always_inline __u64 get_timestamp() {
+static __always_inline __maybe_unused __u64 get_timestamp() {
     return bpf_ktime_get_ns();
 }
 

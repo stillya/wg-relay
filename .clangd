@@ -1,0 +1,6 @@
+CompileFlags:
+  Add:
+    - -xc
+    - -Iebpf/include
+    - -I/usr/include
+    - -I/usr/include/bpf

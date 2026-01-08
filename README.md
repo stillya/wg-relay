@@ -175,6 +175,9 @@ consistent environment with all dependencies pre-installed. Especially in non-li
 # Create test namespaces
 sudo bash setup-netns.sh
 
-# Run proxy in namespace
-sudo make run-forward-proxy
+# Run forward-proxy in namespace
+sudo make run-local-forward
+
+# Run reverse-proxy in namespace
+sudo make run-local-reverse
 ```

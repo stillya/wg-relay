@@ -1,4 +1,4 @@
-ARG GO_VARIANT=1.24-bookworm
+ARG GO_VARIANT=1.25-bookworm
 FROM mcr.microsoft.com/devcontainers/go:${GO_VARIANT}
 
 ARG TARGETARCH
@@ -15,7 +15,9 @@ RUN asm_arch=$(if [ "${TARGETARCH}" = "arm64" ]; then echo "aarch64-linux-gnu"; 
     build-essential \
     pkg-config \
     clang \
+    clangd \
     llvm \
+    lld \
     m4 \
     git \
     libelf-dev \
@@ -32,7 +34,7 @@ RUN asm_arch=$(if [ "${TARGETARCH}" = "arm64" ]; then echo "aarch64-linux-gnu"; 
     xdp-tools \
     tshark \
     ca-certificates \
-    wget && \
+    bear && \
     ln -sf /usr/include/${asm_arch}/asm/ /usr/include/asm && \
     ln -sf /usr/local/go/bin/go /bin/go && \
     git clone --recurse-submodules --depth 1 https://github.com/libbpf/bpftool.git /tmp/bpftool && \

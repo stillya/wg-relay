@@ -88,7 +88,6 @@ type WgReverseProxyProgramSpecs struct {
 type WgReverseProxyMapSpecs struct {
 	MetricsMap           *ebpf.MapSpec `ebpf:"metrics_map"`
 	ObfuscationConfigMap *ebpf.MapSpec `ebpf:"obfuscation_config_map"`
-	StatsMap             *ebpf.MapSpec `ebpf:"stats_map"`
 }
 
 // WgReverseProxyVariableSpecs contains global variables before they are loaded into the kernel.
@@ -119,14 +118,12 @@ func (o *WgReverseProxyObjects) Close() error {
 type WgReverseProxyMaps struct {
 	MetricsMap           *ebpf.Map `ebpf:"metrics_map"`
 	ObfuscationConfigMap *ebpf.Map `ebpf:"obfuscation_config_map"`
-	StatsMap             *ebpf.Map `ebpf:"stats_map"`
 }
 
 func (m *WgReverseProxyMaps) Close() error {
 	return _WgReverseProxyClose(
 		m.MetricsMap,
 		m.ObfuscationConfigMap,
-		m.StatsMap,
 	)
 }
 
