@@ -49,14 +49,9 @@ type WgForwardProxyNatKey struct {
 	NatPort  uint32
 }
 
-type WgForwardProxyObfuscationConfig struct {
-	_              structs.HostLayout
-	Enabled        bool
-	Method         uint8
-	Key            [32]uint8
-	KeyLen         uint8
-	_              [1]byte
-	TargetServerIp uint32
+type WgForwardProxyXorKey struct {
+	_   structs.HostLayout
+	Key [32]uint8
 }
 
 // LoadWgForwardProxy returns the embedded CollectionSpec for WgForwardProxy.
@@ -108,17 +103,25 @@ type WgForwardProxyProgramSpecs struct {
 //
 // It can be passed ebpf.CollectionSpec.Assign.
 type WgForwardProxyMapSpecs struct {
-	ConnectionMap        *ebpf.MapSpec `ebpf:"connection_map"`
-	MetricsMap           *ebpf.MapSpec `ebpf:"metrics_map"`
-	NatPortCounter       *ebpf.MapSpec `ebpf:"nat_port_counter"`
-	NatReverseMap        *ebpf.MapSpec `ebpf:"nat_reverse_map"`
-	ObfuscationConfigMap *ebpf.MapSpec `ebpf:"obfuscation_config_map"`
+	BackendMap     *ebpf.MapSpec `ebpf:"backend_map"`
+	ConnectionMap  *ebpf.MapSpec `ebpf:"connection_map"`
+	MetricsMap     *ebpf.MapSpec `ebpf:"metrics_map"`
+	NatPortCounter *ebpf.MapSpec `ebpf:"nat_port_counter"`
+	NatReverseMap  *ebpf.MapSpec `ebpf:"nat_reverse_map"`
 }
 
 // WgForwardProxyVariableSpecs contains global variables before they are loaded into the kernel.
 //
 // It can be passed ebpf.CollectionSpec.Assign.
 type WgForwardProxyVariableSpecs struct {
+	CfgPaddingEnabled  *ebpf.VariableSpec `ebpf:"__cfg_padding_enabled"`
+	CfgPaddingFillMode *ebpf.VariableSpec `ebpf:"__cfg_padding_fill_mode"`
+	CfgPaddingMax      *ebpf.VariableSpec `ebpf:"__cfg_padding_max"`
+	CfgPaddingMin      *ebpf.VariableSpec `ebpf:"__cfg_padding_min"`
+	CfgWgPort          *ebpf.VariableSpec `ebpf:"__cfg_wg_port"`
+	CfgXorEnabled      *ebpf.VariableSpec `ebpf:"__cfg_xor_enabled"`
+	CfgXorKey          *ebpf.VariableSpec `ebpf:"__cfg_xor_key"`
+	CfgXorKeyLen       *ebpf.VariableSpec `ebpf:"__cfg_xor_key_len"`
 }
 
 // WgForwardProxyObjects contains all objects after they have been loaded into the kernel.
@@ -141,20 +144,20 @@ func (o *WgForwardProxyObjects) Close() error {
 //
 // It can be passed to LoadWgForwardProxyObjects or ebpf.CollectionSpec.LoadAndAssign.
 type WgForwardProxyMaps struct {
-	ConnectionMap        *ebpf.Map `ebpf:"connection_map"`
-	MetricsMap           *ebpf.Map `ebpf:"metrics_map"`
-	NatPortCounter       *ebpf.Map `ebpf:"nat_port_counter"`
-	NatReverseMap        *ebpf.Map `ebpf:"nat_reverse_map"`
-	ObfuscationConfigMap *ebpf.Map `ebpf:"obfuscation_config_map"`
+	BackendMap     *ebpf.Map `ebpf:"backend_map"`
+	ConnectionMap  *ebpf.Map `ebpf:"connection_map"`
+	MetricsMap     *ebpf.Map `ebpf:"metrics_map"`
+	NatPortCounter *ebpf.Map `ebpf:"nat_port_counter"`
+	NatReverseMap  *ebpf.Map `ebpf:"nat_reverse_map"`
 }
 
 func (m *WgForwardProxyMaps) Close() error {
 	return _WgForwardProxyClose(
+		m.BackendMap,
 		m.ConnectionMap,
 		m.MetricsMap,
 		m.NatPortCounter,
 		m.NatReverseMap,
-		m.ObfuscationConfigMap,
 	)
 }
 
@@ -162,6 +165,14 @@ func (m *WgForwardProxyMaps) Close() error {
 //
 // It can be passed to LoadWgForwardProxyObjects or ebpf.CollectionSpec.LoadAndAssign.
 type WgForwardProxyVariables struct {
+	CfgPaddingEnabled  *ebpf.Variable `ebpf:"__cfg_padding_enabled"`
+	CfgPaddingFillMode *ebpf.Variable `ebpf:"__cfg_padding_fill_mode"`
+	CfgPaddingMax      *ebpf.Variable `ebpf:"__cfg_padding_max"`
+	CfgPaddingMin      *ebpf.Variable `ebpf:"__cfg_padding_min"`
+	CfgWgPort          *ebpf.Variable `ebpf:"__cfg_wg_port"`
+	CfgXorEnabled      *ebpf.Variable `ebpf:"__cfg_xor_enabled"`
+	CfgXorKey          *ebpf.Variable `ebpf:"__cfg_xor_key"`
+	CfgXorKeyLen       *ebpf.Variable `ebpf:"__cfg_xor_key_len"`
 }
 
 // WgForwardProxyPrograms contains all programs after they have been loaded into the kernel.

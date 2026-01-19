@@ -1,0 +1,60 @@
+---
+BasedOnStyle: LLVM
+
+UseTab: Always
+TabWidth: 8
+IndentWidth: 8
+ContinuationIndentWidth: 8
+
+ColumnLimit: 120
+
+# Braces - K&R style (opening brace on same line)
+BreakBeforeBraces: Attach
+
+# Pointers and references
+PointerAlignment: Right
+DerivePointerAlignment: false
+
+# Spacing
+SpaceAfterCStyleCast: false
+SpaceBeforeParens: ControlStatements
+SpacesInParentheses: false
+SpacesInSquareBrackets: false
+
+# Includes
+IncludeBlocks: Merge
+IncludeCategories:
+  - Regex:           '^<linux/'
+    Priority:        1
+  - Regex:           '^<bpf/'
+    Priority:        2
+  - Regex:           '^".*'
+    Priority:        3
+  - Regex:           '.*'
+    Priority:        4
+SortIncludes: true
+
+# Alignment
+AlignConsecutiveMacros: true
+AlignConsecutiveDeclarations: false
+AlignEscapedNewlines: Right
+AlignTrailingComments: true
+
+# Function declarations
+AllowShortFunctionsOnASingleLine: None
+AlwaysBreakAfterReturnType: None
+BreakBeforeBinaryOperators: None
+
+# Comments
+ReflowComments: true
+CommentPragmas: '^ IWYU pragma:'
+
+# Other
+AllowShortIfStatementsOnASingleLine: false
+AllowShortLoopsOnASingleLine: false
+AllowShortBlocksOnASingleLine: false
+KeepEmptyLinesAtTheStartOfBlocks: false
+MaxEmptyLinesToKeep: 1
+
+# Struct initialization - traditional C style with each field on new line, but must have comma in the end
+Cpp11BracedListStyle: false

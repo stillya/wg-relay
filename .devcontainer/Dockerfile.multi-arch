@@ -16,6 +16,7 @@ RUN asm_arch=$(if [ "${TARGETARCH}" = "arm64" ]; then echo "aarch64-linux-gnu"; 
     pkg-config \
     clang \
     clangd \
+    clang-format \
     llvm \
     lld \
     m4 \

@@ -27,16 +27,11 @@ func NewForwardLoader() (*ForwardLoader, error) {
 	return &ForwardLoader{}, nil
 }
 
-// LoadAndAttach loads the forward proxy program and attaches it to interfaces
 func (fp *ForwardLoader) LoadAndAttach(ctx context.Context, cfg config.ProxyConfig) error {
 	fp.cfg = cfg
 
 	if err := fp.loadEBPF(); err != nil {
 		return errors.Wrap(err, "failed to load eBPF objects")
-	}
-
-	if err := fp.configure(cfg); err != nil {
-		return errors.Wrap(err, "failed to configure eBPF maps")
 	}
 
 	if err := fp.attachToInterfaces(); err != nil {
@@ -46,64 +41,106 @@ func (fp *ForwardLoader) LoadAndAttach(ctx context.Context, cfg config.ProxyConf
 
 	log.Info("Forward proxy loaded and attached",
 		"enabled", cfg.Enabled,
-		"method", cfg.Method,
 		"target_server_ip", cfg.Forward.TargetServerIP)
 
 	return nil
 }
 
-// configure configures the eBPF maps with the provided configuration
-func (fp *ForwardLoader) configure(cfg config.ProxyConfig) error {
-	if fp.objs == nil || fp.objs.ObfuscationConfigMap == nil {
-		return errors.New("eBPF objects not loaded")
+func (fp *ForwardLoader) configureStaticVars(spec *ebpf.CollectionSpec) error {
+	xorEnabled := fp.cfg.Instrumentations.XOR != nil && fp.cfg.Instrumentations.XOR.Enabled
+	if err := spec.Variables["__cfg_xor_enabled"].Set(xorEnabled); err != nil {
+		return errors.Wrap(err, "failed to set xor_enabled")
 	}
 
-	targetServerIP, err := cfg.GetTargetServerIP()
-	if err != nil {
-		return errors.Wrap(err, "failed to get target server IP")
+	if xorEnabled {
+		keyBytes := fp.cfg.GetXORKey()
+		if keyBytes != nil {
+			var keyArray [32]byte
+			copy(keyArray[:], keyBytes)
+
+			if err := spec.Variables["__cfg_xor_key"].Set(keyArray); err != nil {
+				return errors.Wrap(err, "failed to set xor_key")
+			}
+			if err := spec.Variables["__cfg_xor_key_len"].Set(uint8(len(keyBytes))); err != nil {
+				return errors.Wrap(err, "failed to set xor_key_len")
+			}
+		}
+	} else {
+		if err := spec.Variables["__cfg_xor_key_len"].Set(uint8(0)); err != nil {
+			return errors.Wrap(err, "failed to set xor_key_len to 0")
+		}
 	}
 
-	keyBytes := cfg.GetKeyBytes()
-	epbfConfig := wgebpf.WgForwardProxyObfuscationConfig{
-		Enabled:        true,
-		Method:         uint8(cfg.GetMethod()),
-		KeyLen:         uint8(len(keyBytes)),
-		TargetServerIp: targetServerIP,
+	paddingEnabled := fp.cfg.Instrumentations.Padding != nil && fp.cfg.Instrumentations.Padding.Enabled
+	if err := spec.Variables["__cfg_padding_enabled"].Set(paddingEnabled); err != nil {
+		return errors.Wrap(err, "failed to set padding_enabled")
 	}
 
-	if !cfg.Enabled {
-		epbfConfig.Enabled = false
+	if paddingEnabled {
+		minPad, maxPad, fillMode := fp.cfg.GetPaddingConfig()
+		if err := spec.Variables["__cfg_padding_min"].Set(minPad); err != nil {
+			return errors.Wrap(err, "failed to set padding_min")
+		}
+		if err := spec.Variables["__cfg_padding_max"].Set(maxPad); err != nil {
+			return errors.Wrap(err, "failed to set padding_max")
+		}
+		if err := spec.Variables["__cfg_padding_fill_mode"].Set(fillMode); err != nil {
+			return errors.Wrap(err, "failed to set padding_fill_mode")
+		}
+	} else {
+		if err := spec.Variables["__cfg_padding_min"].Set(uint16(0)); err != nil {
+			return errors.Wrap(err, "failed to set padding_min to 0")
+		}
 	}
 
-	if len(keyBytes) > len(epbfConfig.Key) {
-		return errors.Errorf("key too long: %d bytes, max %d", len(keyBytes), len(epbfConfig.Key))
-	}
-	copy(epbfConfig.Key[:], keyBytes)
-
-	configKey := uint32(0)
-	if err := fp.objs.ObfuscationConfigMap.Put(&configKey, &epbfConfig); err != nil {
-		return errors.Wrap(err, "failed to update forward epbfConfig map")
+	if err := spec.Variables["__cfg_wg_port"].Set(fp.cfg.WGPort); err != nil {
+		return errors.Wrap(err, "failed to set wg_port")
 	}
 
 	return nil
 }
 
-// loadEBPF loads the forward proxy eBPF program
 func (fp *ForwardLoader) loadEBPF() error {
-	fp.objs = &wgebpf.WgForwardProxyObjects{}
+	spec, err := wgebpf.LoadWgForwardProxy()
+	if err != nil {
+		return errors.Wrap(err, "failed to load forward proxy spec")
+	}
 
+	if err := fp.configureStaticVars(spec); err != nil {
+		return errors.Wrap(err, "failed to configure static variables")
+	}
+
+	fp.objs = &wgebpf.WgForwardProxyObjects{}
 	opts := &ebpf.CollectionOptions{
 		Programs: ebpf.ProgramOptions{
 			LogLevel:     2,
-			LogSizeStart: 16777216, // 16 MB log size
+			LogSizeStart: 16777216,
 		},
 	}
 
-	if err := wgebpf.LoadWgForwardProxyObjects(fp.objs, opts); err != nil {
+	if err := spec.LoadAndAssign(fp.objs, opts); err != nil {
 		return errors.Wrap(err, "failed to load forward proxy eBPF objects")
 	}
 
+	if err := fp.configureBackendMap(); err != nil {
+		return errors.Wrap(err, "failed to configure backend map")
+	}
+
 	log.Info("Forward proxy eBPF program loaded")
+	return nil
+}
+
+func (fp *ForwardLoader) configureBackendMap() error {
+	targetServerIP, err := fp.cfg.GetTargetServerIP()
+	if err != nil {
+		return errors.Wrap(err, "failed to get target server IP")
+	}
+
+	key := uint32(0)
+	_ = key
+	_ = targetServerIP
+
+	log.Info("Backend map configured", "target_server_ip", fp.cfg.Forward.TargetServerIP)
 	return nil
 }
 

@@ -1,0 +1,70 @@
+version: "2"
+
+run:
+  timeout: 5m
+
+linters:
+  default: none
+  enable:
+    - govet
+    - errcheck
+    - staticcheck
+    - gosec
+    - ineffassign
+    - unused
+    - revive
+    - misspell
+    - unconvert
+    - copyloopvar
+
+  settings:
+    gosec:
+      excludes:
+        - G104
+
+    revive:
+      rules:
+        - name: exported
+          severity: warning
+        - name: error-return
+        - name: error-naming
+        - name: if-return
+        - name: var-naming
+
+  exclusions:
+    generated: lax
+    rules:
+      # Skip all enabled linters for these generated files
+      - path: _bpfel\.go$
+        linters:
+          - govet
+          - errcheck
+          - staticcheck
+          - gosec
+          - ineffassign
+          - unused
+          - revive
+          - misspell
+          - unconvert
+          - copyloopvar
+
+      - path: _bpfeb\.go$
+        linters:
+          - govet
+          - errcheck
+          - staticcheck
+          - gosec
+          - ineffassign
+          - unused
+          - revive
+          - misspell
+          - unconvert
+          - copyloopvar
+
+      - path: main\.go$
+        linters: [errcheck]
+        text: "Error return value of.*not checked"
+
+issues:
+  max-issues-per-linter: 0
+  max-same-issues: 0

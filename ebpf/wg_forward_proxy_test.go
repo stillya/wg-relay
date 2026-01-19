@@ -12,7 +12,6 @@ import (
 const (
 	wgPort      = 51820
 	xdpPass     = 2
-	xdpTx       = 3
 	xdpRedirect = 4 // fib_lookup redirects to default gateway
 
 	metricToWg      = 1
@@ -21,7 +20,6 @@ const (
 	metricDrop      = 2
 )
 
-// MetricsKey matches the eBPF struct metrics_key
 type MetricsKey struct {
 	Dir     uint8
 	Reason  uint8
@@ -29,87 +27,78 @@ type MetricsKey struct {
 	SrcAddr uint32
 }
 
-// MetricsValue matches the eBPF struct metrics_value
 type MetricsValue struct {
 	Packets uint64
 	Bytes   uint64
 }
 
-func TestWgForwardProxy(t *testing.T) {
+func TestBasicForwarding(t *testing.T) {
+	spec, err := LoadWgForwardProxy()
+	if err != nil {
+		t.Fatalf("Failed to load spec: %v", err)
+	}
+
+	if err := spec.Variables["__cfg_xor_enabled"].Set(false); err != nil {
+		t.Fatalf("Failed to set xor_enabled: %v", err)
+	}
+	if err := spec.Variables["__cfg_xor_key_len"].Set(uint8(0)); err != nil {
+		t.Fatalf("Failed to set xor_key_len: %v", err)
+	}
+	if err := spec.Variables["__cfg_padding_enabled"].Set(false); err != nil {
+		t.Fatalf("Failed to set padding_enabled: %v", err)
+	}
+	if err := spec.Variables["__cfg_padding_min"].Set(uint16(0)); err != nil {
+		t.Fatalf("Failed to set padding_min: %v", err)
+	}
+	if err := spec.Variables["__cfg_wg_port"].Set(uint16(wgPort)); err != nil {
+		t.Fatalf("Failed to set wg_port: %v", err)
+	}
+
 	objs := &WgForwardProxyObjects{}
-	if err := LoadWgForwardProxyObjects(objs, nil); err != nil {
-		t.Fatalf("Failed to load eBPF objects: %v", err)
+	if err := spec.LoadAndAssign(objs, nil); err != nil {
+		t.Fatalf("Failed to load objects: %v", err)
 	}
 	defer objs.Close()
+
+	backendKey := uint32(0)
+	targetIP := ipToUint32("10.0.0.1")
+	if err := objs.BackendMap.Put(&backendKey, &targetIP); err != nil {
+		t.Fatalf("Failed to set backend map: %v", err)
+	}
 
 	tests := []struct {
 		name            string
 		packet          []byte
-		obfuscationCfg  WgForwardProxyObfuscationConfig
 		expectedResult  int
 		expectedMetrics map[MetricsKey]uint64
-		checkObfuscated bool
-		description     string
 	}{
 		{
-			name:            "non_wg_traffic_http",
+			name:            "non_wg_traffic",
 			packet:          createHTTPPacket("192.168.1.1", "192.168.1.2", 8080, 80),
-			obfuscationCfg:  createObfuscationConfig(true, "test-key-123", "10.0.0.1"),
 			expectedResult:  xdpPass,
 			expectedMetrics: map[MetricsKey]uint64{},
-			checkObfuscated: false,
-			description:     "HTTP traffic should pass through unchanged",
 		},
 		{
-			name:           "wg_traffic_obfuscation_enabled",
+			name:           "wg_traffic_to_server",
 			packet:         createWGPacket("192.168.1.1", "192.168.1.2", 12345, wgPort),
-			obfuscationCfg: createObfuscationConfig(true, "test-key-123", "10.0.0.1"),
 			expectedResult: xdpRedirect,
 			expectedMetrics: map[MetricsKey]uint64{
 				{Dir: metricToWg, Reason: metricForwarded}: 1,
 			},
-			checkObfuscated: true,
-			description:     "WG traffic with obfuscation enabled should be processed",
 		},
 		{
-			name:            "wg_traffic_obfuscation_disabled",
-			packet:          createWGPacket("192.168.1.1", "192.168.1.2", 12345, wgPort),
-			obfuscationCfg:  createObfuscationConfig(false, "test-key-123", "10.0.0.1"),
-			expectedResult:  xdpPass,
-			expectedMetrics: map[MetricsKey]uint64{},
-			checkObfuscated: false,
-			description:     "WG traffic with obfuscation disabled should pass through",
-		},
-		{
-			name:           "wg_reverse_traffic",
+			name:           "wg_reverse_traffic_no_nat",
 			packet:         createWGPacket("192.168.1.2", "192.168.1.1", wgPort, 12345),
-			obfuscationCfg: createObfuscationConfig(true, "test-key-123", "10.0.0.1"),
 			expectedResult: xdpPass,
 			expectedMetrics: map[MetricsKey]uint64{
 				{Dir: metricFromWg, Reason: metricDrop}: 1,
 			},
-			checkObfuscated: false,
-			description:     "Reverse WG traffic without NAT mapping should pass through",
 		},
 		{
-			name:            "non_udp_traffic",
+			name:            "tcp_traffic",
 			packet:          createTCPPacket("192.168.1.1", "192.168.1.2", 12345, 80),
-			obfuscationCfg:  createObfuscationConfig(true, "test-key-123", "10.0.0.1"),
 			expectedResult:  xdpPass,
 			expectedMetrics: map[MetricsKey]uint64{},
-			checkObfuscated: false,
-			description:     "TCP traffic should pass through unchanged",
-		},
-		{
-			name:           "wg_traffic_different_target_server",
-			packet:         createWGPacket("192.168.1.1", "192.168.1.2", 12345, wgPort),
-			obfuscationCfg: createObfuscationConfig(true, "test-key-123", "192.168.200.100"),
-			expectedResult: xdpRedirect,
-			expectedMetrics: map[MetricsKey]uint64{
-				{Dir: metricToWg, Reason: metricForwarded}: 1,
-			},
-			checkObfuscated: true,
-			description:     "WG traffic with different target server should be processed",
 		},
 	}
 
@@ -117,40 +106,282 @@ func TestWgForwardProxy(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			oldMetrics := captureMetrics(objs.MetricsMap)
 
-			configKey := uint32(0)
-			if err := objs.ObfuscationConfigMap.Put(&configKey, &tt.obfuscationCfg); err != nil {
-				t.Fatalf("Failed to update config map: %v", err)
-			}
-
-			result, outputPacket, err := runXDPProgram(objs.WgForwardProxy, tt.packet)
+			result, _, err := objs.WgForwardProxy.Test(tt.packet)
 			if err != nil {
-				t.Fatalf("Failed to run eBPF program: %v", err)
+				t.Fatalf("Failed to run program: %v", err)
 			}
 
-			if result != tt.expectedResult {
-				t.Errorf("%s: Expected result %d, got %d", tt.description, tt.expectedResult, result)
-			}
-
-			// Check obfuscation in output buffer if required
-			if tt.checkObfuscated && outputPacket != nil {
-				verifyObfuscation(t, tt.packet, outputPacket, tt.obfuscationCfg, tt.description)
+			if int(result) != tt.expectedResult {
+				t.Errorf("Expected result %d, got %d", tt.expectedResult, result)
 			}
 
 			currentMetrics := captureMetrics(objs.MetricsMap)
-			verifyMetrics(t, oldMetrics, currentMetrics, tt.expectedMetrics, tt.description)
+			verifyMetrics(t, oldMetrics, currentMetrics, tt.expectedMetrics)
 		})
 	}
 }
 
-func runXDPProgram(prog *ebpf.Program, packet []byte) (int, []byte, error) {
-	result, out, err := prog.Test(packet)
-	return int(result), out, err
+func TestXORObfuscation(t *testing.T) {
+	tests := []struct {
+		name       string
+		xorEnabled bool
+		xorKey     string
+	}{
+		{
+			name:       "xor_enabled",
+			xorEnabled: true,
+			xorKey:     "test-key-1234567",
+		},
+		{
+			name:       "xor_disabled",
+			xorEnabled: false,
+			xorKey:     "test-key-1234567",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			spec, err := LoadWgForwardProxy()
+			if err != nil {
+				t.Fatalf("Failed to load spec: %v", err)
+			}
+
+			keyBytes := []byte(tt.xorKey)
+			var keyArray [32]byte
+			copy(keyArray[:], keyBytes)
+
+			if err := spec.Variables["__cfg_xor_enabled"].Set(tt.xorEnabled); err != nil {
+				t.Fatalf("Failed to set xor_enabled: %v", err)
+			}
+			if err := spec.Variables["__cfg_xor_key"].Set(keyArray); err != nil {
+				t.Fatalf("Failed to set xor_key: %v", err)
+			}
+			if err := spec.Variables["__cfg_xor_key_len"].Set(uint8(len(keyBytes))); err != nil {
+				t.Fatalf("Failed to set xor_key_len: %v", err)
+			}
+			if err := spec.Variables["__cfg_padding_enabled"].Set(false); err != nil {
+				t.Fatalf("Failed to set padding_enabled: %v", err)
+			}
+			if err := spec.Variables["__cfg_padding_min"].Set(uint16(0)); err != nil {
+				t.Fatalf("Failed to set padding_min: %v", err)
+			}
+			if err := spec.Variables["__cfg_wg_port"].Set(uint16(wgPort)); err != nil {
+				t.Fatalf("Failed to set wg_port: %v", err)
+			}
+
+			objs := &WgForwardProxyObjects{}
+			if err := spec.LoadAndAssign(objs, nil); err != nil {
+				t.Fatalf("Failed to load objects: %v", err)
+			}
+			defer objs.Close()
+
+			backendKey := uint32(0)
+			targetIP := ipToUint32("10.0.0.1")
+			if err := objs.BackendMap.Put(&backendKey, &targetIP); err != nil {
+				t.Fatalf("Failed to set backend map: %v", err)
+			}
+
+			inputPacket := createWGPacket("192.168.1.1", "192.168.1.2", 12345, wgPort)
+			_, outputPacket, err := objs.WgForwardProxy.Test(inputPacket)
+			if err != nil {
+				t.Fatalf("Failed to run program: %v", err)
+			}
+
+			if tt.xorEnabled {
+				verifyXORObfuscation(t, inputPacket, outputPacket, keyBytes)
+			} else {
+				verifyPayloadUnchanged(t, inputPacket, outputPacket)
+			}
+		})
+	}
+}
+
+func TestPaddingObfuscation(t *testing.T) {
+	tests := []struct {
+		name           string
+		paddingEnabled bool
+		paddingMin     uint16
+		paddingMax     uint16
+		fillMode       uint8
+	}{
+		{
+			name:           "padding_disabled",
+			paddingEnabled: false,
+			paddingMin:     0,
+			paddingMax:     0,
+			fillMode:       0,
+		},
+		{
+			name:           "padding_enabled_zero_fill",
+			paddingEnabled: true,
+			paddingMin:     8,
+			paddingMax:     64,
+			fillMode:       0,
+		},
+		{
+			name:           "padding_enabled_random_fill",
+			paddingEnabled: true,
+			paddingMin:     8,
+			paddingMax:     64,
+			fillMode:       1,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			spec, err := LoadWgForwardProxy()
+			if err != nil {
+				t.Fatalf("Failed to load spec: %v", err)
+			}
+
+			if err := spec.Variables["__cfg_xor_enabled"].Set(false); err != nil {
+				t.Fatalf("Failed to set xor_enabled: %v", err)
+			}
+			if err := spec.Variables["__cfg_xor_key_len"].Set(uint8(0)); err != nil {
+				t.Fatalf("Failed to set xor_key_len: %v", err)
+			}
+			if err := spec.Variables["__cfg_padding_enabled"].Set(tt.paddingEnabled); err != nil {
+				t.Fatalf("Failed to set padding_enabled: %v", err)
+			}
+			if err := spec.Variables["__cfg_padding_min"].Set(tt.paddingMin); err != nil {
+				t.Fatalf("Failed to set padding_min: %v", err)
+			}
+			if err := spec.Variables["__cfg_padding_max"].Set(tt.paddingMax); err != nil {
+				t.Fatalf("Failed to set padding_max: %v", err)
+			}
+			if err := spec.Variables["__cfg_padding_fill_mode"].Set(tt.fillMode); err != nil {
+				t.Fatalf("Failed to set padding_fill_mode: %v", err)
+			}
+			if err := spec.Variables["__cfg_wg_port"].Set(uint16(wgPort)); err != nil {
+				t.Fatalf("Failed to set wg_port: %v", err)
+			}
+
+			objs := &WgForwardProxyObjects{}
+			if err := spec.LoadAndAssign(objs, nil); err != nil {
+				t.Fatalf("Failed to load objects: %v", err)
+			}
+			defer objs.Close()
+
+			backendKey := uint32(0)
+			targetIP := ipToUint32("10.0.0.1")
+			if err := objs.BackendMap.Put(&backendKey, &targetIP); err != nil {
+				t.Fatalf("Failed to set backend map: %v", err)
+			}
+
+			inputPacket := createWGPacket("192.168.1.1", "192.168.1.2", 12345, wgPort)
+			inputLen := len(inputPacket)
+
+			_, outputPacket, err := objs.WgForwardProxy.Test(inputPacket)
+			if err != nil {
+				t.Fatalf("Failed to run program: %v", err)
+			}
+
+			if tt.paddingEnabled {
+				verifyPaddingAdded(t, inputLen, len(outputPacket), tt.paddingMin, tt.paddingMax)
+			} else {
+				if len(outputPacket) != inputLen {
+					t.Errorf("Packet size changed when padding disabled: input=%d, output=%d", inputLen, len(outputPacket))
+				}
+			}
+		})
+	}
+}
+
+func TestPortAndBackendConfig(t *testing.T) {
+	tests := []struct {
+		name           string
+		wgPort         uint16
+		targetServerIP string
+		packetDstPort  uint16
+		shouldForward  bool
+	}{
+		{
+			name:           "default_port",
+			wgPort:         51820,
+			targetServerIP: "10.0.0.1",
+			packetDstPort:  51820,
+			shouldForward:  true,
+		},
+		{
+			name:           "wrong_port",
+			wgPort:         51820,
+			targetServerIP: "10.0.0.1",
+			packetDstPort:  9999,
+			shouldForward:  false,
+		},
+		{
+			name:           "custom_port",
+			wgPort:         51821,
+			targetServerIP: "10.0.0.1",
+			packetDstPort:  51821,
+			shouldForward:  true,
+		},
+		{
+			name:           "different_target_server",
+			wgPort:         51820,
+			targetServerIP: "192.168.200.100",
+			packetDstPort:  51820,
+			shouldForward:  true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			spec, err := LoadWgForwardProxy()
+			if err != nil {
+				t.Fatalf("Failed to load spec: %v", err)
+			}
+
+			if err := spec.Variables["__cfg_xor_enabled"].Set(false); err != nil {
+				t.Fatalf("Failed to set xor_enabled: %v", err)
+			}
+			if err := spec.Variables["__cfg_xor_key_len"].Set(uint8(0)); err != nil {
+				t.Fatalf("Failed to set xor_key_len: %v", err)
+			}
+			if err := spec.Variables["__cfg_padding_enabled"].Set(false); err != nil {
+				t.Fatalf("Failed to set padding_enabled: %v", err)
+			}
+			if err := spec.Variables["__cfg_padding_min"].Set(uint16(0)); err != nil {
+				t.Fatalf("Failed to set padding_min: %v", err)
+			}
+			if err := spec.Variables["__cfg_wg_port"].Set(tt.wgPort); err != nil {
+				t.Fatalf("Failed to set wg_port: %v", err)
+			}
+
+			objs := &WgForwardProxyObjects{}
+			if err := spec.LoadAndAssign(objs, nil); err != nil {
+				t.Fatalf("Failed to load objects: %v", err)
+			}
+			defer objs.Close()
+
+			backendKey := uint32(0)
+			targetIP := ipToUint32(tt.targetServerIP)
+			if err := objs.BackendMap.Put(&backendKey, &targetIP); err != nil {
+				t.Fatalf("Failed to set backend map: %v", err)
+			}
+
+			packet := createWGPacket("192.168.1.1", "192.168.1.2", 12345, tt.packetDstPort)
+			result, _, err := objs.WgForwardProxy.Test(packet)
+			if err != nil {
+				t.Fatalf("Failed to run program: %v", err)
+			}
+
+			if tt.shouldForward {
+				if int(result) != xdpRedirect {
+					t.Errorf("Expected packet to be forwarded (XDP_REDIRECT), got result %d", result)
+				}
+			} else {
+				if int(result) != xdpPass {
+					t.Errorf("Expected packet to pass through (XDP_PASS), got result %d", result)
+				}
+			}
+		})
+	}
 }
 
 func createWGPacket(srcIP, dstIP string, srcPort, dstPort uint16) []byte {
 	packet := make([]byte, 0, 64)
 
-	// Ethernet header (14 bytes) - struct ethhdr
 	eth := make([]byte, 14)
 	// h_dest[6] - destination MAC address
 	copy(eth[0:6], []byte{0x02, 0x00, 0x00, 0x00, 0x00, 0x02}) // dst MAC
@@ -232,28 +463,6 @@ func ipToUint32(ipStr string) uint32 {
 	return uint32(ip[0])<<24 | uint32(ip[1])<<16 | uint32(ip[2])<<8 | uint32(ip[3])
 }
 
-func createObfuscationConfig(enabled bool, key, targetServerIP string) WgForwardProxyObfuscationConfig {
-	cfg := WgForwardProxyObfuscationConfig{
-		Method:         1, // XOR method
-		TargetServerIp: ipToUint32(targetServerIP),
-	}
-
-	if enabled {
-		cfg.Enabled = true
-	} else {
-		cfg.Enabled = false
-	}
-
-	keyBytes := []byte(key)
-	if len(keyBytes) > 32 {
-		keyBytes = keyBytes[:32]
-	}
-	cfg.KeyLen = uint8(len(keyBytes))
-	copy(cfg.Key[:], keyBytes)
-
-	return cfg
-}
-
 func captureMetrics(metricsMap *ebpf.Map) map[MetricsKey]uint64 {
 	metrics := make(map[MetricsKey]uint64)
 
@@ -293,24 +502,24 @@ func captureMetrics(metricsMap *ebpf.Map) map[MetricsKey]uint64 {
 	return metrics
 }
 
-func verifyMetrics(t *testing.T, oldMetrics, actual, expected map[MetricsKey]uint64, description string) {
+func verifyMetrics(t *testing.T, oldMetrics, actual, expected map[MetricsKey]uint64) {
 	for metricKey, expectedValue := range expected {
 		if actualValue, exists := actual[metricKey]; !exists {
-			t.Errorf("%s: Expected metric {Dir: %d, Reason: %d} to be %d, but metric key not found",
-				description, metricKey.Dir, metricKey.Reason, expectedValue)
+			t.Errorf("Expected metric {Dir: %d, Reason: %d} to be %d, but metric key not found",
+				metricKey.Dir, metricKey.Reason, expectedValue)
 		} else {
 			oldValue := oldMetrics[metricKey]
 			deltaValue := actualValue - oldValue
 			if deltaValue != expectedValue {
-				t.Errorf("%s: Metric {Dir: %d, Reason: %d} expected delta %d, got %d (old: %d, new: %d)",
-					description, metricKey.Dir, metricKey.Reason, expectedValue, deltaValue, oldValue, actualValue)
+				t.Errorf("Metric {Dir: %d, Reason: %d} expected delta %d, got %d (old: %d, new: %d)",
+					metricKey.Dir, metricKey.Reason, expectedValue, deltaValue, oldValue, actualValue)
 			}
 		}
 	}
 }
 
-func verifyObfuscation(t *testing.T, inputPacket, outputPacket []byte, cfg WgForwardProxyObfuscationConfig, description string) {
-	if len(inputPacket) < 42 || len(outputPacket) < 42 { // Eth(14) + IP(20) + UDP(8) = 42
+func verifyXORObfuscation(t *testing.T, inputPacket, outputPacket, key []byte) {
+	if len(inputPacket) < 42 || len(outputPacket) < 42 {
 		t.Logf("Packets too small for payload comparison")
 		return
 	}
@@ -318,67 +527,48 @@ func verifyObfuscation(t *testing.T, inputPacket, outputPacket []byte, cfg WgFor
 	inputPayload := inputPacket[42:]
 	outputPayload := outputPacket[42:]
 
-	if len(inputPayload) != len(outputPayload) {
-		t.Errorf("%s: Payload length mismatch - input: %d, output: %d",
-			description, len(inputPayload), len(outputPayload))
+	xorLen := 16
+	if xorLen > len(inputPayload) {
+		xorLen = len(inputPayload)
+	}
+
+	for i := 0; i < xorLen; i++ {
+		expected := inputPayload[i] ^ key[i%len(key)]
+		if outputPayload[i] != expected {
+			t.Errorf("XOR obfuscation mismatch at byte %d: expected %02x, got %02x", i, expected, outputPayload[i])
+		}
+	}
+}
+
+func verifyPayloadUnchanged(t *testing.T, inputPacket, outputPacket []byte) {
+	if len(inputPacket) < 42 || len(outputPacket) < 42 {
 		return
 	}
 
-	if cfg.Method == 1 && cfg.Enabled == true { // XOR method enabled
-		key := cfg.Key[:cfg.KeyLen]
-		obfuscatedBytes := int(cfg.KeyLen)
+	inputPayload := inputPacket[42:]
+	outputPayload := outputPacket[42:]
 
-		if obfuscatedBytes > len(inputPayload) {
-			obfuscatedBytes = len(inputPayload)
-		}
+	minLen := len(inputPayload)
+	if len(outputPayload) < minLen {
+		minLen = len(outputPayload)
+	}
 
-		expectedPayload := make([]byte, len(inputPayload))
+	for i := 0; i < minLen; i++ {
+		if inputPayload[i] != outputPayload[i] {
+			t.Errorf("Payload unexpectedly changed at byte %d when obfuscation disabled", i)
+			break
+		}
+	}
+}
 
-		for i := 0; i < obfuscatedBytes; i++ {
-			expectedPayload[i] = inputPayload[i] ^ key[i%len(key)]
-		}
+func verifyPaddingAdded(t *testing.T, inputLen, outputLen int, minPadding, maxPadding uint16) {
+	if outputLen <= inputLen {
+		t.Errorf("Expected packet to be padded, but size didn't increase: input=%d, output=%d", inputLen, outputLen)
+		return
+	}
 
-		obfuscatedMatches := true
-		for i := 0; i < obfuscatedBytes; i++ {
-			if i < len(outputPayload) && expectedPayload[i] != outputPayload[i] {
-				obfuscatedMatches = false
-				break
-			}
-		}
-
-		// Compare non-obfuscated portion (should be unchanged)
-		unchangedMatches := true
-		for i := obfuscatedBytes; i < len(inputPayload); i++ {
-			if i < len(outputPayload) && inputPayload[i] != outputPayload[i] {
-				unchangedMatches = false
-				break
-			}
-		}
-
-		if !obfuscatedMatches || !unchangedMatches {
-			t.Errorf("%s: Payload obfuscation mismatch", description)
-			if !obfuscatedMatches {
-				t.Errorf("  Obfuscated portion (first %d bytes) doesn't match expected", obfuscatedBytes)
-			}
-			if !unchangedMatches {
-				t.Errorf("  Non-obfuscated portion (bytes %d+) was unexpectedly changed", obfuscatedBytes)
-			}
-			t.Logf("Input payload:    %x", inputPayload[:min(32, len(inputPayload))])
-			t.Logf("Expected payload: %x", expectedPayload[:min(32, len(expectedPayload))])
-			t.Logf("Output payload:   %x", outputPayload[:min(32, len(outputPayload))])
-			t.Logf("Key: %x, Obfuscated bytes: %d", key, obfuscatedBytes)
-		}
-	} else {
-		payloadUnchanged := true
-		for i := range inputPayload {
-			if i < len(outputPayload) && inputPayload[i] != outputPayload[i] {
-				payloadUnchanged = false
-				break
-			}
-		}
-
-		if !payloadUnchanged {
-			t.Errorf("%s: Payload unexpectedly changed when obfuscation disabled", description)
-		}
+	paddingSize := outputLen - inputLen
+	if paddingSize < int(minPadding) || paddingSize > int(maxPadding) {
+		t.Errorf("Padding size %d outside expected range [%d, %d]", paddingSize, minPadding, maxPadding)
 	}
 }

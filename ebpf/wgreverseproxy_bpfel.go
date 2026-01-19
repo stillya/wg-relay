@@ -27,14 +27,9 @@ type WgReverseProxyMetricsValue struct {
 	Bytes   uint64
 }
 
-type WgReverseProxyObfuscationConfig struct {
-	_              structs.HostLayout
-	Enabled        bool
-	Method         uint8
-	Key            [32]uint8
-	KeyLen         uint8
-	_              [1]byte
-	TargetServerIp uint32
+type WgReverseProxyXorKey struct {
+	_   structs.HostLayout
+	Key [32]uint8
 }
 
 // LoadWgReverseProxy returns the embedded CollectionSpec for WgReverseProxy.
@@ -86,14 +81,21 @@ type WgReverseProxyProgramSpecs struct {
 //
 // It can be passed ebpf.CollectionSpec.Assign.
 type WgReverseProxyMapSpecs struct {
-	MetricsMap           *ebpf.MapSpec `ebpf:"metrics_map"`
-	ObfuscationConfigMap *ebpf.MapSpec `ebpf:"obfuscation_config_map"`
+	MetricsMap *ebpf.MapSpec `ebpf:"metrics_map"`
 }
 
 // WgReverseProxyVariableSpecs contains global variables before they are loaded into the kernel.
 //
 // It can be passed ebpf.CollectionSpec.Assign.
 type WgReverseProxyVariableSpecs struct {
+	CfgPaddingEnabled  *ebpf.VariableSpec `ebpf:"__cfg_padding_enabled"`
+	CfgPaddingFillMode *ebpf.VariableSpec `ebpf:"__cfg_padding_fill_mode"`
+	CfgPaddingMax      *ebpf.VariableSpec `ebpf:"__cfg_padding_max"`
+	CfgPaddingMin      *ebpf.VariableSpec `ebpf:"__cfg_padding_min"`
+	CfgWgPort          *ebpf.VariableSpec `ebpf:"__cfg_wg_port"`
+	CfgXorEnabled      *ebpf.VariableSpec `ebpf:"__cfg_xor_enabled"`
+	CfgXorKey          *ebpf.VariableSpec `ebpf:"__cfg_xor_key"`
+	CfgXorKeyLen       *ebpf.VariableSpec `ebpf:"__cfg_xor_key_len"`
 }
 
 // WgReverseProxyObjects contains all objects after they have been loaded into the kernel.
@@ -116,14 +118,12 @@ func (o *WgReverseProxyObjects) Close() error {
 //
 // It can be passed to LoadWgReverseProxyObjects or ebpf.CollectionSpec.LoadAndAssign.
 type WgReverseProxyMaps struct {
-	MetricsMap           *ebpf.Map `ebpf:"metrics_map"`
-	ObfuscationConfigMap *ebpf.Map `ebpf:"obfuscation_config_map"`
+	MetricsMap *ebpf.Map `ebpf:"metrics_map"`
 }
 
 func (m *WgReverseProxyMaps) Close() error {
 	return _WgReverseProxyClose(
 		m.MetricsMap,
-		m.ObfuscationConfigMap,
 	)
 }
 
@@ -131,6 +131,14 @@ func (m *WgReverseProxyMaps) Close() error {
 //
 // It can be passed to LoadWgReverseProxyObjects or ebpf.CollectionSpec.LoadAndAssign.
 type WgReverseProxyVariables struct {
+	CfgPaddingEnabled  *ebpf.Variable `ebpf:"__cfg_padding_enabled"`
+	CfgPaddingFillMode *ebpf.Variable `ebpf:"__cfg_padding_fill_mode"`
+	CfgPaddingMax      *ebpf.Variable `ebpf:"__cfg_padding_max"`
+	CfgPaddingMin      *ebpf.Variable `ebpf:"__cfg_padding_min"`
+	CfgWgPort          *ebpf.Variable `ebpf:"__cfg_wg_port"`
+	CfgXorEnabled      *ebpf.Variable `ebpf:"__cfg_xor_enabled"`
+	CfgXorKey          *ebpf.Variable `ebpf:"__cfg_xor_key"`
+	CfgXorKeyLen       *ebpf.Variable `ebpf:"__cfg_xor_key_len"`
 }
 
 // WgReverseProxyPrograms contains all programs after they have been loaded into the kernel.
