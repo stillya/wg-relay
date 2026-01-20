@@ -1,5 +1,6 @@
+// clang-format off
 //go:build ignore
-
+//  clang-format on
 #include <linux/bpf.h>
 #include <linux/if_ether.h>
 #include <linux/in.h>
