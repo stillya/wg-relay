@@ -28,16 +28,12 @@ func NewReverseLoader() (*ReverseLoader, error) {
 	return &ReverseLoader{}, nil
 }
 
-// LoadAndAttach loads the reverse proxy program and attaches it to interfaces
+// LoadAndAttach loads the eBPF program and attaches it to the configured interfaces.
 func (rp *ReverseLoader) LoadAndAttach(ctx context.Context, cfg config.ProxyConfig) error {
 	rp.cfg = cfg
 
 	if err := rp.loadEBPF(); err != nil {
 		return errors.Wrap(err, "failed to load eBPF objects")
-	}
-
-	if err := rp.configure(cfg); err != nil {
-		return errors.Wrap(err, "failed to configure eBPF maps")
 	}
 
 	if err := rp.attachToInterfaces(); err != nil {
@@ -49,54 +45,61 @@ func (rp *ReverseLoader) LoadAndAttach(ctx context.Context, cfg config.ProxyConf
 	return nil
 }
 
-// configure configures the eBPF maps with the provided configuration
-func (rp *ReverseLoader) configure(cfg config.ProxyConfig) error {
-	if rp.objs == nil || rp.objs.ObfuscationConfigMap == nil {
-		return errors.New("eBPF objects not loaded")
+func (rp *ReverseLoader) configureStaticVars(spec *ebpf.CollectionSpec) error {
+	xorEnabled := rp.cfg.Instrumentations.XOR != nil && rp.cfg.Instrumentations.XOR.Enabled
+	if err := spec.Variables["__cfg_xor_enabled"].Set(xorEnabled); err != nil {
+		return errors.Wrap(err, "failed to set xor_enabled")
 	}
 
-	keyBytes := cfg.GetKeyBytes()
-	ebpfConfig := wgebpf.WgReverseProxyObfuscationConfig{
-		Enabled: true,
-		Method:  uint8(cfg.GetMethod()),
-		KeyLen:  uint8(len(keyBytes)),
+	if xorEnabled {
+		keyBytes := rp.cfg.GetXORKey()
+		if keyBytes != nil {
+			var keyArray [32]byte
+			copy(keyArray[:], keyBytes)
+
+			if err := spec.Variables["__cfg_xor_key"].Set(keyArray); err != nil {
+				return errors.Wrap(err, "failed to set xor_key")
+			}
+			keyLen := len(keyBytes)
+			if keyLen > 255 {
+				keyLen = 255
+			}
+			if err := spec.Variables["__cfg_xor_key_len"].Set(uint8(keyLen)); err != nil { //nolint:gosec // key length is bounded
+				return errors.Wrap(err, "failed to set xor_key_len")
+			}
+		}
+	} else {
+		if err := spec.Variables["__cfg_xor_key_len"].Set(uint8(0)); err != nil {
+			return errors.Wrap(err, "failed to set xor_key_len to 0")
+		}
 	}
 
-	if !cfg.Enabled {
-		ebpfConfig.Enabled = false
+	if err := spec.Variables["__cfg_wg_port"].Set(rp.cfg.WGPort); err != nil {
+		return errors.Wrap(err, "failed to set wg_port")
 	}
-
-	if len(keyBytes) > len(ebpfConfig.Key) {
-		return errors.Errorf("key too long: %d bytes, max %d", len(keyBytes), len(ebpfConfig.Key))
-	}
-	copy(ebpfConfig.Key[:], keyBytes)
-
-	configKey := uint32(0)
-	if err := rp.objs.ObfuscationConfigMap.Put(&configKey, &ebpfConfig); err != nil {
-		return errors.Wrap(err, "failed to update reverse ebpfConfig map")
-	}
-
-	log.Info("Reverse mode configuration updated",
-		"enabled", cfg.Enabled,
-		"method", cfg.Method,
-		"key_len", len(keyBytes))
 
 	return nil
 }
 
-// loadEBPF loads the reverse proxy eBPF program
 func (rp *ReverseLoader) loadEBPF() error {
-	rp.objs = &wgebpf.WgReverseProxyObjects{}
+	spec, err := wgebpf.LoadWgReverseProxy()
+	if err != nil {
+		return errors.Wrap(err, "failed to load reverse proxy spec")
+	}
 
-	// Enable verbose eBPF verifier logging
+	if err := rp.configureStaticVars(spec); err != nil {
+		return errors.Wrap(err, "failed to configure static variables")
+	}
+
+	rp.objs = &wgebpf.WgReverseProxyObjects{}
 	opts := &ebpf.CollectionOptions{
 		Programs: ebpf.ProgramOptions{
 			LogLevel:     2,
-			LogSizeStart: 16777216, // 16 MB log size
+			LogSizeStart: 16777216,
 		},
 	}
 
-	if err := wgebpf.LoadWgReverseProxyObjects(rp.objs, opts); err != nil {
+	if err := spec.LoadAndAssign(rp.objs, opts); err != nil {
 		return errors.Wrap(err, "failed to load reverse proxy eBPF objects")
 	}
 

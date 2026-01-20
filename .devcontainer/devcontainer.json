@@ -3,7 +3,7 @@
 {
   "name": "ebpf-golang-devcontainer",
   // Or use a Dockerfile or Docker Compose file. More info: https://containers.dev/guide/dockerfile
-  "image": "stillya101/ebpf-devcontainer-go:0.1.1",
+  "image": "stillya101/ebpf-devcontainer-go:0.1.2",
   //	"features": {
   //		"ghcr.io/devcontainers/features/go:1": {},
   //	},

@@ -21,15 +21,26 @@ type DaemonConfig struct {
 	Listen string `yaml:"listen"` // Address and port for daemon to bind to
 }
 
+// InstrumentationConfig represents instrumentation configuration
+type InstrumentationConfig struct {
+	XOR *XORConfig `yaml:"xor,omitempty"`
+}
+
+// XORConfig represents XOR obfuscation configuration
+type XORConfig struct {
+	Enabled bool   `yaml:"enabled"`
+	Key     string `yaml:"key"`
+}
+
 // ProxyConfig represents proxy-specific configuration
 type ProxyConfig struct {
-	Enabled    bool          `yaml:"enabled"`     // Enable/disable obfuscation
-	Mode       string        `yaml:"mode"`        // "forward" or "reverse"
-	Method     string        `yaml:"method"`      // "xor" or "none"
-	Key        string        `yaml:"key"`         // Obfuscation key (string)
-	Interfaces []string      `yaml:"interfaces"`  // Network interfaces to attach to
-	DriverMode string        `yaml:"driver_mode"` // "driver", "generic" and "offload" for XDP mode
-	Forward    ForwardConfig `yaml:"forward"`     // Forward proxy configuration
+	Enabled          bool                  `yaml:"enabled"`          // Enable/disable proxy
+	Mode             string                `yaml:"mode"`             // "forward" or "reverse"
+	WGPort           uint16                `yaml:"wg_port"`          // WireGuard port to intercept (default: 51820)
+	Instrumentations InstrumentationConfig `yaml:"instrumentations"` // Instrumentation configuration
+	Interfaces       []string              `yaml:"interfaces"`       // Network interfaces to attach to
+	DriverMode       string                `yaml:"driver_mode"`      // "driver", "generic" and "offload" for XDP mode
+	Forward          ForwardConfig         `yaml:"forward"`          // Forward proxy configuration
 }
 
 // ForwardConfig represents forward proxy configuration (forward mode)
@@ -58,6 +69,7 @@ type StatisticsConfig struct {
 // ObfuscationMethod represents the obfuscation method
 type ObfuscationMethod uint32
 
+// Obfuscation method constants.
 const (
 	MethodNone ObfuscationMethod = 0
 	MethodXOR  ObfuscationMethod = 1
@@ -79,29 +91,24 @@ func (cfg *Config) validate() error {
 
 // validate validates the proxy configuration
 func (cfg *ProxyConfig) validate(mode string) error {
-	// Validate method
-	if cfg.Method != "xor" && cfg.Method != "none" {
-		return errors.New("method must be 'xor' or 'none'")
-	}
-
 	// Validate interfaces
 	if len(cfg.Interfaces) == 0 {
 		return errors.New("at least one interface must be specified")
 	}
 
-	// Validate key is required
-	if len(cfg.Key) == 0 {
-		return errors.New("key is required")
-	}
-
-	// Validate key length
-	if len(cfg.Key) > MaxKeySize {
-		return errors.Errorf("key too long: %d bytes, max %d", len(cfg.Key), MaxKeySize)
-	}
-
 	// Validate driver mode
 	if cfg.DriverMode != "" && cfg.DriverMode != "driver" && cfg.DriverMode != "generic" && cfg.DriverMode != "offload" {
 		return errors.New("driver_mode must be 'driver', 'generic' or 'offload'")
+	}
+
+	// Validate XOR config
+	if cfg.Instrumentations.XOR != nil && cfg.Instrumentations.XOR.Enabled {
+		if len(cfg.Instrumentations.XOR.Key) == 0 {
+			return errors.New("xor key is required when xor is enabled")
+		}
+		if len(cfg.Instrumentations.XOR.Key) > MaxKeySize {
+			return errors.Errorf("xor key too long: %d bytes, max %d", len(cfg.Instrumentations.XOR.Key), MaxKeySize)
+		}
 	}
 
 	// Forward mode specific validations
@@ -130,19 +137,23 @@ func (fc *ForwardConfig) validate() error {
 	return nil
 }
 
-// GetMethod returns the obfuscation method as a constant
-func (cfg *ProxyConfig) GetMethod() ObfuscationMethod {
-	switch cfg.Method {
-	case "xor":
-		return MethodXOR
-	default:
-		return MethodNone
+// GetInstrumentationMethods returns enabled instrumentations as bitfield
+func (cfg *ProxyConfig) GetInstrumentationMethods() uint8 {
+	var methods uint8 = 0
+
+	if cfg.Instrumentations.XOR != nil && cfg.Instrumentations.XOR.Enabled {
+		methods |= 0x01 // INSTRUMENT_XOR
 	}
+
+	return methods
 }
 
-// GetKeyBytes returns the obfuscation key as bytes
-func (cfg *ProxyConfig) GetKeyBytes() []byte {
-	return []byte(cfg.Key)
+// GetXORKey returns the XOR key as bytes
+func (cfg *ProxyConfig) GetXORKey() []byte {
+	if cfg.Instrumentations.XOR != nil && cfg.Instrumentations.XOR.Enabled {
+		return []byte(cfg.Instrumentations.XOR.Key)
+	}
+	return nil
 }
 
 // GetTargetServerIP returns the target server IP as a uint32 in network byte order
@@ -174,10 +185,16 @@ func NewConfig() *Config {
 		Proxy: ProxyConfig{
 			Enabled:    true,
 			Mode:       "forward",
-			Method:     "xor",
+			WGPort:     51820,
 			Interfaces: []string{},
 			DriverMode: "driver",
 			Forward:    ForwardConfig{},
+			Instrumentations: InstrumentationConfig{
+				XOR: &XORConfig{
+					Enabled: false,
+					Key:     "",
+				},
+			},
 		},
 		Monitoring: MonitoringConfig{
 			Prometheus: PrometheusConfig{
@@ -194,7 +211,7 @@ func NewConfig() *Config {
 
 // Load loads and validates configuration from a YAML file
 func Load(filename string) (*Config, error) {
-	data, err := os.ReadFile(filename)
+	data, err := os.ReadFile(filename) //nolint:gosec // G304: config file path is provided by CLI argument
 	if err != nil {
 		return nil, errors.Wrapf(err, "failed to read config file %s", filename)
 	}

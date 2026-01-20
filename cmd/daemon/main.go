@@ -8,6 +8,7 @@ import (
 	"os"
 	"os/signal"
 	"syscall"
+	"time"
 
 	"github.com/jessevdk/go-flags"
 	"github.com/pkg/errors"
@@ -43,7 +44,6 @@ func main() {
 	var opts Opts
 	parser := flags.NewParser(&opts, flags.Default)
 
-	_, err := parser.Parse()
 	if _, err := parser.Parse(); err != nil {
 		var flagsErr *flags.Error
 		if errors.As(err, &flagsErr) && errors.Is(flagsErr.Type, flags.ErrHelp) {
@@ -132,8 +132,14 @@ func main() {
 				mux := http.NewServeMux()
 				mux.Handle("/metrics", promhttp.Handler())
 
+				server := &http.Server{
+					Addr:              cfg.Monitoring.Prometheus.Listen,
+					Handler:           mux,
+					ReadHeaderTimeout: 10 * time.Second,
+				}
+
 				log.Info("Starting Prometheus metrics server", "listen", cfg.Monitoring.Prometheus.Listen)
-				if err := http.ListenAndServe(cfg.Monitoring.Prometheus.Listen, mux); err != nil {
+				if err := server.ListenAndServe(); err != nil {
 					log.Error("Prometheus metrics server failed", "error", err)
 				}
 			}()

@@ -23,7 +23,7 @@ LLC_FLAGS := -march=bpf -mcpu=v3 -filetype=obj
 # Disable built-in implicit rules
 .SUFFIXES:
 
-.PHONY: all generate clean gen_compile_commands
+.PHONY: all generate clean gen_compile_commands format check-format
 
 all: generate
 
@@ -49,7 +49,15 @@ clean:
 	$(QUIET)rm -f *_bpfel.o *_bpfeb.o
 
 gen_compile_commands:
-	@echo "Generating compile_commands.json for eBPF programs..."
+	@echo "Generating compile_commands.json..."
 	@command -v bear >/dev/null 2>&1 || { echo "Error: 'bear' is not installed. Make sure bear is in your PATH."; exit 1; }
 	$(QUIET)bear -- $(MAKE) all
 	@echo "compile_commands.json generated"
+
+fmt:
+	@echo "Formatting C code..."
+	$(QUIET)find . include -name '*.c' -o -name '*.h' | xargs clang-format -i
+
+check-format:
+	@echo "Checking C code formatting..."
+	@find . include -name '*.c' -o -name '*.h' | xargs clang-format -n -Werror

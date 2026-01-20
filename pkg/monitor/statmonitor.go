@@ -9,11 +9,13 @@ import (
 	"github.com/stillya/wg-relay/pkg/maps/metricsmap"
 )
 
+// StatMonitorSource defines the interface for collecting metrics data.
 type StatMonitorSource interface {
 	Collect(ctx context.Context) ([]metricsmap.MetricData, error)
 	Name() string
 }
 
+// StatMonitor periodically collects and displays traffic statistics.
 type StatMonitor struct {
 	source   StatMonitorSource
 	printer  *TablePrinter
@@ -23,11 +25,13 @@ type StatMonitor struct {
 	startTime time.Time
 }
 
+// StatMonitorParams contains configuration parameters for StatMonitor.
 type StatMonitorParams struct {
 	Source   StatMonitorSource
 	Interval time.Duration
 }
 
+// NewStatMonitor creates a new StatMonitor with the given parameters.
 func NewStatMonitor(params StatMonitorParams) *StatMonitor {
 	return &StatMonitor{
 		source:    params.Source,
@@ -38,6 +42,7 @@ func NewStatMonitor(params StatMonitorParams) *StatMonitor {
 	}
 }
 
+// Start begins the periodic collection and display of statistics.
 func (sm *StatMonitor) Start(ctx context.Context) {
 	log.Info("Starting stat monitor", "interval", sm.interval)
 
@@ -58,6 +63,7 @@ func (sm *StatMonitor) Start(ctx context.Context) {
 	}
 }
 
+// Stop signals the monitor to stop collecting statistics.
 func (sm *StatMonitor) Stop() {
 	close(sm.stopCh)
 }
