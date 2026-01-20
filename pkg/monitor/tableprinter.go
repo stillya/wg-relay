@@ -8,8 +8,10 @@ import (
 	"github.com/stillya/wg-relay/pkg/maps/metricsmap"
 )
 
+// TablePrinter formats and prints traffic statistics tables.
 type TablePrinter struct{}
 
+// PrintTrafficTable prints a formatted table of traffic statistics.
 func (tp *TablePrinter) PrintTrafficTable(metricsData []metricsmap.MetricData, elapsed time.Duration) {
 	tp.clearScreen()
 
@@ -29,10 +31,11 @@ func (tp *TablePrinter) PrintTrafficTable(metricsData []metricsmap.MetricData, e
 				perSrcStats[srcAddr] = &srcStats{}
 			}
 
-			if metric.Key.Dir == metricsmap.MetricFromWg {
+			switch metric.Key.Dir {
+			case metricsmap.MetricFromWg:
 				rxBytes += metric.Value.Bytes
 				perSrcStats[srcAddr].rxBytes += metric.Value.Bytes
-			} else if metric.Key.Dir == metricsmap.MetricToWg {
+			case metricsmap.MetricToWg:
 				txBytes += metric.Value.Bytes
 				perSrcStats[srcAddr].txBytes += metric.Value.Bytes
 			}

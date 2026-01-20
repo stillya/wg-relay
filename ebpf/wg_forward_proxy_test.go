@@ -156,7 +156,11 @@ func TestXORObfuscation(t *testing.T) {
 			if err := spec.Variables["__cfg_xor_key"].Set(keyArray); err != nil {
 				t.Fatalf("Failed to set xor_key: %v", err)
 			}
-			if err := spec.Variables["__cfg_xor_key_len"].Set(uint8(len(keyBytes))); err != nil {
+			keyLen := len(keyBytes)
+			if keyLen > 255 {
+				keyLen = 255
+			}
+			if err := spec.Variables["__cfg_xor_key_len"].Set(uint8(keyLen)); err != nil { //nolint:gosec // key length is bounded
 				t.Fatalf("Failed to set xor_key_len: %v", err)
 			}
 			if err := spec.Variables["__cfg_padding_enabled"].Set(false); err != nil {
@@ -482,7 +486,7 @@ func captureMetrics(metricsMap *ebpf.Map) map[MetricsKey]uint64 {
 				key := MetricsKey{Dir: dir, Reason: reason, SrcAddr: srcAddr}
 
 				var perCPUValues []MetricsValue
-				err := metricsMap.Lookup(unsafe.Pointer(&key), &perCPUValues)
+				err := metricsMap.Lookup(unsafe.Pointer(&key), &perCPUValues) //nolint:gosec // unsafe.Pointer required for eBPF map lookup
 				if err != nil {
 					continue
 				}

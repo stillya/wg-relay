@@ -8,11 +8,13 @@ import (
 	"github.com/stillya/wg-relay/pkg/maps/metricsmap"
 )
 
+// MetricCollectorSource defines the interface for collecting metrics from BPF maps.
 type MetricCollectorSource interface {
 	Collect(ctx context.Context) ([]metricsmap.MetricData, error)
 	Name() string
 }
 
+// BpfCollector implements prometheus.Collector for BPF metrics.
 type BpfCollector struct {
 	source MetricCollectorSource
 	mode   string
@@ -23,6 +25,7 @@ type BpfCollector struct {
 	txBytesDesc   *prometheus.Desc
 }
 
+// NewBpfCollector creates a new BpfCollector with the given source and mode.
 func NewBpfCollector(source MetricCollectorSource, mode string) *BpfCollector {
 	return &BpfCollector{
 		source: source,
@@ -54,6 +57,7 @@ func NewBpfCollector(source MetricCollectorSource, mode string) *BpfCollector {
 	}
 }
 
+// Describe implements prometheus.Collector.
 func (c *BpfCollector) Describe(ch chan<- *prometheus.Desc) {
 	ch <- c.rxPacketsDesc
 	ch <- c.txPacketsDesc
@@ -61,6 +65,7 @@ func (c *BpfCollector) Describe(ch chan<- *prometheus.Desc) {
 	ch <- c.txBytesDesc
 }
 
+// Collect implements prometheus.Collector.
 func (c *BpfCollector) Collect(ch chan<- prometheus.Metric) {
 	ctx := context.Background()
 	metricsData, err := c.source.Collect(ctx)

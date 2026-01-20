@@ -56,8 +56,8 @@ gen_compile_commands:
 
 fmt:
 	@echo "Formatting C code..."
-	$(QUIET)find . -name '*.c' -o -name '*.h' | xargs clang-format -i
+	$(QUIET)find . include -name '*.c' -o -name '*.h' | xargs clang-format -i
 
 check-format:
 	@echo "Checking C code formatting..."
-	@find . -name '*.c' -o -name '*.h' | xargs clang-format -n -Werror
+	@find . include -name '*.c' -o -name '*.h' | xargs clang-format -n -Werror

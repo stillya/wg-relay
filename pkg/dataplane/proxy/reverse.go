@@ -28,6 +28,7 @@ func NewReverseLoader() (*ReverseLoader, error) {
 	return &ReverseLoader{}, nil
 }
 
+// LoadAndAttach loads the eBPF program and attaches it to the configured interfaces.
 func (rp *ReverseLoader) LoadAndAttach(ctx context.Context, cfg config.ProxyConfig) error {
 	rp.cfg = cfg
 
@@ -59,7 +60,11 @@ func (rp *ReverseLoader) configureStaticVars(spec *ebpf.CollectionSpec) error {
 			if err := spec.Variables["__cfg_xor_key"].Set(keyArray); err != nil {
 				return errors.Wrap(err, "failed to set xor_key")
 			}
-			if err := spec.Variables["__cfg_xor_key_len"].Set(uint8(len(keyBytes))); err != nil {
+			keyLen := len(keyBytes)
+			if keyLen > 255 {
+				keyLen = 255
+			}
+			if err := spec.Variables["__cfg_xor_key_len"].Set(uint8(keyLen)); err != nil { //nolint:gosec // key length is bounded
 				return errors.Wrap(err, "failed to set xor_key_len")
 			}
 		}

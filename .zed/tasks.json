@@ -41,12 +41,12 @@
   },
   {
     "label": "Lint",
-    "command": "golangci-lint run",
-    "tags": ["lint"],
+    "command": "golangci-lint run ./...",
+    "tags": ["lint"]
   },
   {
     "label": "Fmt",
-    "command": "clang-format -i $(find . -name '*.c' -o -name '*.h').",
+    "command": "go fmt ./... && clang-format -i $(find . -name '*.c' -o -name '*.h')",
     "tags": ["format"]
   }
 ]

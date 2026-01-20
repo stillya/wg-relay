@@ -78,6 +78,7 @@ type StatisticsConfig struct {
 // ObfuscationMethod represents the obfuscation method
 type ObfuscationMethod uint32
 
+// Obfuscation method constants.
 const (
 	MethodNone ObfuscationMethod = 0
 	MethodXOR  ObfuscationMethod = 1
@@ -264,7 +265,7 @@ func NewConfig() *Config {
 
 // Load loads and validates configuration from a YAML file
 func Load(filename string) (*Config, error) {
-	data, err := os.ReadFile(filename)
+	data, err := os.ReadFile(filename) //nolint:gosec // G304: config file path is provided by CLI argument
 	if err != nil {
 		return nil, errors.Wrapf(err, "failed to read config file %s", filename)
 	}

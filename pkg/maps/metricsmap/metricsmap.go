@@ -2,13 +2,13 @@ package metricsmap
 
 import (
 	"context"
-	"fmt"
 	"net"
 
 	"github.com/cilium/ebpf"
 	"github.com/pkg/errors"
 )
 
+// Metric direction constants.
 const (
 	MetricToWg   uint8 = 1
 	MetricFromWg uint8 = 2
@@ -17,6 +17,7 @@ const (
 	MetricDrop      uint8 = 2
 )
 
+// MetricsKey represents the key structure for the BPF metrics map.
 type MetricsKey struct {
 	Dir     uint8
 	Reason  uint8
@@ -24,21 +25,25 @@ type MetricsKey struct {
 	SrcAddr uint32
 }
 
+// MetricsValue represents the value structure for the BPF metrics map.
 type MetricsValue struct {
 	Packets uint64
 	Bytes   uint64
 }
 
+// MetricData combines a metrics key with its corresponding value.
 type MetricData struct {
 	Key   MetricsKey
 	Value MetricsValue
 }
 
+// BPFMapSource provides access to BPF metrics maps.
 type BPFMapSource struct {
 	name string
 	m    *ebpf.Map
 }
 
+// NewBPFMapSource creates a new BPFMapSource with the given name and map.
 func NewBPFMapSource(name string, m *ebpf.Map) *BPFMapSource {
 	return &BPFMapSource{
 		name: name,
@@ -46,10 +51,12 @@ func NewBPFMapSource(name string, m *ebpf.Map) *BPFMapSource {
 	}
 }
 
+// Name returns the name of this metrics source.
 func (s *BPFMapSource) Name() string {
 	return s.name
 }
 
+// Collect retrieves all metrics from the BPF map, aggregating per-CPU values.
 func (s *BPFMapSource) Collect(ctx context.Context) ([]MetricData, error) {
 	if s.m == nil {
 		return nil, errors.New("map is nil")
@@ -86,6 +93,7 @@ func (s *BPFMapSource) Collect(ctx context.Context) ([]MetricData, error) {
 	return results, nil
 }
 
+// DirectionToString converts a direction constant to its string representation.
 func DirectionToString(dir uint8) string {
 	switch dir {
 	case MetricToWg:
@@ -97,6 +105,7 @@ func DirectionToString(dir uint8) string {
 	}
 }
 
+// ReasonToString converts a reason constant to its string representation.
 func ReasonToString(reason uint8) string {
 	switch reason {
 	case MetricForwarded:
@@ -108,6 +117,7 @@ func ReasonToString(reason uint8) string {
 	}
 }
 
+// SrcAddrToString converts a source address to its string representation.
 func SrcAddrToString(srcAddr uint32) string {
 	if srcAddr == 0 {
 		return "unknown"
@@ -118,5 +128,5 @@ func SrcAddrToString(srcAddr uint32) string {
 		byte(srcAddr>>8),
 		byte(srcAddr),
 	)
-	return fmt.Sprintf("%s", ip)
+	return ip.String()
 }

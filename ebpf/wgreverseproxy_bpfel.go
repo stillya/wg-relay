@@ -88,14 +88,10 @@ type WgReverseProxyMapSpecs struct {
 //
 // It can be passed ebpf.CollectionSpec.Assign.
 type WgReverseProxyVariableSpecs struct {
-	CfgPaddingEnabled  *ebpf.VariableSpec `ebpf:"__cfg_padding_enabled"`
-	CfgPaddingFillMode *ebpf.VariableSpec `ebpf:"__cfg_padding_fill_mode"`
-	CfgPaddingMax      *ebpf.VariableSpec `ebpf:"__cfg_padding_max"`
-	CfgPaddingMin      *ebpf.VariableSpec `ebpf:"__cfg_padding_min"`
-	CfgWgPort          *ebpf.VariableSpec `ebpf:"__cfg_wg_port"`
-	CfgXorEnabled      *ebpf.VariableSpec `ebpf:"__cfg_xor_enabled"`
-	CfgXorKey          *ebpf.VariableSpec `ebpf:"__cfg_xor_key"`
-	CfgXorKeyLen       *ebpf.VariableSpec `ebpf:"__cfg_xor_key_len"`
+	CfgWgPort     *ebpf.VariableSpec `ebpf:"__cfg_wg_port"`
+	CfgXorEnabled *ebpf.VariableSpec `ebpf:"__cfg_xor_enabled"`
+	CfgXorKey     *ebpf.VariableSpec `ebpf:"__cfg_xor_key"`
+	CfgXorKeyLen  *ebpf.VariableSpec `ebpf:"__cfg_xor_key_len"`
 }
 
 // WgReverseProxyObjects contains all objects after they have been loaded into the kernel.
@@ -131,14 +127,10 @@ func (m *WgReverseProxyMaps) Close() error {
 //
 // It can be passed to LoadWgReverseProxyObjects or ebpf.CollectionSpec.LoadAndAssign.
 type WgReverseProxyVariables struct {
-	CfgPaddingEnabled  *ebpf.Variable `ebpf:"__cfg_padding_enabled"`
-	CfgPaddingFillMode *ebpf.Variable `ebpf:"__cfg_padding_fill_mode"`
-	CfgPaddingMax      *ebpf.Variable `ebpf:"__cfg_padding_max"`
-	CfgPaddingMin      *ebpf.Variable `ebpf:"__cfg_padding_min"`
-	CfgWgPort          *ebpf.Variable `ebpf:"__cfg_wg_port"`
-	CfgXorEnabled      *ebpf.Variable `ebpf:"__cfg_xor_enabled"`
-	CfgXorKey          *ebpf.Variable `ebpf:"__cfg_xor_key"`
-	CfgXorKeyLen       *ebpf.Variable `ebpf:"__cfg_xor_key_len"`
+	CfgWgPort     *ebpf.Variable `ebpf:"__cfg_wg_port"`
+	CfgXorEnabled *ebpf.Variable `ebpf:"__cfg_xor_enabled"`
+	CfgXorKey     *ebpf.Variable `ebpf:"__cfg_xor_key"`
+	CfgXorKeyLen  *ebpf.Variable `ebpf:"__cfg_xor_key_len"`
 }
 
 // WgReverseProxyPrograms contains all programs after they have been loaded into the kernel.
