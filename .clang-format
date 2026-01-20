@@ -47,7 +47,6 @@ AlwaysBreakAfterReturnType: None
 BreakBeforeBinaryOperators: None
 
 # Comments
-ReflowComments: true
 CommentPragmas: '^ IWYU pragma:'
 
 # Other
