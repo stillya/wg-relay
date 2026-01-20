@@ -76,28 +76,6 @@ func (fp *ForwardLoader) configureStaticVars(spec *ebpf.CollectionSpec) error {
 		}
 	}
 
-	paddingEnabled := fp.cfg.Instrumentations.Padding != nil && fp.cfg.Instrumentations.Padding.Enabled
-	if err := spec.Variables["__cfg_padding_enabled"].Set(paddingEnabled); err != nil {
-		return errors.Wrap(err, "failed to set padding_enabled")
-	}
-
-	if paddingEnabled {
-		minPad, maxPad, fillMode := fp.cfg.GetPaddingConfig()
-		if err := spec.Variables["__cfg_padding_min"].Set(minPad); err != nil {
-			return errors.Wrap(err, "failed to set padding_min")
-		}
-		if err := spec.Variables["__cfg_padding_max"].Set(maxPad); err != nil {
-			return errors.Wrap(err, "failed to set padding_max")
-		}
-		if err := spec.Variables["__cfg_padding_fill_mode"].Set(fillMode); err != nil {
-			return errors.Wrap(err, "failed to set padding_fill_mode")
-		}
-	} else {
-		if err := spec.Variables["__cfg_padding_min"].Set(uint16(0)); err != nil {
-			return errors.Wrap(err, "failed to set padding_min to 0")
-		}
-	}
-
 	if err := spec.Variables["__cfg_wg_port"].Set(fp.cfg.WGPort); err != nil {
 		return errors.Wrap(err, "failed to set wg_port")
 	}

@@ -44,12 +44,6 @@ func TestBasicForwarding(t *testing.T) {
 	if err := spec.Variables["__cfg_xor_key_len"].Set(uint8(0)); err != nil {
 		t.Fatalf("Failed to set xor_key_len: %v", err)
 	}
-	if err := spec.Variables["__cfg_padding_enabled"].Set(false); err != nil {
-		t.Fatalf("Failed to set padding_enabled: %v", err)
-	}
-	if err := spec.Variables["__cfg_padding_min"].Set(uint16(0)); err != nil {
-		t.Fatalf("Failed to set padding_min: %v", err)
-	}
 	if err := spec.Variables["__cfg_wg_port"].Set(uint16(wgPort)); err != nil {
 		t.Fatalf("Failed to set wg_port: %v", err)
 	}
@@ -163,12 +157,6 @@ func TestXORObfuscation(t *testing.T) {
 			if err := spec.Variables["__cfg_xor_key_len"].Set(uint8(keyLen)); err != nil { //nolint:gosec // key length is bounded
 				t.Fatalf("Failed to set xor_key_len: %v", err)
 			}
-			if err := spec.Variables["__cfg_padding_enabled"].Set(false); err != nil {
-				t.Fatalf("Failed to set padding_enabled: %v", err)
-			}
-			if err := spec.Variables["__cfg_padding_min"].Set(uint16(0)); err != nil {
-				t.Fatalf("Failed to set padding_min: %v", err)
-			}
 			if err := spec.Variables["__cfg_wg_port"].Set(uint16(wgPort)); err != nil {
 				t.Fatalf("Failed to set wg_port: %v", err)
 			}
@@ -195,97 +183,6 @@ func TestXORObfuscation(t *testing.T) {
 				verifyXORObfuscation(t, inputPacket, outputPacket, keyBytes)
 			} else {
 				verifyPayloadUnchanged(t, inputPacket, outputPacket)
-			}
-		})
-	}
-}
-
-func TestPaddingObfuscation(t *testing.T) {
-	tests := []struct {
-		name           string
-		paddingEnabled bool
-		paddingMin     uint16
-		paddingMax     uint16
-		fillMode       uint8
-	}{
-		{
-			name:           "padding_disabled",
-			paddingEnabled: false,
-			paddingMin:     0,
-			paddingMax:     0,
-			fillMode:       0,
-		},
-		{
-			name:           "padding_enabled_zero_fill",
-			paddingEnabled: true,
-			paddingMin:     8,
-			paddingMax:     64,
-			fillMode:       0,
-		},
-		{
-			name:           "padding_enabled_random_fill",
-			paddingEnabled: true,
-			paddingMin:     8,
-			paddingMax:     64,
-			fillMode:       1,
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			spec, err := LoadWgForwardProxy()
-			if err != nil {
-				t.Fatalf("Failed to load spec: %v", err)
-			}
-
-			if err := spec.Variables["__cfg_xor_enabled"].Set(false); err != nil {
-				t.Fatalf("Failed to set xor_enabled: %v", err)
-			}
-			if err := spec.Variables["__cfg_xor_key_len"].Set(uint8(0)); err != nil {
-				t.Fatalf("Failed to set xor_key_len: %v", err)
-			}
-			if err := spec.Variables["__cfg_padding_enabled"].Set(tt.paddingEnabled); err != nil {
-				t.Fatalf("Failed to set padding_enabled: %v", err)
-			}
-			if err := spec.Variables["__cfg_padding_min"].Set(tt.paddingMin); err != nil {
-				t.Fatalf("Failed to set padding_min: %v", err)
-			}
-			if err := spec.Variables["__cfg_padding_max"].Set(tt.paddingMax); err != nil {
-				t.Fatalf("Failed to set padding_max: %v", err)
-			}
-			if err := spec.Variables["__cfg_padding_fill_mode"].Set(tt.fillMode); err != nil {
-				t.Fatalf("Failed to set padding_fill_mode: %v", err)
-			}
-			if err := spec.Variables["__cfg_wg_port"].Set(uint16(wgPort)); err != nil {
-				t.Fatalf("Failed to set wg_port: %v", err)
-			}
-
-			objs := &WgForwardProxyObjects{}
-			if err := spec.LoadAndAssign(objs, nil); err != nil {
-				t.Fatalf("Failed to load objects: %v", err)
-			}
-			defer objs.Close()
-
-			backendKey := uint32(0)
-			targetIP := ipToUint32("10.0.0.1")
-			if err := objs.BackendMap.Put(&backendKey, &targetIP); err != nil {
-				t.Fatalf("Failed to set backend map: %v", err)
-			}
-
-			inputPacket := createWGPacket("192.168.1.1", "192.168.1.2", 12345, wgPort)
-			inputLen := len(inputPacket)
-
-			_, outputPacket, err := objs.WgForwardProxy.Test(inputPacket)
-			if err != nil {
-				t.Fatalf("Failed to run program: %v", err)
-			}
-
-			if tt.paddingEnabled {
-				verifyPaddingAdded(t, inputLen, len(outputPacket), tt.paddingMin, tt.paddingMax)
-			} else {
-				if len(outputPacket) != inputLen {
-					t.Errorf("Packet size changed when padding disabled: input=%d, output=%d", inputLen, len(outputPacket))
-				}
 			}
 		})
 	}
@@ -341,12 +238,6 @@ func TestPortAndBackendConfig(t *testing.T) {
 			}
 			if err := spec.Variables["__cfg_xor_key_len"].Set(uint8(0)); err != nil {
 				t.Fatalf("Failed to set xor_key_len: %v", err)
-			}
-			if err := spec.Variables["__cfg_padding_enabled"].Set(false); err != nil {
-				t.Fatalf("Failed to set padding_enabled: %v", err)
-			}
-			if err := spec.Variables["__cfg_padding_min"].Set(uint16(0)); err != nil {
-				t.Fatalf("Failed to set padding_min: %v", err)
 			}
 			if err := spec.Variables["__cfg_wg_port"].Set(tt.wgPort); err != nil {
 				t.Fatalf("Failed to set wg_port: %v", err)
@@ -562,17 +453,5 @@ func verifyPayloadUnchanged(t *testing.T, inputPacket, outputPacket []byte) {
 			t.Errorf("Payload unexpectedly changed at byte %d when obfuscation disabled", i)
 			break
 		}
-	}
-}
-
-func verifyPaddingAdded(t *testing.T, inputLen, outputLen int, minPadding, maxPadding uint16) {
-	if outputLen <= inputLen {
-		t.Errorf("Expected packet to be padded, but size didn't increase: input=%d, output=%d", inputLen, outputLen)
-		return
-	}
-
-	paddingSize := outputLen - inputLen
-	if paddingSize < int(minPadding) || paddingSize > int(maxPadding) {
-		t.Errorf("Padding size %d outside expected range [%d, %d]", paddingSize, minPadding, maxPadding)
 	}
 }

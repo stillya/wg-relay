@@ -1,4 +1,4 @@
-// go:build ignore
+//go:build ignore
 
 #include <linux/bpf.h>
 #include <linux/if_ether.h>
@@ -18,7 +18,7 @@
 // Forward proxy static configuration
 DECLARE_CONFIG(__u16, wg_port, "WireGuard port to intercept");
 
-// Backend map for target server (populated by agent)
+// Backend map for target server
 struct {
 	__uint(type, BPF_MAP_TYPE_HASH);
 	__uint(max_entries, 1);

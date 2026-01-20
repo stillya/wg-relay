@@ -23,22 +23,13 @@ type DaemonConfig struct {
 
 // InstrumentationConfig represents instrumentation configuration
 type InstrumentationConfig struct {
-	XOR     *XORConfig     `yaml:"xor,omitempty"`
-	Padding *PaddingConfig `yaml:"padding,omitempty"`
+	XOR *XORConfig `yaml:"xor,omitempty"`
 }
 
 // XORConfig represents XOR obfuscation configuration
 type XORConfig struct {
 	Enabled bool   `yaml:"enabled"`
 	Key     string `yaml:"key"`
-}
-
-// PaddingConfig represents packet padding configuration
-type PaddingConfig struct {
-	Enabled    bool   `yaml:"enabled"`
-	MinPadding uint16 `yaml:"min_padding"`
-	MaxPadding uint16 `yaml:"max_padding"`
-	FillMode   string `yaml:"fill_mode"` // "zero" or "random"
 }
 
 // ProxyConfig represents proxy-specific configuration
@@ -87,9 +78,6 @@ const (
 // MaxKeySize defines the maximum key size for obfuscation
 const MaxKeySize = 32
 
-// MaxPaddingSize defines the maximum padding size
-const MaxPaddingSize = 256
-
 // validate validates the dataplane configuration
 func (cfg *Config) validate() error {
 	// Validate mode
@@ -120,24 +108,6 @@ func (cfg *ProxyConfig) validate(mode string) error {
 		}
 		if len(cfg.Instrumentations.XOR.Key) > MaxKeySize {
 			return errors.Errorf("xor key too long: %d bytes, max %d", len(cfg.Instrumentations.XOR.Key), MaxKeySize)
-		}
-	}
-
-	if cfg.Instrumentations.Padding != nil && cfg.Instrumentations.Padding.Enabled {
-		if cfg.Instrumentations.Padding.MinPadding == 0 {
-			return errors.New("padding min_padding must be greater than 0 when padding is enabled")
-		}
-		if cfg.Instrumentations.Padding.MaxPadding == 0 {
-			return errors.New("padding max_padding must be greater than 0 when padding is enabled")
-		}
-		if cfg.Instrumentations.Padding.MinPadding > cfg.Instrumentations.Padding.MaxPadding {
-			return errors.New("padding min_padding must be less than or equal to max_padding")
-		}
-		if cfg.Instrumentations.Padding.MaxPadding > MaxPaddingSize {
-			return errors.Errorf("padding max_padding too large: %d bytes, max %d", cfg.Instrumentations.Padding.MaxPadding, MaxPaddingSize)
-		}
-		if cfg.Instrumentations.Padding.FillMode != "zero" && cfg.Instrumentations.Padding.FillMode != "random" {
-			return errors.New("padding fill_mode must be 'zero' or 'random'")
 		}
 	}
 
@@ -175,10 +145,6 @@ func (cfg *ProxyConfig) GetInstrumentationMethods() uint8 {
 		methods |= 0x01 // INSTRUMENT_XOR
 	}
 
-	if cfg.Instrumentations.Padding != nil && cfg.Instrumentations.Padding.Enabled {
-		methods |= 0x02 // INSTRUMENT_PADDING
-	}
-
 	return methods
 }
 
@@ -188,20 +154,6 @@ func (cfg *ProxyConfig) GetXORKey() []byte {
 		return []byte(cfg.Instrumentations.XOR.Key)
 	}
 	return nil
-}
-
-// GetPaddingConfig returns padding configuration
-func (cfg *ProxyConfig) GetPaddingConfig() (uint16, uint16, uint8) {
-	if cfg.Instrumentations.Padding != nil && cfg.Instrumentations.Padding.Enabled {
-		fillMode := uint8(0) // zero
-		if cfg.Instrumentations.Padding.FillMode == "random" {
-			fillMode = 1
-		}
-		return cfg.Instrumentations.Padding.MinPadding,
-			cfg.Instrumentations.Padding.MaxPadding,
-			fillMode
-	}
-	return 0, 0, 0
 }
 
 // GetTargetServerIP returns the target server IP as a uint32 in network byte order
@@ -241,12 +193,6 @@ func NewConfig() *Config {
 				XOR: &XORConfig{
 					Enabled: false,
 					Key:     "",
-				},
-				Padding: &PaddingConfig{
-					Enabled:    false,
-					MinPadding: 8,
-					MaxPadding: 64,
-					FillMode:   "random",
 				},
 			},
 		},
