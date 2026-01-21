@@ -9,9 +9,10 @@ import (
 	"github.com/cilium/ebpf"
 	"github.com/cilium/ebpf/link"
 	"github.com/pkg/errors"
-	"github.com/stillya/wg-relay/pkg/dataplane/config"
 
 	wgebpf "github.com/stillya/wg-relay/ebpf"
+	"github.com/stillya/wg-relay/pkg/bpf"
+	"github.com/stillya/wg-relay/pkg/dataplane/config"
 	"github.com/stillya/wg-relay/pkg/dataplane/maps"
 )
 
@@ -47,49 +48,13 @@ func (fp *ForwardLoader) LoadAndAttach(ctx context.Context, cfg config.ProxyConf
 	return nil
 }
 
-func (fp *ForwardLoader) configureStaticVars(spec *ebpf.CollectionSpec) error {
-	xorEnabled := fp.cfg.Instrumentations.XOR != nil && fp.cfg.Instrumentations.XOR.Enabled
-	if err := spec.Variables["__cfg_xor_enabled"].Set(xorEnabled); err != nil {
-		return errors.Wrap(err, "failed to set xor_enabled")
-	}
-
-	if xorEnabled {
-		keyBytes := fp.cfg.GetXORKey()
-		if keyBytes != nil {
-			var keyArray [32]byte
-			copy(keyArray[:], keyBytes)
-
-			if err := spec.Variables["__cfg_xor_key"].Set(keyArray); err != nil {
-				return errors.Wrap(err, "failed to set xor_key")
-			}
-			keyLen := len(keyBytes)
-			if keyLen > 255 {
-				keyLen = 255
-			}
-			if err := spec.Variables["__cfg_xor_key_len"].Set(uint8(keyLen)); err != nil { //nolint:gosec // key length is bounded
-				return errors.Wrap(err, "failed to set xor_key_len")
-			}
-		}
-	} else {
-		if err := spec.Variables["__cfg_xor_key_len"].Set(uint8(0)); err != nil {
-			return errors.Wrap(err, "failed to set xor_key_len to 0")
-		}
-	}
-
-	if err := spec.Variables["__cfg_wg_port"].Set(fp.cfg.WGPort); err != nil {
-		return errors.Wrap(err, "failed to set wg_port")
-	}
-
-	return nil
-}
-
 func (fp *ForwardLoader) loadEBPF() error {
 	spec, err := wgebpf.LoadWgForwardProxy()
 	if err != nil {
 		return errors.Wrap(err, "failed to load forward proxy spec")
 	}
 
-	if err := fp.configureStaticVars(spec); err != nil {
+	if err := bpf.Configure(spec, &fp.cfg); err != nil {
 		return errors.Wrap(err, "failed to configure static variables")
 	}
 
