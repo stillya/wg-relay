@@ -91,7 +91,6 @@ type WgReverseProxyVariableSpecs struct {
 	CfgWgPort     *ebpf.VariableSpec `ebpf:"__cfg_wg_port"`
 	CfgXorEnabled *ebpf.VariableSpec `ebpf:"__cfg_xor_enabled"`
 	CfgXorKey     *ebpf.VariableSpec `ebpf:"__cfg_xor_key"`
-	CfgXorKeyLen  *ebpf.VariableSpec `ebpf:"__cfg_xor_key_len"`
 }
 
 // WgReverseProxyObjects contains all objects after they have been loaded into the kernel.
@@ -130,7 +129,6 @@ type WgReverseProxyVariables struct {
 	CfgWgPort     *ebpf.Variable `ebpf:"__cfg_wg_port"`
 	CfgXorEnabled *ebpf.Variable `ebpf:"__cfg_xor_enabled"`
 	CfgXorKey     *ebpf.Variable `ebpf:"__cfg_xor_key"`
-	CfgXorKeyLen  *ebpf.Variable `ebpf:"__cfg_xor_key_len"`
 }
 
 // WgReverseProxyPrograms contains all programs after they have been loaded into the kernel.

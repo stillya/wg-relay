@@ -25,8 +25,8 @@ type WgForwardProxyConnectionValue struct {
 	_         structs.HostLayout
 	Timestamp uint64
 	NatPort   uint16
-	Pad       uint16
-	_         [4]byte
+	_         [2]byte
+	Pad       uint32
 }
 
 type WgForwardProxyMetricsKey struct {
@@ -117,7 +117,6 @@ type WgForwardProxyVariableSpecs struct {
 	CfgWgPort     *ebpf.VariableSpec `ebpf:"__cfg_wg_port"`
 	CfgXorEnabled *ebpf.VariableSpec `ebpf:"__cfg_xor_enabled"`
 	CfgXorKey     *ebpf.VariableSpec `ebpf:"__cfg_xor_key"`
-	CfgXorKeyLen  *ebpf.VariableSpec `ebpf:"__cfg_xor_key_len"`
 }
 
 // WgForwardProxyObjects contains all objects after they have been loaded into the kernel.
@@ -164,7 +163,6 @@ type WgForwardProxyVariables struct {
 	CfgWgPort     *ebpf.Variable `ebpf:"__cfg_wg_port"`
 	CfgXorEnabled *ebpf.Variable `ebpf:"__cfg_xor_enabled"`
 	CfgXorKey     *ebpf.Variable `ebpf:"__cfg_xor_key"`
-	CfgXorKeyLen  *ebpf.Variable `ebpf:"__cfg_xor_key_len"`
 }
 
 // WgForwardProxyPrograms contains all programs after they have been loaded into the kernel.
