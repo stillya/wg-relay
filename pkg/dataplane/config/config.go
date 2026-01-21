@@ -21,6 +21,23 @@ type DaemonConfig struct {
 	Listen string `yaml:"listen"` // Address and port for daemon to bind to
 }
 
+// MonitoringConfig represents monitoring configuration
+type MonitoringConfig struct {
+	Prometheus PrometheusConfig `yaml:"prometheus"` // Prometheus HTTP exporter
+	Statistics StatisticsConfig `yaml:"statistics"` // vnstat-style console output
+}
+
+// ProxyConfig represents proxy-specific configuration
+type ProxyConfig struct {
+	Enabled          bool                  `yaml:"enabled"`                // Enable/disable proxy
+	Mode             string                `yaml:"mode"`                   // "forward" or "reverse"
+	WGPort           uint16                `yaml:"wg_port" ebpf:"wg_port"` // WireGuard port to intercept (default: 51820)
+	Instrumentations InstrumentationConfig `yaml:"instrumentations"`       // Instrumentation configuration
+	Interfaces       []string              `yaml:"interfaces"`             // Network interfaces to attach to
+	DriverMode       string                `yaml:"driver_mode"`            // "driver", "generic" and "offload" for XDP mode
+	Forward          ForwardConfig         `yaml:"forward"`                // Forward proxy configuration
+}
+
 // InstrumentationConfig represents instrumentation configuration
 type InstrumentationConfig struct {
 	XOR *XORConfig `yaml:"xor,omitempty"`
@@ -28,30 +45,13 @@ type InstrumentationConfig struct {
 
 // XORConfig represents XOR obfuscation configuration
 type XORConfig struct {
-	Enabled bool   `yaml:"enabled"`
-	Key     string `yaml:"key"`
-}
-
-// ProxyConfig represents proxy-specific configuration
-type ProxyConfig struct {
-	Enabled          bool                  `yaml:"enabled"`          // Enable/disable proxy
-	Mode             string                `yaml:"mode"`             // "forward" or "reverse"
-	WGPort           uint16                `yaml:"wg_port"`          // WireGuard port to intercept (default: 51820)
-	Instrumentations InstrumentationConfig `yaml:"instrumentations"` // Instrumentation configuration
-	Interfaces       []string              `yaml:"interfaces"`       // Network interfaces to attach to
-	DriverMode       string                `yaml:"driver_mode"`      // "driver", "generic" and "offload" for XDP mode
-	Forward          ForwardConfig         `yaml:"forward"`          // Forward proxy configuration
+	Enabled bool   `yaml:"enabled" ebpf:"xor_enabled"`
+	Key     string `yaml:"key" ebpf:"xor_key,bytes32"`
 }
 
 // ForwardConfig represents forward proxy configuration (forward mode)
 type ForwardConfig struct {
 	TargetServerIP string `yaml:"target_server_ip"` // Target WireGuard server IP
-}
-
-// MonitoringConfig represents monitoring configuration
-type MonitoringConfig struct {
-	Prometheus PrometheusConfig `yaml:"prometheus"` // Prometheus HTTP exporter
-	Statistics StatisticsConfig `yaml:"statistics"` // vnstat-style console output
 }
 
 // PrometheusConfig represents Prometheus monitoring configuration

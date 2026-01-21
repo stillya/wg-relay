@@ -38,7 +38,7 @@ type Opts struct {
 	Version    bool   `short:"v" long:"version" description:"Show version information"`
 }
 
-const version = "0.0.1"
+const version = "0.1.0"
 
 func main() {
 	var opts Opts
