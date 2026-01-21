@@ -41,9 +41,6 @@ func TestBasicForwarding(t *testing.T) {
 	if err := spec.Variables["__cfg_xor_enabled"].Set(false); err != nil {
 		t.Fatalf("Failed to set xor_enabled: %v", err)
 	}
-	if err := spec.Variables["__cfg_xor_key_len"].Set(uint8(0)); err != nil {
-		t.Fatalf("Failed to set xor_key_len: %v", err)
-	}
 	if err := spec.Variables["__cfg_wg_port"].Set(uint16(wgPort)); err != nil {
 		t.Fatalf("Failed to set wg_port: %v", err)
 	}
@@ -150,13 +147,6 @@ func TestXORObfuscation(t *testing.T) {
 			if err := spec.Variables["__cfg_xor_key"].Set(keyArray); err != nil {
 				t.Fatalf("Failed to set xor_key: %v", err)
 			}
-			keyLen := len(keyBytes)
-			if keyLen > 255 {
-				keyLen = 255
-			}
-			if err := spec.Variables["__cfg_xor_key_len"].Set(uint8(keyLen)); err != nil { //nolint:gosec // key length is bounded
-				t.Fatalf("Failed to set xor_key_len: %v", err)
-			}
 			if err := spec.Variables["__cfg_wg_port"].Set(uint16(wgPort)); err != nil {
 				t.Fatalf("Failed to set wg_port: %v", err)
 			}
@@ -235,9 +225,6 @@ func TestPortAndBackendConfig(t *testing.T) {
 
 			if err := spec.Variables["__cfg_xor_enabled"].Set(false); err != nil {
 				t.Fatalf("Failed to set xor_enabled: %v", err)
-			}
-			if err := spec.Variables["__cfg_xor_key_len"].Set(uint8(0)); err != nil {
-				t.Fatalf("Failed to set xor_key_len: %v", err)
 			}
 			if err := spec.Variables["__cfg_wg_port"].Set(tt.wgPort); err != nil {
 				t.Fatalf("Failed to set wg_port: %v", err)

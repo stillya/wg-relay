@@ -11,7 +11,6 @@ struct xor_key {
 
 DECLARE_CONFIG(bool, xor_enabled, "Enable XOR obfuscation");
 DECLARE_CONFIG(struct xor_key, xor_key, "XOR obfuscation key");
-DECLARE_CONFIG(__u8, xor_key_len, "XOR key length");
 
 #define XOR_PROCESS_LEN 16
 
