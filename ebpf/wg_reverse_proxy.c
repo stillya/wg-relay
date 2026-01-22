@@ -10,7 +10,9 @@
 #include <bpf/bpf_endian.h>
 #include <bpf/bpf_helpers.h>
 #include "csum.h"
+#include "instrumentation/instrumentation.h"
 #include "instrumentation/xor.h"
+#include "instrumentation/padding.h"
 #include "metrics.h"
 #include "packet.h"
 #include "static_config.h"
@@ -19,23 +21,59 @@
 DECLARE_CONFIG(__u16, wg_port, "WireGuard port to intercept");
 
 // Apply obfuscation in TC mode (manual ordering)
-// NOTE: Order matters!
+// NOTE: Order matters! XOR first, then padding (so size marker is at end)
 static __always_inline int instr_obfuscate_tc(struct wg_ctx *ctx) {
-	if (xor_obfuscate_tc(ctx) < 0) {
-		return -1;
+	int ret;
+
+	ret = xor_obfuscate_tc(ctx);
+	if (ret == INSTR_ERROR) {
+		return INSTR_ERROR;
+	}
+	if (ret == INSTR_PKT_INVD) {
+		if (parse_tc_packet(ctx->skb, ctx) < 0) {
+			return INSTR_ERROR;
+		}
 	}
 
-	return 0;
+	ret = padding_obfuscate_tc(ctx);
+	if (ret == INSTR_ERROR) {
+		return INSTR_ERROR;
+	}
+	if (ret == INSTR_PKT_INVD) {
+		if (parse_tc_packet(ctx->skb, ctx) < 0) {
+			return INSTR_ERROR;
+		}
+	}
+
+	return INSTR_OK;
 }
 
 // Apply deobfuscation in TC mode (reverse order)
-// NOTE: Order matters!
+// NOTE: Order matters! Remove padding first, then XOR
 static __always_inline int instr_deobfuscate_tc(struct wg_ctx *ctx) {
-	if (xor_deobfuscate_tc(ctx) < 0) {
-		return -1;
+	int ret;
+
+	ret = padding_deobfuscate_tc(ctx);
+	if (ret == INSTR_ERROR) {
+		return INSTR_ERROR;
+	}
+	if (ret == INSTR_PKT_INVD) {
+		if (parse_tc_packet(ctx->skb, ctx) < 0) {
+			return INSTR_ERROR;
+		}
 	}
 
-	return 0;
+	ret = xor_deobfuscate_tc(ctx);
+	if (ret == INSTR_ERROR) {
+		return INSTR_ERROR;
+	}
+	if (ret == INSTR_PKT_INVD) {
+		if (parse_tc_packet(ctx->skb, ctx) < 0) {
+			return INSTR_ERROR;
+		}
+	}
+
+	return INSTR_OK;
 }
 
 SEC("tc")

@@ -10,7 +10,9 @@
 #include <bpf/bpf_endian.h>
 #include <bpf/bpf_helpers.h>
 #include "csum.h"
+#include "instrumentation/instrumentation.h"
 #include "instrumentation/xor.h"
+#include "instrumentation/padding.h"
 #include "metrics.h"
 #include "nat.h"
 #include "packet.h"
@@ -177,21 +179,57 @@ static __always_inline int forward_packet(struct wg_ctx *ctx, __u32 new_saddr, _
 // Apply obfuscation in XDP mode (manual ordering)
 // NOTE: Order matters!
 static __always_inline int instr_obfuscate_xdp(struct wg_ctx *ctx) {
-	if (xor_obfuscate_xdp(ctx) < 0) {
-		return -1;
+	int ret;
+
+	ret = xor_obfuscate_xdp(ctx);
+	if (ret == INSTR_ERROR) {
+		return INSTR_ERROR;
+	}
+	if (ret == INSTR_PKT_INVD) {
+		if (parse_xdp_packet(ctx->xdp, ctx) < 0) {
+			return INSTR_ERROR;
+		}
 	}
 
-	return 0;
+	ret = padding_obfuscate_xdp(ctx);
+	if (ret == INSTR_ERROR) {
+		return INSTR_ERROR;
+	}
+	if (ret == INSTR_PKT_INVD) {
+		if (parse_xdp_packet(ctx->xdp, ctx) < 0) {
+			return INSTR_ERROR;
+		}
+	}
+
+	return INSTR_OK;
 }
 
 // Apply deobfuscation in XDP mode (reverse order)
 // NOTE: Order matters!
 static __always_inline int instr_deobfuscate_xdp(struct wg_ctx *ctx) {
-	if (xor_deobfuscate_xdp(ctx) < 0) {
-		return -1;
+	int ret;
+
+	ret = padding_deobfuscate_xdp(ctx);
+	if (ret == INSTR_ERROR) {
+		return INSTR_ERROR;
+	}
+	if (ret == INSTR_PKT_INVD) {
+		if (parse_xdp_packet(ctx->xdp, ctx) < 0) {
+			return INSTR_ERROR;
+		}
 	}
 
-	return 0;
+	ret = xor_deobfuscate_xdp(ctx);
+	if (ret == INSTR_ERROR) {
+		return INSTR_ERROR;
+	}
+	if (ret == INSTR_PKT_INVD) {
+		if (parse_xdp_packet(ctx->xdp, ctx) < 0) {
+			return INSTR_ERROR;
+		}
+	}
+
+	return INSTR_OK;
 }
 
 SEC("xdp")
@@ -221,24 +259,27 @@ int wg_forward_proxy(struct xdp_md *xdp_ctx) {
 			return XDP_PASS;
 		}
 
-		// Deobfuscate packet from WG server
 		if (instr_deobfuscate_xdp(&ctx) < 0) {
 			DEBUG_PRINTK("Deobfuscation failed, dropping packet");
 			update_metrics(METRIC_FROM_WG, METRIC_DROP, pkt_len, 0);
 			return XDP_DROP;
 		}
 
-		__u32 proxy_ip = bpf_ntohl(ctx.ip->daddr);
+		__u32 dst_addr = bpf_ntohl(ctx.ip->daddr);
 		__u32 client_ip = bpf_ntohl(original_conn.client_ip);
+		__u16 server_port = original_conn.server_port;
+		__u16 client_port = original_conn.client_port;
 
 		update_metrics(METRIC_FROM_WG, METRIC_FORWARDED, pkt_len, client_ip);
-		return forward_packet(&ctx, proxy_ip, original_conn.server_port, client_ip, original_conn.client_port);
+		return forward_packet(&ctx, dst_addr, server_port, client_ip, client_port);
 	}
 
 	if (unlikely(is_to_wg)) {
+		__u32 src_addr = bpf_ntohl(ctx.ip->saddr);
+
 		if (create_nat_connection(&ctx) < 0) {
 			DEBUG_PRINTK("Failed to create NAT connection for TO WG packet");
-			update_metrics(METRIC_TO_WG, METRIC_DROP, pkt_len, bpf_ntohl(ctx.ip->saddr));
+			update_metrics(METRIC_TO_WG, METRIC_DROP, pkt_len, src_addr);
 			return XDP_PASS;
 		}
 
@@ -255,31 +296,31 @@ int wg_forward_proxy(struct xdp_md *xdp_ctx) {
 				     "%pI4:%d, passing through",
 				     &conn_key.client_ip, conn_key.client_port, &conn_key.server_ip,
 				     conn_key.server_port);
-			update_metrics(METRIC_TO_WG, METRIC_DROP, pkt_len, bpf_ntohl(ctx.ip->saddr));
+			update_metrics(METRIC_TO_WG, METRIC_DROP, pkt_len, src_addr);
 			return XDP_PASS;
 		}
 
-		// Obfuscate packet to WG server
+		__u16 nat_port = conn_value->nat_port;
+
 		if (instr_obfuscate_xdp(&ctx) < 0) {
 			DEBUG_PRINTK("Obfuscation failed, dropping packet");
-			update_metrics(METRIC_TO_WG, METRIC_DROP, pkt_len, bpf_ntohl(ctx.ip->saddr));
+			update_metrics(METRIC_TO_WG, METRIC_DROP, pkt_len, src_addr);
 			return XDP_DROP;
 		}
 
-		// Lookup target server IP from backend map
 		__u32 backend_key = BACKEND_KEY_TARGET_SERVER_IP;
 		__u32 *target_ip = bpf_map_lookup_elem(&backend_map, &backend_key);
 		if (!target_ip) {
 			DEBUG_PRINTK("No target server IP configured");
-			update_metrics(METRIC_TO_WG, METRIC_DROP, pkt_len, bpf_ntohl(ctx.ip->saddr));
+			update_metrics(METRIC_TO_WG, METRIC_DROP, pkt_len, src_addr);
 			return XDP_DROP;
 		}
 
 		__u32 proxy_ip = bpf_ntohl(ctx.ip->daddr);
 		__u32 server_ip = *target_ip;
 
-		update_metrics(METRIC_TO_WG, METRIC_FORWARDED, pkt_len, bpf_ntohl(ctx.ip->saddr));
-		return forward_packet(&ctx, proxy_ip, conn_value->nat_port, server_ip, CONFIG(wg_port));
+		update_metrics(METRIC_TO_WG, METRIC_FORWARDED, pkt_len, src_addr);
+		return forward_packet(&ctx, proxy_ip, nat_port, server_ip, CONFIG(wg_port));
 	}
 
 	DEBUG_PRINTK("No matching handler for WG packet, passing through");
