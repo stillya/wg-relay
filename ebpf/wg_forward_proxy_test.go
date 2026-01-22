@@ -178,6 +178,125 @@ func TestXORObfuscation(t *testing.T) {
 	}
 }
 
+func TestPaddingObfuscation(t *testing.T) {
+	tests := []struct {
+		name           string
+		paddingEnabled bool
+		paddingSize    uint8
+	}{
+		{
+			name:           "padding_enabled",
+			paddingEnabled: true,
+			paddingSize:    64,
+		},
+		{
+			name:           "padding_disabled",
+			paddingEnabled: false,
+			paddingSize:    32,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			spec, err := LoadWgForwardProxy()
+			if err != nil {
+				t.Fatalf("Failed to load spec: %v", err)
+			}
+
+			if err := spec.Variables["__cfg_xor_enabled"].Set(false); err != nil {
+				t.Fatalf("Failed to set xor_enabled: %v", err)
+			}
+			if err := spec.Variables["__cfg_padding_enabled"].Set(tt.paddingEnabled); err != nil {
+				t.Fatalf("Failed to set padding_enabled: %v", err)
+			}
+			if err := spec.Variables["__cfg_padding_size"].Set(tt.paddingSize); err != nil {
+				t.Fatalf("Failed to set padding_size: %v", err)
+			}
+			if err := spec.Variables["__cfg_wg_port"].Set(uint16(wgPort)); err != nil {
+				t.Fatalf("Failed to set wg_port: %v", err)
+			}
+
+			objs := &WgForwardProxyObjects{}
+			if err := spec.LoadAndAssign(objs, nil); err != nil {
+				t.Fatalf("Failed to load objects: %v", err)
+			}
+			defer objs.Close()
+
+			backendKey := uint32(0)
+			targetIP := ipToUint32("10.0.0.1")
+			if err := objs.BackendMap.Put(&backendKey, &targetIP); err != nil {
+				t.Fatalf("Failed to set backend map: %v", err)
+			}
+
+			inputPacket := createWGPacket("192.168.1.1", "192.168.1.2", 12345, wgPort)
+			_, outputPacket, err := objs.WgForwardProxy.Test(inputPacket)
+			if err != nil {
+				t.Fatalf("Failed to run program: %v", err)
+			}
+
+			if tt.paddingEnabled {
+				verifyPaddingObfuscation(t, inputPacket, outputPacket, tt.paddingSize)
+			} else {
+				if len(outputPacket) != len(inputPacket) {
+					t.Errorf("Packet length changed when padding disabled: input %d, output %d",
+						len(inputPacket), len(outputPacket))
+				}
+			}
+		})
+	}
+}
+
+func TestPaddingWithXOR(t *testing.T) {
+	spec, err := LoadWgForwardProxy()
+	if err != nil {
+		t.Fatalf("Failed to load spec: %v", err)
+	}
+
+	xorKey := "test-key-1234567"
+	keyBytes := []byte(xorKey)
+	var keyArray [32]byte
+	copy(keyArray[:], keyBytes)
+
+	paddingSize := uint8(32)
+
+	if err := spec.Variables["__cfg_xor_enabled"].Set(true); err != nil {
+		t.Fatalf("Failed to set xor_enabled: %v", err)
+	}
+	if err := spec.Variables["__cfg_xor_key"].Set(keyArray); err != nil {
+		t.Fatalf("Failed to set xor_key: %v", err)
+	}
+	if err := spec.Variables["__cfg_padding_enabled"].Set(true); err != nil {
+		t.Fatalf("Failed to set padding_enabled: %v", err)
+	}
+	if err := spec.Variables["__cfg_padding_size"].Set(paddingSize); err != nil {
+		t.Fatalf("Failed to set padding_size: %v", err)
+	}
+	if err := spec.Variables["__cfg_wg_port"].Set(uint16(wgPort)); err != nil {
+		t.Fatalf("Failed to set wg_port: %v", err)
+	}
+
+	objs := &WgForwardProxyObjects{}
+	if err := spec.LoadAndAssign(objs, nil); err != nil {
+		t.Fatalf("Failed to load objects: %v", err)
+	}
+	defer objs.Close()
+
+	backendKey := uint32(0)
+	targetIP := ipToUint32("10.0.0.1")
+	if err := objs.BackendMap.Put(&backendKey, &targetIP); err != nil {
+		t.Fatalf("Failed to set backend map: %v", err)
+	}
+
+	inputPacket := createWGPacket("192.168.1.1", "192.168.1.2", 12345, wgPort)
+	_, outputPacket, err := objs.WgForwardProxy.Test(inputPacket)
+	if err != nil {
+		t.Fatalf("Failed to run program: %v", err)
+	}
+
+	verifyPaddingObfuscation(t, inputPacket, outputPacket, paddingSize)
+	verifyXORObfuscation(t, inputPacket, outputPacket, keyBytes)
+}
+
 func TestPortAndBackendConfig(t *testing.T) {
 	tests := []struct {
 		name           string
@@ -441,4 +560,21 @@ func verifyPayloadUnchanged(t *testing.T, inputPacket, outputPacket []byte) {
 			break
 		}
 	}
+}
+
+func verifyPaddingObfuscation(t *testing.T, inputPacket, outputPacket []byte, paddingSize uint8) {
+	t.Logf("Input packet length: %d, Output packet length: %d, Expected padding size: %d",
+		len(inputPacket), len(outputPacket), paddingSize)
+
+	expectedLen := len(inputPacket) + int(paddingSize)
+	if len(outputPacket) != expectedLen {
+		t.Errorf("Expected output packet length %d, got %d", expectedLen, len(outputPacket))
+		return
+	}
+
+	sizeMarker := outputPacket[len(outputPacket)-1]
+	if sizeMarker != paddingSize {
+		t.Errorf("Expected size marker %d at position %d, got %d", paddingSize, len(outputPacket)-1, sizeMarker)
+	}
+
 }

@@ -88,9 +88,11 @@ type WgReverseProxyMapSpecs struct {
 //
 // It can be passed ebpf.CollectionSpec.Assign.
 type WgReverseProxyVariableSpecs struct {
-	CfgWgPort     *ebpf.VariableSpec `ebpf:"__cfg_wg_port"`
-	CfgXorEnabled *ebpf.VariableSpec `ebpf:"__cfg_xor_enabled"`
-	CfgXorKey     *ebpf.VariableSpec `ebpf:"__cfg_xor_key"`
+	CfgPaddingEnabled *ebpf.VariableSpec `ebpf:"__cfg_padding_enabled"`
+	CfgPaddingSize    *ebpf.VariableSpec `ebpf:"__cfg_padding_size"`
+	CfgWgPort         *ebpf.VariableSpec `ebpf:"__cfg_wg_port"`
+	CfgXorEnabled     *ebpf.VariableSpec `ebpf:"__cfg_xor_enabled"`
+	CfgXorKey         *ebpf.VariableSpec `ebpf:"__cfg_xor_key"`
 }
 
 // WgReverseProxyObjects contains all objects after they have been loaded into the kernel.
@@ -126,9 +128,11 @@ func (m *WgReverseProxyMaps) Close() error {
 //
 // It can be passed to LoadWgReverseProxyObjects or ebpf.CollectionSpec.LoadAndAssign.
 type WgReverseProxyVariables struct {
-	CfgWgPort     *ebpf.Variable `ebpf:"__cfg_wg_port"`
-	CfgXorEnabled *ebpf.Variable `ebpf:"__cfg_xor_enabled"`
-	CfgXorKey     *ebpf.Variable `ebpf:"__cfg_xor_key"`
+	CfgPaddingEnabled *ebpf.Variable `ebpf:"__cfg_padding_enabled"`
+	CfgPaddingSize    *ebpf.Variable `ebpf:"__cfg_padding_size"`
+	CfgWgPort         *ebpf.Variable `ebpf:"__cfg_wg_port"`
+	CfgXorEnabled     *ebpf.Variable `ebpf:"__cfg_xor_enabled"`
+	CfgXorKey         *ebpf.Variable `ebpf:"__cfg_xor_key"`
 }
 
 // WgReverseProxyPrograms contains all programs after they have been loaded into the kernel.

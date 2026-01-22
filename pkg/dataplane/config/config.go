@@ -40,13 +40,20 @@ type ProxyConfig struct {
 
 // InstrumentationConfig represents instrumentation configuration
 type InstrumentationConfig struct {
-	XOR *XORConfig `yaml:"xor,omitempty"`
+	XOR     *XORConfig     `yaml:"xor,omitempty"`
+	Padding *PaddingConfig `yaml:"padding,omitempty"`
 }
 
 // XORConfig represents XOR obfuscation configuration
 type XORConfig struct {
 	Enabled bool   `yaml:"enabled" ebpf:"xor_enabled"`
 	Key     string `yaml:"key" ebpf:"xor_key,bytes32"`
+}
+
+// PaddingConfig represents padding obfuscation configuration
+type PaddingConfig struct {
+	Enabled bool  `yaml:"enabled" ebpf:"padding_enabled"`
+	Size    uint8 `yaml:"size" ebpf:"padding_size"`
 }
 
 // ForwardConfig represents forward proxy configuration (forward mode)
@@ -108,6 +115,13 @@ func (cfg *ProxyConfig) validate(mode string) error {
 		}
 		if len(cfg.Instrumentations.XOR.Key) > MaxKeySize {
 			return errors.Errorf("xor key too long: %d bytes, max %d", len(cfg.Instrumentations.XOR.Key), MaxKeySize)
+		}
+	}
+
+	// Validate Padding config
+	if cfg.Instrumentations.Padding != nil && cfg.Instrumentations.Padding.Enabled {
+		if cfg.Instrumentations.Padding.Size < 1 {
+			return errors.New("padding size must be at least 1")
 		}
 	}
 

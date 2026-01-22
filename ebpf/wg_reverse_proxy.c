@@ -11,6 +11,7 @@
 #include <bpf/bpf_helpers.h>
 #include "csum.h"
 #include "instrumentation/xor.h"
+#include "instrumentation/padding.h"
 #include "metrics.h"
 #include "packet.h"
 #include "static_config.h"
@@ -19,9 +20,12 @@
 DECLARE_CONFIG(__u16, wg_port, "WireGuard port to intercept");
 
 // Apply obfuscation in TC mode (manual ordering)
-// NOTE: Order matters!
+// NOTE: Order matters! XOR first, then padding (so size marker is at end)
 static __always_inline int instr_obfuscate_tc(struct wg_ctx *ctx) {
 	if (xor_obfuscate_tc(ctx) < 0) {
+		return -1;
+	}
+	if (padding_obfuscate_tc(ctx) < 0) {
 		return -1;
 	}
 
@@ -29,8 +33,11 @@ static __always_inline int instr_obfuscate_tc(struct wg_ctx *ctx) {
 }
 
 // Apply deobfuscation in TC mode (reverse order)
-// NOTE: Order matters!
+// NOTE: Order matters! Remove padding first, then XOR
 static __always_inline int instr_deobfuscate_tc(struct wg_ctx *ctx) {
+	if (padding_deobfuscate_tc(ctx) < 0) {
+		return -1;
+	}
 	if (xor_deobfuscate_tc(ctx) < 0) {
 		return -1;
 	}
