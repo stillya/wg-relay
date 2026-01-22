@@ -67,13 +67,19 @@ daemon:
   listen: ":8080"                         # Daemon bind address
 
 proxy:
-  method: "xor"                           # Obfuscation method (Currently only "xor" is supported)
-  key: "my_secret_key_32_bytes_long_123"  # Obfuscation key
   driver_mode: "driver"                   # use generic if you at containerized environment
   interfaces:
   - "eth0"                                # Main interface to intercept
   forward:
     target_server_ip: "192.168.200.2"     # Target WireGuard server IP
+  
+  instrumentation:
+    xor:
+      enabled: true
+      key: "my_secret_key_32_bytes_long_123"  # XOR obfuscation key
+    padding:
+      enabled: true
+      size: 64                                # Padding size in bytes
 ```
 
 ### 3. Run
@@ -97,6 +103,7 @@ sudo make run-reverse-proxy    # wg-server namespace
 ### Obfuscation Methods
 
 - **XOR**: Simple XOR-based obfuscation with a configurable key
+- **Padding**: Adds padding to packets to alter traffic patterns
 - **None**: Pass-through mode for testing
 
 ### XDP Driver Modes
