@@ -3,6 +3,7 @@
 
 #include "common.h"
 #include "context.h"
+#include "instrumentation.h"
 #include "static_config.h"
 
 struct xor_key {
@@ -16,22 +17,21 @@ DECLARE_CONFIG(struct xor_key, xor_key, "XOR obfuscation key");
 
 static __always_inline int __xor_process(struct wg_ctx *ctx) {
 	if (!CONFIG(xor_enabled)) {
-		return 0;
+		return INSTR_OK;
 	}
 
 	__u8 *payload = ctx->payload;
 	if (payload + XOR_PROCESS_LEN > (__u8 *)ctx->payload_end) {
-		return -1;
+		return INSTR_ERROR;
 	}
 
-	// Apply XOR with static key
 	struct xor_key key = CONFIG(xor_key);
 #pragma clang loop unroll(full)
 	for (int i = 0; i < XOR_PROCESS_LEN; i++) {
 		payload[i] ^= key.key[i];
 	}
 
-	return 0;
+	return INSTR_OK;
 }
 
 // XOR is symmetric
