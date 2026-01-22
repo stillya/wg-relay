@@ -18,6 +18,9 @@ proxy:
     xor: # XOR obfuscation
       enabled: true
       key: "my_secret_key_32_bytes_long_123"
+    padding: # Padding obfuscation
+      enabled: true
+      size: 32
 
   driver_mode: "driver"                  # "driver", "generic" or "offload" for XDP mode
   interfaces: # Network interfaces to attach to

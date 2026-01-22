@@ -73,15 +73,6 @@ type StatisticsConfig struct {
 	Interval time.Duration `yaml:"interval"` // Statistics update interval
 }
 
-// ObfuscationMethod represents the obfuscation method
-type ObfuscationMethod uint32
-
-// Obfuscation method constants.
-const (
-	MethodNone ObfuscationMethod = 0
-	MethodXOR  ObfuscationMethod = 1
-)
-
 // MaxKeySize defines the maximum key size for obfuscation
 const MaxKeySize = 32
 

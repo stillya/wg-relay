@@ -62,25 +62,25 @@ static __always_inline __maybe_unused int padding_deobfuscate_xdp(struct wg_ctx 
 		return INSTR_OK;
 	}
 
-	__u64 pkt_len64 = (data_end - data);
-	if (pkt_len64 == 0 || pkt_len64 > 65535) {
+	__u64 pkt_len = (data_end - data);
+	if (pkt_len == 0 || pkt_len > 65535) {
 		return INSTR_OK;
 	}
 
-	__u32 marker_offset = (__u32)(pkt_len64 - 1);
+	__u32 mrk_offset = (__u32)(pkt_len - 1);
 
-	if (data + marker_offset + 1 > data_end) {
+	if (data + mrk_offset + 1 > data_end) {
 		return INSTR_OK;
 	}
 
-	__u8 *marker = (__u8 *)data + marker_offset;
-	__u8 padding_size = *marker;
+	__u8 *mrk = (__u8 *)data + mrk_offset;
+	__u8 padding_size = *mrk;
 
 	if (padding_size == 0) {
 		return INSTR_OK;
 	}
 
-	if (pkt_len64 < padding_size) {
+	if (pkt_len < padding_size) {
 		return INSTR_OK;
 	}
 
@@ -121,19 +121,19 @@ static __always_inline __maybe_unused int padding_obfuscate_tc(struct wg_ctx *ct
 		return INSTR_ERROR;
 	}
 
-	__u64 pkt_len64 = (data_end - data);
-	if (pkt_len64 == 0 || pkt_len64 > 65535) {
+	__u64 pkt_len = (data_end - data);
+	if (pkt_len == 0 || pkt_len > 65535) {
 		return INSTR_ERROR;
 	}
 
-	__u32 marker_offset = (__u32)(pkt_len64 - 1);
+	__u32 mrk_offset = (__u32)(pkt_len - 1);
 
-	if (data + marker_offset + 1 > data_end) {
+	if (data + mrk_offset + 1 > data_end) {
 		return INSTR_ERROR;
 	}
 
-	__u8 *marker = (__u8 *)data + marker_offset;
-	*marker = cfg_padding_size;
+	__u8 *mrk = (__u8 *)data + mrk_offset;
+	*mrk = cfg_padding_size;
 
 	return INSTR_PKT_INVD;
 }
@@ -150,25 +150,25 @@ static __always_inline __maybe_unused int padding_deobfuscate_tc(struct wg_ctx *
 		return INSTR_OK;
 	}
 
-	__u64 pkt_len64 = (data_end - data);
-	if (pkt_len64 == 0 || pkt_len64 > 65535) {
+	__u64 pkt_len = (data_end - data);
+	if (pkt_len == 0 || pkt_len > 65535) {
 		return INSTR_OK;
 	}
 
-	__u32 marker_offset = (__u32)(pkt_len64 - 1);
+	__u32 mrk_offset = (__u32)(pkt_len - 1);
 
-	if (data + marker_offset + 1 > data_end) {
+	if (data + mrk_offset + 1 > data_end) {
 		return INSTR_OK;
 	}
 
-	__u8 *marker = (__u8 *)data + marker_offset;
-	__u8 padding_size = *marker;
+	__u8 *mrk = (__u8 *)data + mrk_offset;
+	__u8 padding_size = *mrk;
 
 	if (padding_size == 0) {
 		return INSTR_OK;
 	}
 
-	if (pkt_len64 < padding_size) {
+	if (pkt_len < padding_size) {
 		return INSTR_OK;
 	}
 
