@@ -13,6 +13,13 @@ import (
 	"github.com/cilium/ebpf"
 )
 
+type WgForwardProxyBackendEntry struct {
+	_    structs.HostLayout
+	Ip   uint32
+	Port uint16
+	Pad  uint16
+}
+
 type WgForwardProxyConnectionKey struct {
 	_          structs.HostLayout
 	ClientIp   uint32
@@ -25,8 +32,8 @@ type WgForwardProxyConnectionValue struct {
 	_         structs.HostLayout
 	Timestamp uint64
 	NatPort   uint16
-	_         [2]byte
-	Pad       uint32
+	Pad       uint16
+	_         [4]byte
 }
 
 type WgForwardProxyMetricsKey struct {
@@ -103,6 +110,7 @@ type WgForwardProxyProgramSpecs struct {
 //
 // It can be passed ebpf.CollectionSpec.Assign.
 type WgForwardProxyMapSpecs struct {
+	BackendCount   *ebpf.MapSpec `ebpf:"backend_count"`
 	BackendMap     *ebpf.MapSpec `ebpf:"backend_map"`
 	ConnectionMap  *ebpf.MapSpec `ebpf:"connection_map"`
 	MetricsMap     *ebpf.MapSpec `ebpf:"metrics_map"`
@@ -141,6 +149,7 @@ func (o *WgForwardProxyObjects) Close() error {
 //
 // It can be passed to LoadWgForwardProxyObjects or ebpf.CollectionSpec.LoadAndAssign.
 type WgForwardProxyMaps struct {
+	BackendCount   *ebpf.Map `ebpf:"backend_count"`
 	BackendMap     *ebpf.Map `ebpf:"backend_map"`
 	ConnectionMap  *ebpf.Map `ebpf:"connection_map"`
 	MetricsMap     *ebpf.Map `ebpf:"metrics_map"`
@@ -150,6 +159,7 @@ type WgForwardProxyMaps struct {
 
 func (m *WgForwardProxyMaps) Close() error {
 	return _WgForwardProxyClose(
+		m.BackendCount,
 		m.BackendMap,
 		m.ConnectionMap,
 		m.MetricsMap,

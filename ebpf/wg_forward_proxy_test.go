@@ -51,10 +51,10 @@ func TestBasicForwarding(t *testing.T) {
 	}
 	defer objs.Close()
 
-	backendKey := uint32(0)
-	targetIP := ipToUint32("10.0.0.1")
-	if err := objs.BackendMap.Put(&backendKey, &targetIP); err != nil {
-		t.Fatalf("Failed to set backend map: %v", err)
+	if err := configureBackends(objs, []BackendEntry{
+		{IP: ipToUint32("10.0.0.1"), Port: 51820},
+	}); err != nil {
+		t.Fatalf("Failed to configure backends: %v", err)
 	}
 
 	tests := []struct {
@@ -157,10 +157,10 @@ func TestXORObfuscation(t *testing.T) {
 			}
 			defer objs.Close()
 
-			backendKey := uint32(0)
-			targetIP := ipToUint32("10.0.0.1")
-			if err := objs.BackendMap.Put(&backendKey, &targetIP); err != nil {
-				t.Fatalf("Failed to set backend map: %v", err)
+			if err := configureBackends(objs, []BackendEntry{
+				{IP: ipToUint32("10.0.0.1"), Port: 51820},
+			}); err != nil {
+				t.Fatalf("Failed to configure backends: %v", err)
 			}
 
 			inputPacket := createWGPacket("192.168.1.1", "192.168.1.2", 12345, wgPort)
@@ -222,10 +222,10 @@ func TestPaddingObfuscation(t *testing.T) {
 			}
 			defer objs.Close()
 
-			backendKey := uint32(0)
-			targetIP := ipToUint32("10.0.0.1")
-			if err := objs.BackendMap.Put(&backendKey, &targetIP); err != nil {
-				t.Fatalf("Failed to set backend map: %v", err)
+			if err := configureBackends(objs, []BackendEntry{
+				{IP: ipToUint32("10.0.0.1"), Port: 51820},
+			}); err != nil {
+				t.Fatalf("Failed to configure backends: %v", err)
 			}
 
 			inputPacket := createWGPacket("192.168.1.1", "192.168.1.2", 12345, wgPort)
@@ -281,10 +281,10 @@ func TestPaddingWithXOR(t *testing.T) {
 	}
 	defer objs.Close()
 
-	backendKey := uint32(0)
-	targetIP := ipToUint32("10.0.0.1")
-	if err := objs.BackendMap.Put(&backendKey, &targetIP); err != nil {
-		t.Fatalf("Failed to set backend map: %v", err)
+	if err := configureBackends(objs, []BackendEntry{
+		{IP: ipToUint32("10.0.0.1"), Port: 51820},
+	}); err != nil {
+		t.Fatalf("Failed to configure backends: %v", err)
 	}
 
 	inputPacket := createWGPacket("192.168.1.1", "192.168.1.2", 12345, wgPort)
@@ -295,6 +295,45 @@ func TestPaddingWithXOR(t *testing.T) {
 
 	verifyPaddingObfuscation(t, inputPacket, outputPacket, paddingSize)
 	verifyXORObfuscation(t, inputPacket, outputPacket, keyBytes)
+}
+
+func TestMultipleBackends(t *testing.T) {
+	spec, err := LoadWgForwardProxy()
+	if err != nil {
+		t.Fatalf("Failed to load spec: %v", err)
+	}
+
+	if err := spec.Variables["__cfg_xor_enabled"].Set(false); err != nil {
+		t.Fatalf("Failed to set xor_enabled: %v", err)
+	}
+	if err := spec.Variables["__cfg_wg_port"].Set(uint16(wgPort)); err != nil {
+		t.Fatalf("Failed to set wg_port: %v", err)
+	}
+
+	objs := &WgForwardProxyObjects{}
+	if err := spec.LoadAndAssign(objs, nil); err != nil {
+		t.Fatalf("Failed to load objects: %v", err)
+	}
+	defer objs.Close()
+
+	backends := []BackendEntry{
+		{IP: ipToUint32("10.0.0.1"), Port: 51820, Pad: 0},
+		{IP: ipToUint32("10.0.0.2"), Port: 51821, Pad: 0},
+		{IP: ipToUint32("10.0.0.3"), Port: 51822, Pad: 0},
+	}
+	if err := configureBackends(objs, backends); err != nil {
+		t.Fatalf("Failed to configure backends: %v", err)
+	}
+
+	packet := createWGPacket("192.168.1.1", "192.168.1.2", 12345, wgPort)
+	result, _, err := objs.WgForwardProxy.Test(packet)
+	if err != nil {
+		t.Fatalf("Failed to run program: %v", err)
+	}
+
+	if int(result) != xdpRedirect {
+		t.Errorf("Expected XDP_REDIRECT, got %d", result)
+	}
 }
 
 func TestPortAndBackendConfig(t *testing.T) {
@@ -355,10 +394,10 @@ func TestPortAndBackendConfig(t *testing.T) {
 			}
 			defer objs.Close()
 
-			backendKey := uint32(0)
-			targetIP := ipToUint32(tt.targetServerIP)
-			if err := objs.BackendMap.Put(&backendKey, &targetIP); err != nil {
-				t.Fatalf("Failed to set backend map: %v", err)
+			if err := configureBackends(objs, []BackendEntry{
+				{IP: ipToUint32(tt.targetServerIP), Port: 51820},
+			}); err != nil {
+				t.Fatalf("Failed to configure backends: %v", err)
 			}
 
 			packet := createWGPacket("192.168.1.1", "192.168.1.2", 12345, tt.packetDstPort)
@@ -577,4 +616,25 @@ func verifyPaddingObfuscation(t *testing.T, inputPacket, outputPacket []byte, pa
 		t.Errorf("Expected size marker %d at position %d, got %d", paddingSize, len(outputPacket)-1, sizeMarker)
 	}
 
+}
+
+// BackendEntry matches the eBPF struct backend_entry
+type BackendEntry struct {
+	IP   uint32
+	Port uint16
+	Pad  uint16
+}
+
+// configureBackends sets up backends with custom ports for L4LB testing
+func configureBackends(objs *WgForwardProxyObjects, backends []BackendEntry) error {
+	for i, entry := range backends {
+		key := uint32(i)
+		if err := objs.BackendMap.Put(&key, &entry); err != nil {
+			return err
+		}
+	}
+
+	countKey := uint32(0)
+	count := uint32(len(backends))
+	return objs.BackendCount.Put(&countKey, &count)
 }

@@ -64,7 +64,11 @@ func TestPaddingConfig_Validation(t *testing.T) {
 				Mode:       "forward",
 				Interfaces: []string{"eth0"},
 				Forward: ForwardConfig{
-					TargetServerIP: "10.0.0.1",
+					Backends: []BackendServer{
+						{
+							IP: "10.0.0.1",
+						},
+					},
 				},
 				Instrumentations: InstrumentationConfig{
 					Padding: tt.padding,
@@ -148,9 +152,13 @@ func TestInstrumentationConfig_Combined(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			cfg := &ProxyConfig{
-				Mode:             "forward",
-				Interfaces:       []string{"eth0"},
-				Forward:          ForwardConfig{TargetServerIP: "10.0.0.1"},
+				Mode:       "forward",
+				Interfaces: []string{"eth0"},
+				Forward: ForwardConfig{Backends: []BackendServer{
+					{
+						IP: "10.0.0.1",
+					},
+				}},
 				Instrumentations: tt.instr,
 			}
 

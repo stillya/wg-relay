@@ -2,6 +2,7 @@ package proxy
 
 import (
 	"context"
+	"fmt"
 	"net"
 
 	log "log/slog"
@@ -14,6 +15,7 @@ import (
 	"github.com/stillya/wg-relay/pkg/bpf"
 	"github.com/stillya/wg-relay/pkg/dataplane/config"
 	"github.com/stillya/wg-relay/pkg/dataplane/maps"
+	"github.com/stillya/wg-relay/pkg/utils"
 )
 
 // ForwardLoader manages XDP-based forward proxy
@@ -41,9 +43,12 @@ func (fp *ForwardLoader) LoadAndAttach(ctx context.Context, cfg config.ProxyConf
 		return errors.Wrap(err, "failed to attach to interfaces")
 	}
 
+	backendCount := len(cfg.Forward.Backends)
+
 	log.Info("Forward proxy loaded and attached",
 		"enabled", cfg.Enabled,
-		"target_server_ip", cfg.Forward.TargetServerIP)
+		"backend_count", backendCount,
+	)
 
 	return nil
 }
@@ -79,16 +84,47 @@ func (fp *ForwardLoader) loadEBPF() error {
 }
 
 func (fp *ForwardLoader) configureBackendMap() error {
-	targetServerIP, err := fp.cfg.GetTargetServerIP()
-	if err != nil {
-		return errors.Wrap(err, "failed to get target server IP")
+	backends := fp.cfg.GetBackends()
+
+	if len(backends) == 0 {
+		return errors.New("no backends configured")
 	}
 
-	key := uint32(0)
-	_ = key
-	_ = targetServerIP
+	for i, backend := range backends {
+		key := uint32(i)
+		ip, err := utils.IpToUint32(backend.IP)
+		if err != nil {
+			return errors.Wrapf(err, "failed to convert IP address %s to uint32", backend.IP)
+		}
+		entry := &wgebpf.WgForwardProxyBackendEntry{
+			Ip:   ip,
+			Port: backend.Port,
+		}
+		if err := fp.objs.BackendMap.Put(&key, entry); err != nil {
+			return errors.Wrapf(err, "failed to add backend[%d] to map", i)
+		}
+	}
 
-	log.Info("Backend map configured", "target_server_ip", fp.cfg.Forward.TargetServerIP)
+	countKey := uint32(0)
+	count := uint32(len(backends))
+	if err := fp.objs.BackendCount.Put(&countKey, &count); err != nil {
+		return errors.Wrap(err, "failed to set backend count")
+	}
+
+	backendAddrs := make([]string, len(backends))
+	for i, b := range fp.cfg.Forward.Backends {
+		if b.Port > 0 {
+			backendAddrs[i] = fmt.Sprintf("%s:%d", b.IP, b.Port)
+		} else {
+			backendAddrs[i] = b.IP
+		}
+	}
+
+	log.Info("Backend map configured",
+		"count", len(backends),
+		"backends", backendAddrs,
+	)
+
 	return nil
 }
 
