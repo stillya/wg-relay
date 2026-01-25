@@ -7,7 +7,6 @@ import (
 	"github.com/stillya/wg-relay/pkg/utils"
 )
 
-// Forward proxy specific constants
 const (
 	xdpPass     = 2
 	xdpRedirect = 4 // fib_lookup redirects to default gateway

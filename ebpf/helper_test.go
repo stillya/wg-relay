@@ -10,7 +10,6 @@ import (
 	"github.com/stillya/wg-relay/pkg/utils"
 )
 
-// Shared constants for both forward and reverse proxy tests
 const (
 	wgPort = 51820
 

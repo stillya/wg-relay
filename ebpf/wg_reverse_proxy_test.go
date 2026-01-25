@@ -4,7 +4,6 @@ import (
 	"testing"
 )
 
-// Reverse proxy specific constants (TC return codes)
 const (
 	tcActOk   = 0 // TC_ACT_OK - packet continues
 	tcActShot = 2 // TC_ACT_SHOT - packet dropped

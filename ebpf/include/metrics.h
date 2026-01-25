@@ -6,6 +6,8 @@
 #include <bpf/bpf_helpers.h>
 #include "common.h"
 
+#define METRICS_MAP_SIZE 65536
+
 enum metric_dir { METRIC_TO_WG = 1, METRIC_FROM_WG };
 
 enum metric_reason { METRIC_FORWARDED = 1, METRIC_DROP };
@@ -25,7 +27,7 @@ struct metrics_value {
 // Per-CPU metrics map for high performance
 struct {
 	__uint(type, BPF_MAP_TYPE_PERCPU_HASH);
-	__uint(max_entries, 16);
+	__uint(max_entries, METRICS_MAP_SIZE);
 	__type(key, struct metrics_key);
 	__type(value, struct metrics_value);
 } metrics_map SEC(".maps");
@@ -36,8 +38,8 @@ static __always_inline __maybe_unused void update_metrics(__u8 dir, __u8 reason,
 
 	struct metrics_value *value = bpf_map_lookup_elem(&metrics_map, &key);
 	if (value) {
-		__sync_fetch_and_add(&value->packets, 1);
-		__sync_fetch_and_add(&value->bytes, bytes);
+		value->packets += 1;
+		value->bytes += bytes;
 	} else {
 		struct metrics_value new_value = { .packets = 1, .bytes = bytes };
 		bpf_map_update_elem(&metrics_map, &key, &new_value, BPF_NOEXIST);
