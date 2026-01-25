@@ -9,10 +9,9 @@
 // Maximum number of backends
 #define MAX_BACKENDS 256
 
-// Backend entry with IP and port
 struct backend_entry {
-	__u32 ip;   // Backend IP address (network byte order)
-	__u16 port; // Backend port (host byte order)
+	__u32 ip;
+	__u16 port;
 	__u16 pad;
 };
 
@@ -70,8 +69,6 @@ static __always_inline __maybe_unused int select_backend_hash(__u32 client_ip, _
 
 	__u32 num_backends = *count;
 
-	// Hash client IP and port for consistent backend selection
-	// Same client will always hit the same backend (until backend count changes)
 	__u32 hash = jhash_2words(client_ip, (__u32)client_port, 0x12345678);
 	__u32 idx = hash % num_backends;
 
