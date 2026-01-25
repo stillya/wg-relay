@@ -2,7 +2,7 @@ include Makefile.defs
 
 SUBDIRS = ebpf
 
-.PHONY: help all build clean run-daemon run-forward-proxy run-reverse-proxy run-local-forward run-local-reverse run-local-probe-only test-ebpf test $(SUBDIRS)
+.PHONY: help all build clean run-daemon run-forward-proxy run-reverse-proxy run-local-forward run-local-reverse run-local-probe test-ebpf test $(SUBDIRS)
 
 # Variables
 DAEMON_BINARY := wg-relay-daemon

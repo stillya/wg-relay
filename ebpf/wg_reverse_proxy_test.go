@@ -96,7 +96,6 @@ func TestBasicReversing(t *testing.T) {
 }
 
 func TestReverseProxyXORObfuscation(t *testing.T) {
-	// xorKey must be exactly xorProcessLen bytes to match eBPF key array size
 	xorKey := "test-key-1234567890abcdef12345678"
 
 	tests := []struct {
@@ -295,7 +294,6 @@ func TestReverseProxyPaddingObfuscation(t *testing.T) {
 }
 
 func TestReverseProxyCombinedObfuscation(t *testing.T) {
-	// xorKey must be exactly xorProcessLen bytes to match eBPF key array size
 	xorKey := "test-key-1234567890abcdef12345678"
 
 	tests := []struct {
