@@ -53,7 +53,7 @@ func main() {
 	}
 
 	if opts.Version {
-		fmt.Printf("wg-proxy daemon version %s\n", version)
+		fmt.Printf("wg-relay daemon version %s\n", version)
 		os.Exit(0)
 	}
 
@@ -67,7 +67,7 @@ func main() {
 	}))
 	log.SetDefault(logger)
 
-	log.Info("Starting wg-proxy daemon", "version", version)
+	log.Info("Starting wg-relay daemon", "version", version)
 
 	cfg, err := loadConfig(opts)
 	if err != nil {
@@ -147,9 +147,9 @@ func main() {
 
 		if cfg.Monitoring.Statistics.Enabled {
 			statsMonitor = monitor.NewStatMonitor(monitor.StatMonitorParams{
-				Source:   metricsSource,
 				Interval: cfg.Monitoring.Statistics.Interval,
-			})
+				Mode:     cfg.Proxy.Mode,
+			}, metricsSource)
 			go statsMonitor.Start(ctx)
 			defer statsMonitor.Stop()
 		}

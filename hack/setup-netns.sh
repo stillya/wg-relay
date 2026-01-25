@@ -3,6 +3,9 @@
 # Network namespace setup script for WireGuard proxy testing
 # Creates eBPF proxy and WireGuard server namespaces
 # Client runs on host, eBPF proxy in ebpf-proxy namespace, server in wg-server namespace
+#
+# Note: This script should be run from the project root directory:
+#   sudo ./hack/setup-netns.sh setup
 
 set -e
 

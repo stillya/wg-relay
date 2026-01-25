@@ -2,7 +2,7 @@ include Makefile.defs
 
 SUBDIRS = ebpf
 
-.PHONY: help all build clean run-daemon run-forward-proxy run-reverse-proxy test-ebpf test $(SUBDIRS)
+.PHONY: help all build clean run-daemon run-forward-proxy run-reverse-proxy run-local-forward run-local-reverse run-local-probe-only test-ebpf test $(SUBDIRS)
 
 # Variables
 DAEMON_BINARY := wg-relay-daemon
@@ -15,10 +15,38 @@ help:
 	@echo "  build                 - Build the daemon"
 	@echo "  clean                 - Clean generated files and build artifacts"
 	@echo "  run-daemon            - Build and run the daemon with default config"
-	@echo "  run-forward-proxy     - Run forward proxy in ebpf-proxy namespace"
-	@echo "  run-reverse-proxy     - Run reverse proxy in wg-server namespace"
+	@echo "  run-local-forward     - Run forward proxy in ebpf-proxy namespace"
+	@echo "  run-local-reverse     - Run reverse proxy + probe server in wg-server namespace"
+	@echo "  run-local-probe-only  - Run probe server only (see obfuscated packets)"
 	@echo "  test-ebpf             - Run eBPF unit tests"
 	@echo "  test                  - Run all tests"
+	@echo ""
+	@echo "Local testing workflow (run all commands from project root):"
+	@echo "  1. Setup namespaces:     sudo ./hack/setup-netns.sh setup"
+	@echo ""
+	@echo "  Scenario 1: See obfuscated packets (forward proxy + probe only)"
+	@echo "  2. Terminal 1 - Forward proxy (obfuscates):"
+	@echo "     make run-local-forward"
+	@echo "  3. Terminal 2 - Probe server (shows obfuscated packets):"
+	@echo "     make run-local-probe-only"
+	@echo "  4. Terminal 3 - Send probe:"
+	@echo "     python3 hack/wgprobe.py"
+	@echo ""
+	@echo "  Scenario 2: See deobfuscated packets (reverse proxy + probe)"
+	@echo "  2. Terminal 1 - Reverse proxy + server (deobfuscates):"
+	@echo "     make run-local-reverse"
+	@echo "  3. Terminal 2 - Send probe:"
+	@echo "     python3 hack/wgprobe.py"
+	@echo ""
+	@echo "  Scenario 3: Packet capture (see wire-level obfuscation)"
+	@echo "  2. Terminal 1 - Forward proxy:"
+	@echo "     make run-local-forward"
+	@echo "  3. Terminal 2 - Capture in ebpf-proxy namespace:"
+	@echo "     sudo ip netns exec ebpf-proxy tcpdump -i veth-wg@1 -X udp port 51820"
+	@echo "  4. Terminal 3 - Send probe:"
+	@echo "     python3 hack/wgprobe.py"
+	@echo ""
+	@echo "Note: XDP/TC intercepts packets at kernel level. Use probe-only mode or tcpdump to see obfuscation."
 
 $(SUBDIRS):
 	$(QUIET)$(MAKE) -C $@ all
@@ -37,7 +65,7 @@ clean:
 	$(QUIET)rm -rf $(BUILD_DIR)
 
 run-daemon: build
-	@echo "Running wg-proxy daemon..."
+	@echo "Running wg-relay daemon..."
 	@echo "Note: This requires root privileges for eBPF operations"
 	@echo "Press Ctrl+C to stop"
 	sudo ./$(BUILD_DIR)/$(DAEMON_BINARY) -c config.yaml
@@ -46,13 +74,38 @@ run-local-forward: build
 	@echo "Running forward proxy daemon in ebpf-proxy namespace..."
 	@echo "Note: This requires root privileges and namespace setup"
 	@echo "Press Ctrl+C to stop"
-	sudo ip netns exec ebpf-proxy ./$(BUILD_DIR)/$(DAEMON_BINARY) -c config.yaml -d
+	sudo ip netns exec ebpf-proxy ./$(BUILD_DIR)/$(DAEMON_BINARY) -c hack/config-forward.yaml -d
 
 run-local-reverse: build
-	@echo "Running reverse proxy daemon in wg-server namespace..."
+	@echo "Running reverse proxy daemon + probe server in wg-server namespace..."
 	@echo "Note: This requires root privileges and namespace setup"
+	@echo "Press Ctrl+C to stop both daemon and probe server"
+	@bash -c '\
+		sudo ip netns exec wg-server bash -c "./$(BUILD_DIR)/$(DAEMON_BINARY) -c hack/config-reverse.yaml -d & echo \$$! > /tmp/wg-relay-reverse.pid; wait" & \
+		DAEMON_BG_PID=$$!; \
+		sleep 3; \
+		cleanup() { \
+			echo ""; \
+			echo "Shutting down daemon..."; \
+			if [ -f /tmp/wg-relay-reverse.pid ]; then \
+				DPID=$$(cat /tmp/wg-relay-reverse.pid 2>/dev/null); \
+				if [ ! -z "$$DPID" ]; then \
+					sudo kill $$DPID 2>/dev/null || true; \
+				fi; \
+				rm -f /tmp/wg-relay-reverse.pid; \
+			fi; \
+			wait $$DAEMON_BG_PID 2>/dev/null || true; \
+		}; \
+		trap cleanup EXIT; \
+		sudo ip netns exec wg-server python3 hack/wgprobe.py --server || true; \
+		cleanup'
+
+run-local-probe:
+	@echo "Running probe server in wg-server namespace (without daemon)..."
+	@echo "This shows obfuscated packets before deobfuscation"
+	@echo "Note: Use with 'make run-local-forward' to see obfuscated traffic"
 	@echo "Press Ctrl+C to stop"
-	sudo ip netns exec wg-server ./$(BUILD_DIR)/$(DAEMON_BINARY) -c config.yaml -d
+	sudo ip netns exec wg-server python3 hack/wgprobe.py --server
 
 test-ebpf: all
 	@echo "Running eBPF unit tests..."

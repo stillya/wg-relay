@@ -12,7 +12,7 @@ import (
 type TablePrinter struct{}
 
 // PrintTrafficTable prints a formatted table of traffic statistics.
-func (tp *TablePrinter) PrintTrafficTable(metricsData []metricsmap.MetricData, elapsed time.Duration) {
+func (tp *TablePrinter) PrintTrafficTable(mode string, metricsData []metricsmap.MetricData, elapsed time.Duration) {
 	tp.clearScreen()
 
 	type srcStats struct {
@@ -51,7 +51,7 @@ func (tp *TablePrinter) PrintTrafficTable(metricsData []metricsmap.MetricData, e
 	estimatedTotalDaily := estimatedRxDaily + estimatedTxDaily
 
 	fmt.Printf("\n")
-	fmt.Printf("                         wg-relay traffic statistics\n")
+	fmt.Printf("                         wg-relay(%s) traffic statistics\n", mode)
 	fmt.Printf("\n")
 	fmt.Printf(" %-18s | %12s | %12s | %12s | %12s\n", "", "from_wg", "to_wg", "total", "avg. rate")
 	fmt.Printf(" %s+%s+%s+%s+%s\n",

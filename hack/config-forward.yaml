@@ -1,0 +1,32 @@
+daemon:
+  listen: ":8080"
+
+monitoring:
+  statistics:
+    enabled: true
+    interval: "5s"
+  prometheus:
+    enabled: true
+    listen: ":8081"
+
+proxy:
+  enabled: true
+  mode: "forward"
+  wg_port: 51820
+
+  instrumentations:
+    xor:
+      enabled: true
+      key: "my_secret_key_32_bytes_long_123"
+    padding:
+      enabled: false
+      size: 32
+
+  driver_mode: "generic"
+  interfaces:
+    - "veth-ebpf@2"
+    - "veth-wg@1"
+  forward:
+    backends:
+      - ip: "192.168.200.2"
+        port: 51820
