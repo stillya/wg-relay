@@ -15,21 +15,12 @@
 #include "instrumentation/padding.h"
 #include "metrics.h"
 #include "nat.h"
+#include "backend.h"
 #include "packet.h"
 #include "static_config.h"
 
 // Forward proxy static configuration
 DECLARE_CONFIG(__u16, wg_port, "WireGuard port to intercept");
-
-// Backend map for target server
-struct {
-	__uint(type, BPF_MAP_TYPE_HASH);
-	__uint(max_entries, 1);
-	__type(key, __u32);
-	__type(value, __u32);
-} backend_map SEC(".maps");
-
-#define BACKEND_KEY_TARGET_SERVER_IP 0
 
 // Connection tracking map: client connection -> NAT info
 struct {
@@ -47,8 +38,9 @@ struct {
 	__type(value, struct connection_key);
 } nat_reverse_map SEC(".maps");
 
-// Create NAT connection for outgoing packets (client -> server)
-static __always_inline int create_nat_connection(struct wg_ctx *ctx) {
+// Create or lookup NAT connection for outgoing packets (client -> server)
+static __always_inline int create_nat_connection(struct wg_ctx *ctx,
+						 struct backend_entry *backend) {
 	struct connection_key conn_key = {
 		.client_ip = ctx->ip->saddr,
 		.client_port = ctx->src_port,
@@ -56,7 +48,11 @@ static __always_inline int create_nat_connection(struct wg_ctx *ctx) {
 		.server_port = ctx->dst_port,
 	};
 
-	// Check if connection already exists first
+	if (select_backend_hash(conn_key.client_ip, conn_key.client_port, backend) < 0) {
+		return -1;
+	}
+
+	// Check if connection already exists
 	struct connection_value *existing = bpf_map_lookup_elem(&connection_map, &conn_key);
 	if (existing) {
 		existing->timestamp = get_timestamp();
@@ -70,33 +66,25 @@ static __always_inline int create_nat_connection(struct wg_ctx *ctx) {
 		.nat_port = nat_port,
 	};
 
-	// Lookup target server IP from backend map
-	__u32 backend_key = BACKEND_KEY_TARGET_SERVER_IP;
-	__u32 *target_ip = bpf_map_lookup_elem(&backend_map, &backend_key);
-	if (!target_ip) {
-		return -1;
-	}
+	struct nat_key nat_key = {
+		.server_ip = backend->ip,
+		.nat_port = nat_port,
+	};
 
-	struct nat_key nat_key = { 0 };
-	nat_key.server_ip = bpf_htonl(*target_ip);
-	nat_key.nat_port = nat_port;
-
-	int conn_updated = bpf_map_update_elem(&connection_map, &conn_key, &conn_value, BPF_NOEXIST);
-	if (conn_updated == -EEXIST) {
+	int ret = bpf_map_update_elem(&connection_map, &conn_key, &conn_value, BPF_NOEXIST);
+	if (ret == -EEXIST) {
 		existing = bpf_map_lookup_elem(&connection_map, &conn_key);
 		if (existing) {
 			existing->timestamp = get_timestamp();
 			return 0;
-		} else {
-			return -1;
 		}
-	} else if (conn_updated != 0) {
+		return -1;
+	} else if (ret != 0) {
 		return -1;
 	}
 
-	int reverse_updated = bpf_map_update_elem(&nat_reverse_map, &nat_key, &conn_key, BPF_ANY);
-	if (reverse_updated != 0) {
-		// cleanup if reverse mapping fails
+	ret = bpf_map_update_elem(&nat_reverse_map, &nat_key, &conn_key, BPF_ANY);
+	if (ret != 0) {
 		bpf_map_delete_elem(&connection_map, &conn_key);
 		return -1;
 	}
@@ -277,7 +265,8 @@ int wg_forward_proxy(struct xdp_md *xdp_ctx) {
 	if (unlikely(is_to_wg)) {
 		__u32 src_addr = bpf_ntohl(ctx.ip->saddr);
 
-		if (create_nat_connection(&ctx) < 0) {
+		struct backend_entry backend = { 0 };
+		if (create_nat_connection(&ctx, &backend) < 0) {
 			DEBUG_PRINTK("Failed to create NAT connection for TO WG packet");
 			update_metrics(METRIC_TO_WG, METRIC_DROP, pkt_len, src_addr);
 			return XDP_PASS;
@@ -300,27 +289,18 @@ int wg_forward_proxy(struct xdp_md *xdp_ctx) {
 			return XDP_PASS;
 		}
 
-		__u16 nat_port = conn_value->nat_port;
-
 		if (instr_obfuscate_xdp(&ctx) < 0) {
 			DEBUG_PRINTK("Obfuscation failed, dropping packet");
 			update_metrics(METRIC_TO_WG, METRIC_DROP, pkt_len, src_addr);
 			return XDP_DROP;
 		}
 
-		__u32 backend_key = BACKEND_KEY_TARGET_SERVER_IP;
-		__u32 *target_ip = bpf_map_lookup_elem(&backend_map, &backend_key);
-		if (!target_ip) {
-			DEBUG_PRINTK("No target server IP configured");
-			update_metrics(METRIC_TO_WG, METRIC_DROP, pkt_len, src_addr);
-			return XDP_DROP;
-		}
-
 		__u32 proxy_ip = bpf_ntohl(ctx.ip->daddr);
-		__u32 server_ip = *target_ip;
+		__u32 server_ip = bpf_ntohl(backend.ip);
+		__u16 target_port = backend.port > 0 ? backend.port : CONFIG(wg_port);
 
 		update_metrics(METRIC_TO_WG, METRIC_FORWARDED, pkt_len, src_addr);
-		return forward_packet(&ctx, proxy_ip, nat_port, server_ip, CONFIG(wg_port));
+		return forward_packet(&ctx, proxy_ip, conn_value->nat_port, server_ip, target_port);
 	}
 
 	DEBUG_PRINTK("No matching handler for WG packet, passing through");

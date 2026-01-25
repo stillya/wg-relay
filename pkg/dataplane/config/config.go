@@ -56,9 +56,15 @@ type PaddingConfig struct {
 	Size    uint8 `yaml:"size" ebpf:"padding_size"`
 }
 
+// BackendServer represents a single backend server
+type BackendServer struct {
+	IP   string `yaml:"ip"`   // Backend server IP address
+	Port uint16 `yaml:"port"` // Backend server port (optional, defaults to wg_port)
+}
+
 // ForwardConfig represents forward proxy configuration (forward mode)
 type ForwardConfig struct {
-	TargetServerIP string `yaml:"target_server_ip"` // Target WireGuard server IP
+	Backends []BackendServer `yaml:"backends"` // List of backend servers
 }
 
 // PrometheusConfig represents Prometheus monitoring configuration
@@ -76,83 +82,6 @@ type StatisticsConfig struct {
 // MaxKeySize defines the maximum key size for obfuscation
 const MaxKeySize = 32
 
-// validate validates the dataplane configuration
-func (cfg *Config) validate() error {
-	// Validate mode
-	if cfg.Proxy.Mode != "forward" && cfg.Proxy.Mode != "reverse" {
-		return errors.New("mode must be 'forward' or 'reverse'")
-	}
-
-	// Validate proxy configuration
-	return cfg.Proxy.validate(cfg.Proxy.Mode)
-}
-
-// validate validates the proxy configuration
-func (cfg *ProxyConfig) validate(mode string) error {
-	// Validate interfaces
-	if len(cfg.Interfaces) == 0 {
-		return errors.New("at least one interface must be specified")
-	}
-
-	// Validate driver mode
-	if cfg.DriverMode != "" && cfg.DriverMode != "driver" && cfg.DriverMode != "generic" && cfg.DriverMode != "offload" {
-		return errors.New("driver_mode must be 'driver', 'generic' or 'offload'")
-	}
-
-	// Validate XOR config
-	if cfg.Instrumentations.XOR != nil && cfg.Instrumentations.XOR.Enabled {
-		if len(cfg.Instrumentations.XOR.Key) == 0 {
-			return errors.New("xor key is required when xor is enabled")
-		}
-		if len(cfg.Instrumentations.XOR.Key) > MaxKeySize {
-			return errors.Errorf("xor key too long: %d bytes, max %d", len(cfg.Instrumentations.XOR.Key), MaxKeySize)
-		}
-	}
-
-	// Validate Padding config
-	if cfg.Instrumentations.Padding != nil && cfg.Instrumentations.Padding.Enabled {
-		if cfg.Instrumentations.Padding.Size < 1 {
-			return errors.New("padding size must be at least 1")
-		}
-	}
-
-	// Forward mode specific validations
-	if mode == "forward" {
-		return cfg.Forward.validate()
-	}
-
-	return nil
-}
-
-// validate validates the forward proxy configuration
-func (fc *ForwardConfig) validate() error {
-	if fc.TargetServerIP == "" {
-		return errors.New("target_server_ip is required in forward mode")
-	}
-
-	// Validate target server IP
-	targetIP := net.ParseIP(fc.TargetServerIP)
-	if targetIP == nil {
-		return errors.Errorf("invalid target server IP: %s", fc.TargetServerIP)
-	}
-	if targetIP.To4() == nil {
-		return errors.Errorf("target server IP must be IPv4: %s", fc.TargetServerIP)
-	}
-
-	return nil
-}
-
-// GetInstrumentationMethods returns enabled instrumentations as bitfield
-func (cfg *ProxyConfig) GetInstrumentationMethods() uint8 {
-	var methods uint8 = 0
-
-	if cfg.Instrumentations.XOR != nil && cfg.Instrumentations.XOR.Enabled {
-		methods |= 0x01 // INSTRUMENT_XOR
-	}
-
-	return methods
-}
-
 // GetXORKey returns the XOR key as bytes
 func (cfg *ProxyConfig) GetXORKey() []byte {
 	if cfg.Instrumentations.XOR != nil && cfg.Instrumentations.XOR.Enabled {
@@ -161,24 +90,9 @@ func (cfg *ProxyConfig) GetXORKey() []byte {
 	return nil
 }
 
-// GetTargetServerIP returns the target server IP as a uint32 in network byte order
-func (cfg *ProxyConfig) GetTargetServerIP() (uint32, error) {
-	if cfg.Forward.TargetServerIP == "" {
-		return 0, nil
-	}
-
-	targetIP := net.ParseIP(cfg.Forward.TargetServerIP)
-	if targetIP == nil {
-		return 0, errors.Errorf("invalid target server IP: %s", cfg.Forward.TargetServerIP)
-	}
-
-	targetIP = targetIP.To4()
-	if targetIP == nil {
-		return 0, errors.Errorf("target server IP must be IPv4: %s", cfg.Forward.TargetServerIP)
-	}
-
-	// Convert to uint32 in network byte order
-	return uint32(targetIP[0])<<24 | uint32(targetIP[1])<<16 | uint32(targetIP[2])<<8 | uint32(targetIP[3]), nil
+// GetBackends returns all configured backends
+func (cfg *ProxyConfig) GetBackends() []BackendServer {
+	return cfg.Forward.Backends
 }
 
 // NewConfig creates a new dataplane configuration with defaults
@@ -231,4 +145,74 @@ func Load(filename string) (*Config, error) {
 	}
 
 	return cfg, nil
+}
+
+// validate validates the dataplane configuration
+func (cfg *Config) validate() error {
+	// Validate mode
+	if cfg.Proxy.Mode != "forward" && cfg.Proxy.Mode != "reverse" {
+		return errors.New("mode must be 'forward' or 'reverse'")
+	}
+
+	// Validate proxy configuration
+	return cfg.Proxy.validate(cfg.Proxy.Mode)
+}
+
+// validate validates the proxy configuration
+func (cfg *ProxyConfig) validate(mode string) error {
+	// Validate interfaces
+	if len(cfg.Interfaces) == 0 {
+		return errors.New("at least one interface must be specified")
+	}
+
+	// Validate driver mode
+	if cfg.DriverMode != "" && cfg.DriverMode != "driver" && cfg.DriverMode != "generic" && cfg.DriverMode != "offload" {
+		return errors.New("driver_mode must be 'driver', 'generic' or 'offload'")
+	}
+
+	// Validate XOR config
+	if cfg.Instrumentations.XOR != nil && cfg.Instrumentations.XOR.Enabled {
+		if len(cfg.Instrumentations.XOR.Key) == 0 {
+			return errors.New("xor key is required when xor is enabled")
+		}
+		if len(cfg.Instrumentations.XOR.Key) > MaxKeySize {
+			return errors.Errorf("xor key too long: %d bytes, max %d", len(cfg.Instrumentations.XOR.Key), MaxKeySize)
+		}
+	}
+
+	// Validate Padding config
+	if cfg.Instrumentations.Padding != nil && cfg.Instrumentations.Padding.Enabled {
+		if cfg.Instrumentations.Padding.Size < 1 {
+			return errors.New("padding size must be at least 1")
+		}
+	}
+
+	// Forward mode specific validations
+	if mode == "forward" {
+		return cfg.Forward.validate()
+	}
+
+	return nil
+}
+
+// validate validates the forward proxy configuration
+func (fc *ForwardConfig) validate() error {
+	if len(fc.Backends) == 0 {
+		return errors.New("at least one backend is required in forward mode")
+	}
+
+	for i, backend := range fc.Backends {
+		if backend.IP == "" {
+			return errors.Errorf("backend[%d]: ip is required", i)
+		}
+		ip := net.ParseIP(backend.IP)
+		if ip == nil {
+			return errors.Errorf("backend[%d]: invalid IP address: %s", i, backend.IP)
+		}
+		if ip.To4() == nil {
+			return errors.Errorf("backend[%d]: IP must be IPv4: %s", i, backend.IP)
+		}
+	}
+
+	return nil
 }

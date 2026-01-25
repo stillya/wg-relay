@@ -27,4 +27,8 @@ proxy:
     - "veth-ebpf@2"
     - "veth-wg@1"
   forward: # Forward proxy configuration (forward mode)
-    target_server_ip: "192.168.200.2"     # Target WireGuard server IP (required)
+    backends:
+      - ip: "192.168.200.2"   # Backend 1
+        port: 51820           # Optional: port (defaults to wg_port)
+      - ip: "192.168.200.3"   # Backend 2
+      - ip: "192.168.200.4"   # Backend 3

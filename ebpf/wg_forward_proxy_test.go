@@ -7,6 +7,8 @@ import (
 	"unsafe"
 
 	"github.com/cilium/ebpf"
+	"github.com/stillya/wg-relay/pkg/dataplane/config"
+	"github.com/stillya/wg-relay/pkg/utils"
 )
 
 const (
@@ -51,10 +53,10 @@ func TestBasicForwarding(t *testing.T) {
 	}
 	defer objs.Close()
 
-	backendKey := uint32(0)
-	targetIP := ipToUint32("10.0.0.1")
-	if err := objs.BackendMap.Put(&backendKey, &targetIP); err != nil {
-		t.Fatalf("Failed to set backend map: %v", err)
+	if err := configureBackends(objs, []config.BackendServer{
+		{IP: "10.0.0.1", Port: 51820},
+	}); err != nil {
+		t.Fatalf("Failed to configure backends: %v", err)
 	}
 
 	tests := []struct {
@@ -62,12 +64,14 @@ func TestBasicForwarding(t *testing.T) {
 		packet          []byte
 		expectedResult  int
 		expectedMetrics map[MetricsKey]uint64
+		verifyOutput    bool
 	}{
 		{
 			name:            "non_wg_traffic",
 			packet:          createHTTPPacket("192.168.1.1", "192.168.1.2", 8080, 80),
 			expectedResult:  xdpPass,
 			expectedMetrics: map[MetricsKey]uint64{},
+			verifyOutput:    false,
 		},
 		{
 			name:           "wg_traffic_to_server",
@@ -76,6 +80,7 @@ func TestBasicForwarding(t *testing.T) {
 			expectedMetrics: map[MetricsKey]uint64{
 				{Dir: metricToWg, Reason: metricForwarded}: 1,
 			},
+			verifyOutput: true,
 		},
 		{
 			name:           "wg_reverse_traffic_no_nat",
@@ -84,12 +89,14 @@ func TestBasicForwarding(t *testing.T) {
 			expectedMetrics: map[MetricsKey]uint64{
 				{Dir: metricFromWg, Reason: metricDrop}: 1,
 			},
+			verifyOutput: false,
 		},
 		{
 			name:            "tcp_traffic",
 			packet:          createTCPPacket("192.168.1.1", "192.168.1.2", 12345, 80),
 			expectedResult:  xdpPass,
 			expectedMetrics: map[MetricsKey]uint64{},
+			verifyOutput:    false,
 		},
 	}
 
@@ -97,13 +104,17 @@ func TestBasicForwarding(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			oldMetrics := captureMetrics(objs.MetricsMap)
 
-			result, _, err := objs.WgForwardProxy.Test(tt.packet)
+			result, outputPacket, err := objs.WgForwardProxy.Test(tt.packet)
 			if err != nil {
 				t.Fatalf("Failed to run program: %v", err)
 			}
 
 			if int(result) != tt.expectedResult {
 				t.Errorf("Expected result %d, got %d", tt.expectedResult, result)
+			}
+
+			if tt.verifyOutput {
+				verifyPacket(t, outputPacket, "10.0.0.1", 51820)
 			}
 
 			currentMetrics := captureMetrics(objs.MetricsMap)
@@ -157,10 +168,10 @@ func TestXORObfuscation(t *testing.T) {
 			}
 			defer objs.Close()
 
-			backendKey := uint32(0)
-			targetIP := ipToUint32("10.0.0.1")
-			if err := objs.BackendMap.Put(&backendKey, &targetIP); err != nil {
-				t.Fatalf("Failed to set backend map: %v", err)
+			if err := configureBackends(objs, []config.BackendServer{
+				{IP: "10.0.0.1", Port: 51820},
+			}); err != nil {
+				t.Fatalf("Failed to configure backends: %v", err)
 			}
 
 			inputPacket := createWGPacket("192.168.1.1", "192.168.1.2", 12345, wgPort)
@@ -168,6 +179,8 @@ func TestXORObfuscation(t *testing.T) {
 			if err != nil {
 				t.Fatalf("Failed to run program: %v", err)
 			}
+
+			verifyPacket(t, outputPacket, "10.0.0.1", 51820)
 
 			if tt.xorEnabled {
 				verifyXORObfuscation(t, inputPacket, outputPacket, keyBytes)
@@ -222,10 +235,10 @@ func TestPaddingObfuscation(t *testing.T) {
 			}
 			defer objs.Close()
 
-			backendKey := uint32(0)
-			targetIP := ipToUint32("10.0.0.1")
-			if err := objs.BackendMap.Put(&backendKey, &targetIP); err != nil {
-				t.Fatalf("Failed to set backend map: %v", err)
+			if err := configureBackends(objs, []config.BackendServer{
+				{IP: "10.0.0.1", Port: 51820},
+			}); err != nil {
+				t.Fatalf("Failed to configure backends: %v", err)
 			}
 
 			inputPacket := createWGPacket("192.168.1.1", "192.168.1.2", 12345, wgPort)
@@ -233,6 +246,8 @@ func TestPaddingObfuscation(t *testing.T) {
 			if err != nil {
 				t.Fatalf("Failed to run program: %v", err)
 			}
+
+			verifyPacket(t, outputPacket, "10.0.0.1", 51820)
 
 			if tt.paddingEnabled {
 				verifyPaddingObfuscation(t, inputPacket, outputPacket, tt.paddingSize)
@@ -281,10 +296,10 @@ func TestPaddingWithXOR(t *testing.T) {
 	}
 	defer objs.Close()
 
-	backendKey := uint32(0)
-	targetIP := ipToUint32("10.0.0.1")
-	if err := objs.BackendMap.Put(&backendKey, &targetIP); err != nil {
-		t.Fatalf("Failed to set backend map: %v", err)
+	if err := configureBackends(objs, []config.BackendServer{
+		{IP: "10.0.0.1", Port: 51820},
+	}); err != nil {
+		t.Fatalf("Failed to configure backends: %v", err)
 	}
 
 	inputPacket := createWGPacket("192.168.1.1", "192.168.1.2", 12345, wgPort)
@@ -293,45 +308,94 @@ func TestPaddingWithXOR(t *testing.T) {
 		t.Fatalf("Failed to run program: %v", err)
 	}
 
+	verifyPacket(t, outputPacket, "10.0.0.1", 51820)
+
 	verifyPaddingObfuscation(t, inputPacket, outputPacket, paddingSize)
 	verifyXORObfuscation(t, inputPacket, outputPacket, keyBytes)
 }
 
-func TestPortAndBackendConfig(t *testing.T) {
+func TestMultipleBackends(t *testing.T) {
+	spec, err := LoadWgForwardProxy()
+	if err != nil {
+		t.Fatalf("Failed to load spec: %v", err)
+	}
+
+	if err := spec.Variables["__cfg_xor_enabled"].Set(false); err != nil {
+		t.Fatalf("Failed to set xor_enabled: %v", err)
+	}
+	if err := spec.Variables["__cfg_wg_port"].Set(uint16(wgPort)); err != nil {
+		t.Fatalf("Failed to set wg_port: %v", err)
+	}
+
+	objs := &WgForwardProxyObjects{}
+	if err := spec.LoadAndAssign(objs, nil); err != nil {
+		t.Fatalf("Failed to load objects: %v", err)
+	}
+	defer objs.Close()
+
+	backends := []config.BackendServer{
+		{IP: "10.0.0.1", Port: 51820},
+		{IP: "10.0.0.2", Port: 51821},
+		{IP: "10.0.0.3", Port: 51822},
+	}
+	if err := configureBackends(objs, backends); err != nil {
+		t.Fatalf("Failed to configure backends: %v", err)
+	}
+
+	packet := createWGPacket("192.168.1.1", "192.168.1.2", 12345, wgPort)
+	result, outputPacket, err := objs.WgForwardProxy.Test(packet)
+	if err != nil {
+		t.Fatalf("Failed to run program: %v", err)
+	}
+
+	if int(result) != xdpRedirect {
+		t.Errorf("Expected XDP_REDIRECT, got %d", result)
+	}
+
+	info, err := parseUDPPacket(outputPacket)
+	if err != nil {
+		t.Fatalf("Failed to parse output packet: %v", err)
+	}
+	if info == nil {
+		t.Fatal("Output packet is not a UDP packet")
+	}
+
+	found := false
+	for _, backend := range backends {
+		if info.dstIP == backend.IP && info.dstPort == backend.Port {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Errorf("Output packet destination %s:%d not found in configured backends", info.dstIP, info.dstPort)
+	}
+}
+
+func TestWgPortConfig(t *testing.T) {
 	tests := []struct {
-		name           string
-		wgPort         uint16
-		targetServerIP string
-		packetDstPort  uint16
-		shouldForward  bool
+		name          string
+		wgPort        uint16
+		packetDstPort uint16
+		shouldForward bool
 	}{
 		{
-			name:           "default_port",
-			wgPort:         51820,
-			targetServerIP: "10.0.0.1",
-			packetDstPort:  51820,
-			shouldForward:  true,
+			name:          "default_port",
+			wgPort:        51820,
+			packetDstPort: 51820,
+			shouldForward: true,
 		},
 		{
-			name:           "wrong_port",
-			wgPort:         51820,
-			targetServerIP: "10.0.0.1",
-			packetDstPort:  9999,
-			shouldForward:  false,
+			name:          "wrong_port",
+			wgPort:        51820,
+			packetDstPort: 9999,
+			shouldForward: false,
 		},
 		{
-			name:           "custom_port",
-			wgPort:         51821,
-			targetServerIP: "10.0.0.1",
-			packetDstPort:  51821,
-			shouldForward:  true,
-		},
-		{
-			name:           "different_target_server",
-			wgPort:         51820,
-			targetServerIP: "192.168.200.100",
-			packetDstPort:  51820,
-			shouldForward:  true,
+			name:          "custom_port",
+			wgPort:        51821,
+			packetDstPort: 51821,
+			shouldForward: true,
 		},
 	}
 
@@ -355,14 +419,14 @@ func TestPortAndBackendConfig(t *testing.T) {
 			}
 			defer objs.Close()
 
-			backendKey := uint32(0)
-			targetIP := ipToUint32(tt.targetServerIP)
-			if err := objs.BackendMap.Put(&backendKey, &targetIP); err != nil {
-				t.Fatalf("Failed to set backend map: %v", err)
+			if err := configureBackends(objs, []config.BackendServer{
+				{IP: "10.0.0.1", Port: 51820},
+			}); err != nil {
+				t.Fatalf("Failed to configure backends: %v", err)
 			}
 
 			packet := createWGPacket("192.168.1.1", "192.168.1.2", 12345, tt.packetDstPort)
-			result, _, err := objs.WgForwardProxy.Test(packet)
+			result, outputPacket, err := objs.WgForwardProxy.Test(packet)
 			if err != nil {
 				t.Fatalf("Failed to run program: %v", err)
 			}
@@ -371,6 +435,7 @@ func TestPortAndBackendConfig(t *testing.T) {
 				if int(result) != xdpRedirect {
 					t.Errorf("Expected packet to be forwarded (XDP_REDIRECT), got result %d", result)
 				}
+				verifyPacket(t, outputPacket, "10.0.0.1", 51820)
 			} else {
 				if int(result) != xdpPass {
 					t.Errorf("Expected packet to pass through (XDP_PASS), got result %d", result)
@@ -419,7 +484,7 @@ func createWGPacket(srcIP, dstIP string, srcPort, dstPort uint16) []byte {
 	return packet
 }
 
-func createHTTPPacket(srcIP, dstIP string, srcPort, dstPort uint16) []byte {
+func createTCPPacket(srcIP, dstIP string, srcPort, dstPort uint16) []byte {
 	packet := make([]byte, 0, 64)
 
 	// Ethernet header (14 bytes) - struct ethhdr
@@ -432,7 +497,7 @@ func createHTTPPacket(srcIP, dstIP string, srcPort, dstPort uint16) []byte {
 	binary.BigEndian.PutUint16(eth[12:14], 0x0800) // ETH_P_IP
 	packet = append(packet, eth...)
 
-	// IP header
+	// IP header (20 bytes)
 	ip := make([]byte, 20)
 	ip[0] = 0x45
 	binary.BigEndian.PutUint16(ip[2:4], 40)
@@ -452,16 +517,8 @@ func createHTTPPacket(srcIP, dstIP string, srcPort, dstPort uint16) []byte {
 	return packet
 }
 
-func createTCPPacket(srcIP, dstIP string, srcPort, dstPort uint16) []byte {
-	return createHTTPPacket(srcIP, dstIP, srcPort, dstPort)
-}
-
-func ipToUint32(ipStr string) uint32 {
-	ip := net.ParseIP(ipStr).To4()
-	if ip == nil {
-		return 0
-	}
-	return uint32(ip[0])<<24 | uint32(ip[1])<<16 | uint32(ip[2])<<8 | uint32(ip[3])
+func createHTTPPacket(srcIP, dstIP string, srcPort, dstPort uint16) []byte {
+	return createTCPPacket(srcIP, dstIP, srcPort, dstPort)
 }
 
 func captureMetrics(metricsMap *ebpf.Map) map[MetricsKey]uint64 {
@@ -469,9 +526,12 @@ func captureMetrics(metricsMap *ebpf.Map) map[MetricsKey]uint64 {
 
 	directions := []uint8{metricToWg, metricFromWg}
 	reasons := []uint8{metricForwarded, metricDrop}
+
+	firstAddr, _ := utils.IPToUint32("192.168.1.1")
+	secondAddr, _ := utils.IPToUint32("192.168.1.2")
 	srcAddrs := []uint32{
-		ipToUint32("192.168.1.1"),
-		ipToUint32("192.168.1.2"),
+		firstAddr,
+		secondAddr,
 		0, // unknown/any
 	}
 
@@ -501,6 +561,59 @@ func captureMetrics(metricsMap *ebpf.Map) map[MetricsKey]uint64 {
 	}
 
 	return metrics
+}
+
+type packetInfo struct {
+	srcIP   string
+	dstIP   string
+	srcPort uint16
+	dstPort uint16
+}
+
+func parseUDPPacket(packet []byte) (*packetInfo, error) {
+	if len(packet) < 42 {
+		return nil, nil
+	}
+
+	// Check if it's IP protocol (ETH_P_IP = 0x0800)
+	if binary.BigEndian.Uint16(packet[12:14]) != 0x0800 {
+		return nil, nil
+	}
+
+	// Check if it's UDP protocol (17)
+	if packet[23] != 17 {
+		return nil, nil
+	}
+
+	// Parse IPs in little-endian format
+	srcIPBytes := packet[26:30]
+	dstIPBytes := packet[30:34]
+
+	info := &packetInfo{
+		srcIP:   net.IPv4(srcIPBytes[3], srcIPBytes[2], srcIPBytes[1], srcIPBytes[0]).String(),
+		dstIP:   net.IPv4(dstIPBytes[3], dstIPBytes[2], dstIPBytes[1], dstIPBytes[0]).String(),
+		srcPort: binary.BigEndian.Uint16(packet[34:36]),
+		dstPort: binary.BigEndian.Uint16(packet[36:38]),
+	}
+
+	return info, nil
+}
+
+func verifyPacket(t *testing.T, outputPacket []byte, expectedIP string, expectedPort int) {
+	info, err := parseUDPPacket(outputPacket)
+	if err != nil {
+		t.Fatalf("Failed to parse UDP packet: %v", err)
+	}
+	if info == nil {
+		t.Fatal("Output packet is not a UDP packet")
+	}
+
+	if info.dstIP != expectedIP {
+		t.Errorf("Expected destination IP %s, got %s", expectedIP, info.dstIP)
+	}
+	if int(info.dstPort) != expectedPort {
+		t.Errorf("Expected destination port %d, got %d", expectedPort, info.dstPort)
+	}
 }
 
 func verifyMetrics(t *testing.T, oldMetrics, actual, expected map[MetricsKey]uint64) {
@@ -577,4 +690,25 @@ func verifyPaddingObfuscation(t *testing.T, inputPacket, outputPacket []byte, pa
 		t.Errorf("Expected size marker %d at position %d, got %d", paddingSize, len(outputPacket)-1, sizeMarker)
 	}
 
+}
+
+func configureBackends(objs *WgForwardProxyObjects, backends []config.BackendServer) error {
+	for i, backend := range backends {
+		ip, err := utils.IPToUint32(backend.IP)
+		if err != nil {
+			return err
+		}
+		entry := &WgForwardProxyBackendEntry{
+			Ip:   ip,
+			Port: backend.Port,
+		}
+		key := uint32(i) //nolint:gosec // G304: it's fine
+		if err := objs.BackendMap.Put(&key, entry); err != nil {
+			return err
+		}
+	}
+
+	countKey := uint32(0)
+	count := uint32(len(backends)) //nolint:gosec // G304: it's fine
+	return objs.BackendCount.Put(&countKey, &count)
 }

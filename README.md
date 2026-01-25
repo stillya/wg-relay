@@ -60,26 +60,37 @@ make test-ebpf
 Create a `config.yaml` file:
 
 ```yaml
-mode: "forward"                           # "forward" or "reverse"
-enabled: true                             # Enable/disable obfuscation
+daemon:                          # Daemon configuration
+  listen: ":8080"                # Address and port for daemon to bind to
 
-daemon:
-  listen: ":8080"                         # Daemon bind address
+monitoring:                      # Monitoring configuration
+  statistics:                    # vnstat-style console output
+    enabled: true                # Enable/disable statistics display
+    interval: "5s"               # Statistics update interval
+  prometheus:                    # Prometheus HTTP exporter
+    enabled: true                # Enable/disable Prometheus metrics server
+    listen: ":8081"              # Address and port for metrics server
 
 proxy:
-  driver_mode: "driver"                   # use generic if you at containerized environment
-  interfaces:
-  - "eth0"                                # Main interface to intercept
-  forward:
-    target_server_ip: "192.168.200.2"     # Target WireGuard server IP
-  
-  instrumentation:
-    xor:
+  enabled: true                  # Enable/disable proxy
+  mode: "forward"                # "forward" for forward proxy, "reverse" for reverse proxy
+  wg_port: 51820                 # WireGuard port to intercept (default: 51820)
+
+  instrumentations:              # Instrumentation configuration
+    xor:                         # XOR obfuscation
       enabled: true
-      key: "my_secret_key_32_bytes_long_123"  # XOR obfuscation key
-    padding:
+      key: "your_xor_key"
+    padding:                     # Padding obfuscation
       enabled: true
-      size: 64                                # Padding size in bytes
+      size: 32
+
+  driver_mode: "driver"          # "driver", "generic" or "offload" for XDP mode
+  interfaces:                    # Network interfaces to attach to
+    - "eth0"
+  forward:                       # Forward proxy configuration (forward mode)
+    backends:
+      - ip: "192.168.200.2"      # Backend 1
+        port: 51820              # Optional: port (defaults to wg_port)
 ```
 
 ### 3. Run
@@ -97,7 +108,7 @@ sudo make run-reverse-proxy    # wg-server namespace
 
 ### Proxy Modes
 
-- **Forward Mode**: Intercepts outbound WireGuard traffic, obfuscates it, and forwards to target server
+- **Forward Mode**: Intercepts outbound WireGuard traffic, obfuscates it, and forwards to one of backend
 - **Reverse Mode**: Handles bidirectional traffic processing for server-side deployment
 
 ### Obfuscation Methods
