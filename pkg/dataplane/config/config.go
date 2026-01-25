@@ -56,7 +56,7 @@ type PaddingConfig struct {
 	Size    uint8 `yaml:"size" ebpf:"padding_size"`
 }
 
-// BackendServer represents a single backend server for L4 load balancing
+// BackendServer represents a single backend server
 type BackendServer struct {
 	IP   string `yaml:"ip"`   // Backend server IP address
 	Port uint16 `yaml:"port"` // Backend server port (optional, defaults to wg_port)
