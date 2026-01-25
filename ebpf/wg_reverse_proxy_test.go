@@ -96,6 +96,9 @@ func TestBasicReversing(t *testing.T) {
 }
 
 func TestReverseProxyXORObfuscation(t *testing.T) {
+	// xorKey must be exactly xorProcessLen bytes to match eBPF key array size
+	xorKey := "test-key-1234567890abcdef12345678"
+
 	tests := []struct {
 		name       string
 		direction  string // "from_wg" or "to_wg"
@@ -106,25 +109,25 @@ func TestReverseProxyXORObfuscation(t *testing.T) {
 			name:       "xor_enabled_from_wg",
 			direction:  "from_wg",
 			xorEnabled: true,
-			xorKey:     "test-key-1234567",
+			xorKey:     xorKey,
 		},
 		{
 			name:       "xor_disabled_from_wg",
 			direction:  "from_wg",
 			xorEnabled: false,
-			xorKey:     "test-key-1234567",
+			xorKey:     xorKey,
 		},
 		{
 			name:       "xor_enabled_to_wg",
 			direction:  "to_wg",
 			xorEnabled: true,
-			xorKey:     "test-key-1234567",
+			xorKey:     xorKey,
 		},
 		{
 			name:       "xor_disabled_to_wg",
 			direction:  "to_wg",
 			xorEnabled: false,
-			xorKey:     "test-key-1234567",
+			xorKey:     xorKey,
 		},
 	}
 
@@ -292,6 +295,9 @@ func TestReverseProxyPaddingObfuscation(t *testing.T) {
 }
 
 func TestReverseProxyCombinedObfuscation(t *testing.T) {
+	// xorKey must be exactly xorProcessLen bytes to match eBPF key array size
+	xorKey := "test-key-1234567890abcdef12345678"
+
 	tests := []struct {
 		name        string
 		direction   string
@@ -302,13 +308,13 @@ func TestReverseProxyCombinedObfuscation(t *testing.T) {
 			name:        "combined_from_wg",
 			direction:   "from_wg",
 			paddingSize: 32,
-			xorKey:      "test-key-1234567",
+			xorKey:      xorKey,
 		},
 		{
 			name:        "combined_to_wg",
 			direction:   "to_wg",
 			paddingSize: 32,
-			xorKey:      "test-key-1234567",
+			xorKey:      xorKey,
 		},
 	}
 
@@ -381,10 +387,10 @@ func createObfuscatedAndPaddedWGPacket(srcIP, dstIP string, srcPort, dstPort uin
 	// Start with a base packet, XOR it, then add padding
 	packet := createWGPacket(srcIP, dstIP, srcPort, dstPort)
 
-	// XOR the payload (first 16 bytes after headers)
+	// XOR the payload (xorProcessLen bytes after headers)
 	if len(packet) > 42 && len(xorKey) > 0 {
 		payload := packet[42:]
-		xorLen := 16
+		xorLen := xorProcessLen
 		if xorLen > len(payload) {
 			xorLen = len(payload)
 		}

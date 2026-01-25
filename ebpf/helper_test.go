@@ -41,9 +41,12 @@ type packetInfo struct {
 	dstPort uint16
 }
 
+// xorProcessLen must match XOR_PROCESS_LEN in xor.h
+const xorProcessLen = 32
+
 // createWGPacket creates a WireGuard UDP packet for testing
 func createWGPacket(srcIP, dstIP string, srcPort, dstPort uint16) []byte {
-	packet := make([]byte, 0, 64)
+	packet := make([]byte, 0, 128)
 
 	eth := make([]byte, 14)
 	// h_dest[6] - destination MAC address
@@ -73,9 +76,10 @@ func createWGPacket(srcIP, dstIP string, srcPort, dstPort uint16) []byte {
 	// Checksum at udp[6:8] left as 0
 	packet = append(packet, udp...)
 
-	// WireGuard payload (24 bytes)
-	wgPayload := []byte{0x01, 0x00, 0x00, 0x00, 0x11, 0x22, 0x33, 0x44, 0x55, 0x66, 0x77, 0x88, 0x01, 0x00,
-		0x00, 0x00, 0x11, 0x22, 0x33, 0x44, 0x55, 0x66, 0x77, 0x88}
+	wgPayload := make([]byte, xorProcessLen)
+	for i := 0; i < xorProcessLen; i++ {
+		wgPayload[i] = byte(i + 1)
+	}
 	packet = append(packet, wgPayload...)
 
 	return packet
@@ -127,7 +131,7 @@ func createObfuscatedWGPacket(srcIP, dstIP string, srcPort, dstPort uint16, xorK
 	// XOR the payload (starting at byte 42 after eth+ip+udp headers)
 	if len(packet) > 42 && len(xorKey) > 0 {
 		payload := packet[42:]
-		xorLen := 16
+		xorLen := xorProcessLen
 		if xorLen > len(payload) {
 			xorLen = len(payload)
 		}
@@ -296,7 +300,7 @@ func verifyXORObfuscation(t *testing.T, inputPacket, outputPacket, key []byte) {
 	inputPayload := inputPacket[42:]
 	outputPayload := outputPacket[42:]
 
-	xorLen := 16
+	xorLen := xorProcessLen
 	if xorLen > len(inputPayload) {
 		xorLen = len(inputPayload)
 	}
@@ -320,7 +324,7 @@ func verifyXORDeobfuscation(t *testing.T, obfuscatedInput, output, key []byte) {
 	obfuscatedPayload := obfuscatedInput[42:]
 	outputPayload := output[42:]
 
-	xorLen := 16
+	xorLen := xorProcessLen
 	if xorLen > len(obfuscatedPayload) {
 		xorLen = len(obfuscatedPayload)
 	}
