@@ -3,9 +3,6 @@
 # Network namespace setup script for WireGuard proxy testing
 # Creates eBPF proxy and WireGuard server namespaces
 # Client runs on host, eBPF proxy in ebpf-proxy namespace, server in wg-server namespace
-#
-# Note: This script should be run from the project root directory:
-#   sudo ./hack/setup-netns.sh setup
 
 set -e
 
@@ -36,68 +33,68 @@ fi
 # Function to cleanup existing setup
 cleanup() {
     log "Cleaning up existing network namespaces and interfaces..."
-    
+
     # Remove namespaces (this also removes their interfaces)
     ip netns del ebpf-proxy 2>/dev/null || true
     ip netns del wg-server 2>/dev/null || true
-    
+
     # Remove any remaining veth interfaces in default namespace
     ip link del veth-ebpf@1 2>/dev/null || true
     ip link del veth-ebpf@2 2>/dev/null || true
     ip link del veth-wg@1 2>/dev/null || true
     ip link del veth-wg@2 2>/dev/null || true
-    
+
     log "Cleanup completed"
 }
 
 # Function to setup network namespaces
 setup_netns() {
     log "Creating network namespaces..."
-    
+
     # Create namespaces
     ip netns add ebpf-proxy
     ip netns add wg-server
-    
+
     # Create veth pairs
     # Host to eBPF proxy connection
     ip link add name veth-ebpf@1 type veth peer name veth-ebpf@2
-    
-    # eBPF proxy to WireGuard server connection  
+
+    # eBPF proxy to WireGuard server connection
     ip link add name veth-wg@1 type veth peer name veth-wg@2
-    
+
     # Move interfaces to namespaces
     ip link set veth-ebpf@2 netns ebpf-proxy
     ip link set veth-wg@1 netns ebpf-proxy
     ip link set veth-wg@2 netns wg-server
-    
+
     # Configure host interface (where client runs)
     ip addr add 192.168.100.1/24 dev veth-ebpf@1
     ip link set veth-ebpf@1 up
-    
+
     # Configure eBPF proxy namespace
     ip netns exec ebpf-proxy ip addr add 192.168.100.2/24 dev veth-ebpf@2
     ip netns exec ebpf-proxy ip addr add 192.168.200.1/24 dev veth-wg@1
     ip netns exec ebpf-proxy ip link set veth-ebpf@2 up
     ip netns exec ebpf-proxy ip link set veth-wg@1 up
     ip netns exec ebpf-proxy ip link set lo up
-    
-    # Configure server namespace  
+
+    # Configure server namespace
     ip netns exec wg-server ip addr add 192.168.200.2/24 dev veth-wg@2
     ip netns exec wg-server ip link set veth-wg@2 up
     ip netns exec wg-server ip link set lo up
     ip netns exec wg-server ip route add default via 192.168.200.1
-    
+
     # Enable IP forwarding on host and in eBPF proxy namespace
     echo 1 > /proc/sys/net/ipv4/ip_forward
     ip netns exec ebpf-proxy sysctl -w net.ipv4.ip_forward=1
-    
+
     # Add routing from host to server through eBPF proxy
     ip route add 192.168.200.0/24 via 192.168.100.2 dev veth-ebpf@1 2>/dev/null || true
-    
-    # Add routing in eBPF proxy namespace  
+
+    # Add routing in eBPF proxy namespace
     ip netns exec ebpf-proxy ip route add 192.168.100.0/24 dev veth-ebpf@2 2>/dev/null || true
     ip netns exec ebpf-proxy ip route add 192.168.200.0/24 dev veth-wg@1 2>/dev/null || true
-    
+
     log "Network namespaces configured successfully"
 }
 
@@ -111,7 +108,7 @@ show_config() {
     echo "  Route to server: 192.168.200.0/24 via 192.168.100.2"
     echo ""
     echo "eBPF Proxy Namespace (ebpf-proxy):"
-    echo "  Host-side: veth-ebpf@2 (192.168.100.2/24)" 
+    echo "  Host-side: veth-ebpf@2 (192.168.100.2/24)"
     echo "  Server-side: veth-wg@1 (192.168.200.1/24)"
     echo "  eBPF attachment: veth-ebpf@2 (ingress)"
     echo ""
@@ -129,28 +126,28 @@ show_config() {
 # Function to test connectivity
 test_connectivity() {
     log "Testing basic connectivity..."
-    
+
     # Test host to eBPF proxy
     if ping -c 1 -W 2 192.168.100.2 >/dev/null 2>&1; then
         log "✓ Host can reach eBPF proxy"
     else
         warn "✗ Host cannot reach eBPF proxy (192.168.100.2)"
     fi
-    
+
     # Test eBPF proxy to server
     if ip netns exec ebpf-proxy ping -c 1 -W 2 192.168.200.2 >/dev/null 2>&1; then
         log "✓ eBPF proxy can reach server"
     else
         warn "✗ eBPF proxy cannot reach server (192.168.200.2)"
     fi
-    
+
     # Test server to eBPF proxy
     if ip netns exec wg-server ping -c 1 -W 2 192.168.200.1 >/dev/null 2>&1; then
         log "✓ Server can reach eBPF proxy"
     else
         warn "✗ Server cannot reach eBPF proxy (192.168.200.1)"
     fi
-    
+
     # Test end-to-end (without eBPF)
     if ping -c 1 -W 2 192.168.200.2 >/dev/null 2>&1; then
         log "✓ End-to-end connectivity working (host -> server)"
