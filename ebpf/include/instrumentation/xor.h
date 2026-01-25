@@ -13,7 +13,7 @@ struct xor_key {
 DECLARE_CONFIG(bool, xor_enabled, "Enable XOR obfuscation");
 DECLARE_CONFIG(struct xor_key, xor_key, "XOR obfuscation key");
 
-#define XOR_PROCESS_LEN 32
+#define XOR_PROCESS_LEN 16
 
 static __always_inline int __xor_process(struct wg_ctx *ctx) {
 	if (!CONFIG(xor_enabled)) {

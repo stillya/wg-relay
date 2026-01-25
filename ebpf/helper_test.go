@@ -168,13 +168,13 @@ func parseUDPPacket(packet []byte) (*packetInfo, error) {
 		return nil, nil
 	}
 
-	// Parse IPs in little-endian format
+	// Parse IPs in big-endian format
 	srcIPBytes := packet[26:30]
 	dstIPBytes := packet[30:34]
 
 	info := &packetInfo{
-		srcIP:   net.IPv4(srcIPBytes[3], srcIPBytes[2], srcIPBytes[1], srcIPBytes[0]).String(),
-		dstIP:   net.IPv4(dstIPBytes[3], dstIPBytes[2], dstIPBytes[1], dstIPBytes[0]).String(),
+		srcIP:   net.IPv4(srcIPBytes[0], srcIPBytes[1], srcIPBytes[2], srcIPBytes[3]).String(),
+		dstIP:   net.IPv4(dstIPBytes[0], dstIPBytes[1], dstIPBytes[2], dstIPBytes[3]).String(),
 		srcPort: binary.BigEndian.Uint16(packet[34:36]),
 		dstPort: binary.BigEndian.Uint16(packet[36:38]),
 	}

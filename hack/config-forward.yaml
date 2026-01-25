@@ -19,7 +19,7 @@ proxy:
       enabled: true
       key: "my_secret_key_32_bytes_long_123"
     padding:
-      enabled: false
+      enabled: true
       size: 32
 
   driver_mode: "generic"

@@ -63,7 +63,7 @@ func TestStatMonitor_PrintTrafficTable(t *testing.T) {
 	outputStr := string(output)
 
 	expectedStrings := []string{
-		"wg-relay traffic statistics",
+		"wg-relay(forward) traffic statistics",
 		"from_wg",
 		"to_wg",
 		"total",
