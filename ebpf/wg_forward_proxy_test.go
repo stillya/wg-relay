@@ -427,7 +427,7 @@ func TestWgPortConfig(t *testing.T) {
 // verifyPacket is a forward-proxy specific wrapper that uses the shared verifyPacketDestination
 func verifyPacket(t *testing.T, outputPacket []byte, expectedIP string, expectedPort int) {
 	t.Helper()
-	verifyPacketDestination(t, outputPacket, expectedIP, uint16(expectedPort))
+	verifyPacketDestination(t, outputPacket, expectedIP, uint16(expectedPort)) //nolint:gosec // G115: it's fine
 }
 
 // configureBackends configures backend servers for the forward proxy
