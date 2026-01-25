@@ -372,7 +372,7 @@ func TestMultipleBackends(t *testing.T) {
 	}
 }
 
-func TestPortAndBackendConfig(t *testing.T) {
+func TestWgPortConfig(t *testing.T) {
 	tests := []struct {
 		name          string
 		wgPort        uint16
@@ -395,12 +395,6 @@ func TestPortAndBackendConfig(t *testing.T) {
 			name:          "custom_port",
 			wgPort:        51821,
 			packetDstPort: 51821,
-			shouldForward: true,
-		},
-		{
-			name:          "different_target_server",
-			wgPort:        51820,
-			packetDstPort: 51820,
 			shouldForward: true,
 		},
 	}
