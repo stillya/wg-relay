@@ -17,36 +17,36 @@ type StatMonitorSource interface {
 
 // StatMonitor periodically collects and displays traffic statistics.
 type StatMonitor struct {
-	source   StatMonitorSource
-	printer  *TablePrinter
-	interval time.Duration
-	stopCh   chan struct{}
+	StatMonitorParams
+	source  StatMonitorSource
+	printer *TablePrinter
+	stopCh  chan struct{}
 
 	startTime time.Time
 }
 
 // StatMonitorParams contains configuration parameters for StatMonitor.
 type StatMonitorParams struct {
-	Source   StatMonitorSource
+	Mode     string
 	Interval time.Duration
 }
 
 // NewStatMonitor creates a new StatMonitor with the given parameters.
-func NewStatMonitor(params StatMonitorParams) *StatMonitor {
+func NewStatMonitor(params StatMonitorParams, source StatMonitorSource) *StatMonitor {
 	return &StatMonitor{
-		source:    params.Source,
-		printer:   &TablePrinter{},
-		interval:  params.Interval,
-		stopCh:    make(chan struct{}),
-		startTime: time.Now(),
+		StatMonitorParams: params,
+		source:            source,
+		printer:           &TablePrinter{},
+		stopCh:            make(chan struct{}),
+		startTime:         time.Now(),
 	}
 }
 
 // Start begins the periodic collection and display of statistics.
 func (sm *StatMonitor) Start(ctx context.Context) {
-	log.Info("Starting stat monitor", "interval", sm.interval)
+	log.Info("Starting stat monitor", "interval", sm.Interval)
 
-	ticker := time.NewTicker(sm.interval)
+	ticker := time.NewTicker(sm.Interval)
 	defer ticker.Stop()
 
 	for {
@@ -80,5 +80,5 @@ func (sm *StatMonitor) printStats(ctx context.Context) {
 	}
 
 	elapsed := time.Since(sm.startTime)
-	sm.printer.PrintTrafficTable(metricsData, elapsed)
+	sm.printer.PrintTrafficTable(sm.Mode, metricsData, elapsed)
 }

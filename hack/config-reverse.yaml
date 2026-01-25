@@ -1,0 +1,27 @@
+daemon:
+  listen: ":8080"
+
+monitoring:
+  statistics:
+    enabled: false
+    interval: "5s"
+  prometheus:
+    enabled: true
+    listen: ":8081"
+
+proxy:
+  enabled: true
+  mode: "reverse"
+  wg_port: 51820
+
+  instrumentations:
+    xor:
+      enabled: true
+      key: "my_secret_key_32_bytes_long_123"
+    padding:
+      enabled: true
+      size: 32
+
+  driver_mode: "generic"
+  interfaces:
+    - "veth-wg@2"

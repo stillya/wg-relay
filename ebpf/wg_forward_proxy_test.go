@@ -102,6 +102,8 @@ func TestBasicForwarding(t *testing.T) {
 }
 
 func TestXORObfuscation(t *testing.T) {
+	xorKey := "test-key-1234567890abcdef12345678"
+
 	tests := []struct {
 		name       string
 		xorEnabled bool
@@ -110,12 +112,12 @@ func TestXORObfuscation(t *testing.T) {
 		{
 			name:       "xor_enabled",
 			xorEnabled: true,
-			xorKey:     "test-key-1234567",
+			xorKey:     xorKey,
 		},
 		{
 			name:       "xor_disabled",
 			xorEnabled: false,
-			xorKey:     "test-key-1234567",
+			xorKey:     xorKey,
 		},
 	}
 
@@ -245,7 +247,7 @@ func TestPaddingWithXOR(t *testing.T) {
 		t.Fatalf("Failed to load spec: %v", err)
 	}
 
-	xorKey := "test-key-1234567"
+	xorKey := "test-key-1234567890abcdef12345678"
 	keyBytes := []byte(xorKey)
 	var keyArray [32]byte
 	copy(keyArray[:], keyBytes)

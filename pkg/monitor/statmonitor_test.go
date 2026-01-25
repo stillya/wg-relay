@@ -44,9 +44,9 @@ func TestStatMonitor_PrintTrafficTable(t *testing.T) {
 	}
 
 	sm := NewStatMonitor(StatMonitorParams{
-		Source:   source,
+		Mode:     "forward",
 		Interval: 10 * time.Second,
-	})
+	}, source)
 
 	// Capture stdout
 	oldStdout := os.Stdout
@@ -63,7 +63,7 @@ func TestStatMonitor_PrintTrafficTable(t *testing.T) {
 	outputStr := string(output)
 
 	expectedStrings := []string{
-		"wg-relay traffic statistics",
+		"wg-relay(forward) traffic statistics",
 		"from_wg",
 		"to_wg",
 		"total",
@@ -93,9 +93,9 @@ func TestStatMonitor_EmptyData(t *testing.T) {
 	}
 
 	sm := NewStatMonitor(StatMonitorParams{
-		Source:   source,
+		Mode:     "forward",
 		Interval: time.Second,
-	})
+	}, source)
 
 	// Capture stdout
 	oldStdout := os.Stdout

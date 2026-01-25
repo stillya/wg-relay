@@ -296,7 +296,7 @@ int wg_forward_proxy(struct xdp_md *xdp_ctx) {
 		}
 
 		__u32 proxy_ip = bpf_ntohl(ctx.ip->daddr);
-		__u32 server_ip = bpf_ntohl(backend.ip);
+		__u32 server_ip = backend.ip; // already in host byte order
 		__u16 target_port = backend.port > 0 ? backend.port : CONFIG(wg_port);
 
 		update_metrics(METRIC_TO_WG, METRIC_FORWARDED, pkt_len, src_addr);

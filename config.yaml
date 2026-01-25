@@ -24,11 +24,8 @@ proxy:
 
   driver_mode: "driver"                  # "driver", "generic" or "offload" for XDP mode
   interfaces: # Network interfaces to attach to
-    - "veth-ebpf@2"
-    - "veth-wg@1"
+    - "eth0"
   forward: # Forward proxy configuration (forward mode)
     backends:
       - ip: "192.168.200.2"   # Backend 1
         port: 51820           # Optional: port (defaults to wg_port)
-      - ip: "192.168.200.3"   # Backend 2
-      - ip: "192.168.200.4"   # Backend 3
