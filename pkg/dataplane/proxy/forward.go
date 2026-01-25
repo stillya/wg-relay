@@ -91,8 +91,8 @@ func (fp *ForwardLoader) configureBackendMap() error {
 	}
 
 	for i, backend := range backends {
-		key := uint32(i)
-		ip, err := utils.IpToUint32(backend.IP)
+		key := uint32(i) //nolint:gosec // G304: it's fine
+		ip, err := utils.IPToUint32(backend.IP)
 		if err != nil {
 			return errors.Wrapf(err, "failed to convert IP address %s to uint32", backend.IP)
 		}
@@ -106,7 +106,7 @@ func (fp *ForwardLoader) configureBackendMap() error {
 	}
 
 	countKey := uint32(0)
-	count := uint32(len(backends))
+	count := uint32(len(backends)) //nolint:gosec // G304: it's fine
 	if err := fp.objs.BackendCount.Put(&countKey, &count); err != nil {
 		return errors.Wrap(err, "failed to set backend count")
 	}

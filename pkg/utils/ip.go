@@ -6,8 +6,8 @@ import (
 	"github.com/pkg/errors"
 )
 
-// IpToUint32 converts an IP string to uint32 in network byte order
-func IpToUint32(ipStr string) (uint32, error) {
+// IPToUint32 converts an IP string to uint32 in network byte order
+func IPToUint32(ipStr string) (uint32, error) {
 	ip := net.ParseIP(ipStr)
 	if ip == nil {
 		return 0, errors.Errorf("invalid IP address: %s", ipStr)

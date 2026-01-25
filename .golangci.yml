@@ -45,6 +45,9 @@ linters:
       - source: "^//go:generate "
         linters:
           - lll
+      - path: 'util/*'
+        linters:
+          - revive
 
 issues:
   max-issues-per-linter: 0

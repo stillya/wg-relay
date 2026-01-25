@@ -533,8 +533,8 @@ func captureMetrics(metricsMap *ebpf.Map) map[MetricsKey]uint64 {
 	directions := []uint8{metricToWg, metricFromWg}
 	reasons := []uint8{metricForwarded, metricDrop}
 
-	firstAddr, _ := utils.IpToUint32("192.168.1.1")
-	secondAddr, _ := utils.IpToUint32("192.168.1.2")
+	firstAddr, _ := utils.IPToUint32("192.168.1.1")
+	secondAddr, _ := utils.IPToUint32("192.168.1.2")
 	srcAddrs := []uint32{
 		firstAddr,
 		secondAddr,
@@ -700,7 +700,7 @@ func verifyPaddingObfuscation(t *testing.T, inputPacket, outputPacket []byte, pa
 
 func configureBackends(objs *WgForwardProxyObjects, backends []config.BackendServer) error {
 	for i, backend := range backends {
-		ip, err := utils.IpToUint32(backend.IP)
+		ip, err := utils.IPToUint32(backend.IP)
 		if err != nil {
 			return err
 		}
@@ -708,13 +708,13 @@ func configureBackends(objs *WgForwardProxyObjects, backends []config.BackendSer
 			Ip:   ip,
 			Port: backend.Port,
 		}
-		key := uint32(i)
+		key := uint32(i) //nolint:gosec // G304: it's fine
 		if err := objs.BackendMap.Put(&key, entry); err != nil {
 			return err
 		}
 	}
 
 	countKey := uint32(0)
-	count := uint32(len(backends))
+	count := uint32(len(backends)) //nolint:gosec // G304: it's fine
 	return objs.BackendCount.Put(&countKey, &count)
 }
