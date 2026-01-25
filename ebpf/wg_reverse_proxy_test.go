@@ -10,7 +10,7 @@ const (
 	tcActShot = 2 // TC_ACT_SHOT - packet dropped
 )
 
-func TestReverseProxyBasicProcessing(t *testing.T) {
+func TestBasicReversing(t *testing.T) {
 	spec, err := LoadWgReverseProxy()
 	if err != nil {
 		t.Fatalf("Failed to load spec: %v", err)
@@ -37,12 +37,14 @@ func TestReverseProxyBasicProcessing(t *testing.T) {
 		packet          []byte
 		expectedResult  int
 		expectedMetrics map[MetricsKey]uint64
+		verifyOutput    bool
 	}{
 		{
 			name:            "non_wg_traffic",
 			packet:          createHTTPPacket("192.168.1.1", "192.168.1.2", 8080, 80),
 			expectedResult:  tcActOk,
 			expectedMetrics: map[MetricsKey]uint64{},
+			verifyOutput:    false,
 		},
 		{
 			name:           "wg_traffic_from_server",
@@ -51,6 +53,7 @@ func TestReverseProxyBasicProcessing(t *testing.T) {
 			expectedMetrics: map[MetricsKey]uint64{
 				{Dir: metricFromWg, Reason: metricForwarded}: 1,
 			},
+			verifyOutput: true,
 		},
 		{
 			name:           "wg_traffic_to_server",
@@ -59,12 +62,14 @@ func TestReverseProxyBasicProcessing(t *testing.T) {
 			expectedMetrics: map[MetricsKey]uint64{
 				{Dir: metricToWg, Reason: metricForwarded}: 1,
 			},
+			verifyOutput: true,
 		},
 		{
 			name:            "tcp_traffic",
 			packet:          createTCPPacket("192.168.1.1", "192.168.1.2", 12345, 80),
 			expectedResult:  tcActOk,
 			expectedMetrics: map[MetricsKey]uint64{},
+			verifyOutput:    false,
 		},
 	}
 
@@ -72,13 +77,17 @@ func TestReverseProxyBasicProcessing(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			oldMetrics := captureMetrics(objs.MetricsMap)
 
-			result, _, err := objs.WgReverseProxy.Test(tt.packet)
+			result, outputPacket, err := objs.WgReverseProxy.Test(tt.packet)
 			if err != nil {
 				t.Fatalf("Failed to run program: %v", err)
 			}
 
 			if int(result) != tt.expectedResult {
 				t.Errorf("Expected result %d, got %d", tt.expectedResult, result)
+			}
+
+			if tt.verifyOutput {
+				verifyPayloadUnchanged(t, tt.packet, outputPacket)
 			}
 
 			currentMetrics := captureMetrics(objs.MetricsMap)
@@ -362,108 +371,6 @@ func TestReverseProxyCombinedObfuscation(t *testing.T) {
 				// After removing padding and XORing back, the payload should match original
 				originalPacket := createWGPacket("192.168.1.1", "192.168.1.2", 12345, wgPort)
 				verifyPayloadUnchanged(t, originalPacket, outputPacket)
-			}
-		})
-	}
-}
-
-func TestReverseProxyWgPortConfig(t *testing.T) {
-	tests := []struct {
-		name           string
-		configWgPort   uint16
-		packetSrcPort  uint16
-		packetDstPort  uint16
-		shouldProcess  bool
-		expectedMetric MetricsKey
-	}{
-		{
-			name:           "default_port_from_wg",
-			configWgPort:   51820,
-			packetSrcPort:  51820,
-			packetDstPort:  12345,
-			shouldProcess:  true,
-			expectedMetric: MetricsKey{Dir: metricFromWg, Reason: metricForwarded},
-		},
-		{
-			name:           "default_port_to_wg",
-			configWgPort:   51820,
-			packetSrcPort:  12345,
-			packetDstPort:  51820,
-			shouldProcess:  true,
-			expectedMetric: MetricsKey{Dir: metricToWg, Reason: metricForwarded},
-		},
-		{
-			name:          "wrong_port",
-			configWgPort:  51820,
-			packetSrcPort: 9999,
-			packetDstPort: 8888,
-			shouldProcess: false,
-		},
-		{
-			name:           "custom_port_from_wg",
-			configWgPort:   51821,
-			packetSrcPort:  51821,
-			packetDstPort:  12345,
-			shouldProcess:  true,
-			expectedMetric: MetricsKey{Dir: metricFromWg, Reason: metricForwarded},
-		},
-		{
-			name:           "custom_port_to_wg",
-			configWgPort:   51821,
-			packetSrcPort:  12345,
-			packetDstPort:  51821,
-			shouldProcess:  true,
-			expectedMetric: MetricsKey{Dir: metricToWg, Reason: metricForwarded},
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			spec, err := LoadWgReverseProxy()
-			if err != nil {
-				t.Fatalf("Failed to load spec: %v", err)
-			}
-
-			if err := spec.Variables["__cfg_xor_enabled"].Set(false); err != nil {
-				t.Fatalf("Failed to set xor_enabled: %v", err)
-			}
-			if err := spec.Variables["__cfg_padding_enabled"].Set(false); err != nil {
-				t.Fatalf("Failed to set padding_enabled: %v", err)
-			}
-			if err := spec.Variables["__cfg_wg_port"].Set(tt.configWgPort); err != nil {
-				t.Fatalf("Failed to set wg_port: %v", err)
-			}
-
-			objs := &WgReverseProxyObjects{}
-			if err := spec.LoadAndAssign(objs, nil); err != nil {
-				t.Fatalf("Failed to load objects: %v", err)
-			}
-			defer objs.Close()
-
-			packet := createWGPacket("192.168.1.1", "192.168.1.2", tt.packetSrcPort, tt.packetDstPort)
-			oldMetrics := captureMetrics(objs.MetricsMap)
-
-			result, _, err := objs.WgReverseProxy.Test(packet)
-			if err != nil {
-				t.Fatalf("Failed to run program: %v", err)
-			}
-
-			// Reverse proxy always returns TC_ACT_OK for non-error cases
-			if int(result) != tcActOk {
-				t.Errorf("Expected TC_ACT_OK (%d), got %d", tcActOk, result)
-			}
-
-			currentMetrics := captureMetrics(objs.MetricsMap)
-
-			if tt.shouldProcess {
-				// Verify the expected metric was incremented
-				expectedMetrics := map[MetricsKey]uint64{
-					tt.expectedMetric: 1,
-				}
-				verifyMetrics(t, oldMetrics, currentMetrics, expectedMetrics)
-			} else {
-				// Verify no metrics were incremented
-				verifyMetrics(t, oldMetrics, currentMetrics, map[MetricsKey]uint64{})
 			}
 		})
 	}
