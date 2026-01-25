@@ -66,11 +66,6 @@ static __always_inline int create_nat_connection(struct wg_ctx *ctx,
 		.nat_port = nat_port,
 	};
 
-	struct nat_key nat_key = {
-		.server_ip = backend->ip,
-		.nat_port = nat_port,
-	};
-
 	int ret = bpf_map_update_elem(&connection_map, &conn_key, &conn_value, BPF_NOEXIST);
 	if (ret == -EEXIST) {
 		existing = bpf_map_lookup_elem(&connection_map, &conn_key);
@@ -82,6 +77,12 @@ static __always_inline int create_nat_connection(struct wg_ctx *ctx,
 	} else if (ret != 0) {
 		return -1;
 	}
+
+
+	struct nat_key nat_key = {
+		.server_ip = bpf_htonl(backend->ip),
+		.nat_port = nat_port,
+	};
 
 	ret = bpf_map_update_elem(&nat_reverse_map, &nat_key, &conn_key, BPF_ANY);
 	if (ret != 0) {
