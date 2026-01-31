@@ -24,21 +24,15 @@ type Manager struct {
 	loader Loader
 }
 
-// ManagerConfig holds configuration for the dataplane manager
-type ManagerConfig struct {
-	Cfg    config.ProxyConfig
-	Loader Loader
-}
-
 // NewManager creates a new dataplane manager
-func NewManager(cfg ManagerConfig) (*Manager, error) {
+func NewManager(cfg config.ProxyConfig, loader Loader) (*Manager, error) {
 	if err := rlimit.RemoveMemlock(); err != nil {
 		return nil, errors.Wrap(err, "failed to remove memlock limit")
 	}
 
 	return &Manager{
-		cfg:    cfg.Cfg,
-		loader: cfg.Loader,
+		cfg:    cfg,
+		loader: loader,
 	}, nil
 }
 

@@ -2,6 +2,7 @@ package monitor
 
 import (
 	"fmt"
+	"sort"
 	"strings"
 	"time"
 
@@ -9,7 +10,9 @@ import (
 )
 
 // TablePrinter formats and prints traffic statistics tables.
-type TablePrinter struct{}
+type TablePrinter struct {
+	maxSources int
+}
 
 // PrintTrafficTable prints a formatted table of traffic statistics.
 func (tp *TablePrinter) PrintTrafficTable(mode string, metricsData []metricsmap.MetricData, elapsed time.Duration) {
@@ -86,13 +89,39 @@ func (tp *TablePrinter) PrintTrafficTable(mode string, metricsData []metricsmap.
 			strings.Repeat("-", 14),
 			strings.Repeat("-", 14))
 
-		for srcAddr, stats := range perSrcStats {
-			total := stats.rxBytes + stats.txBytes
+		type srcEntry struct {
+			addr  string
+			stats *srcStats
+			total uint64
+		}
+		sortedSources := make([]srcEntry, 0, len(perSrcStats))
+		for addr, stats := range perSrcStats {
+			sortedSources = append(sortedSources, srcEntry{
+				addr:  addr,
+				stats: stats,
+				total: stats.rxBytes + stats.txBytes,
+			})
+		}
+		sort.Slice(sortedSources, func(i, j int) bool {
+			return sortedSources[i].total > sortedSources[j].total
+		})
+
+		displayCount := len(sortedSources)
+		if tp.maxSources > 0 && displayCount > tp.maxSources {
+			displayCount = tp.maxSources
+		}
+
+		for i := 0; i < displayCount; i++ {
+			entry := sortedSources[i]
 			fmt.Printf(" %-18s | %12s | %12s | %12s\n",
-				srcAddr,
-				formatBytes(stats.rxBytes),
-				formatBytes(stats.txBytes),
-				formatBytes(total))
+				entry.addr,
+				formatBytes(entry.stats.rxBytes),
+				formatBytes(entry.stats.txBytes),
+				formatBytes(entry.total))
+		}
+
+		if tp.maxSources > 0 && len(sortedSources) > tp.maxSources {
+			fmt.Printf(" ... and %d more sources\n", len(sortedSources)-tp.maxSources)
 		}
 	}
 

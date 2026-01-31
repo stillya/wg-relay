@@ -75,8 +75,9 @@ type PrometheusConfig struct {
 
 // StatisticsConfig represents statistics monitoring configuration
 type StatisticsConfig struct {
-	Enabled  bool          `yaml:"enabled"`  // Enable/disable statistics display
-	Interval time.Duration `yaml:"interval"` // Statistics update interval
+	Enabled    bool          `yaml:"enabled"`     // Enable/disable statistics display
+	Interval   time.Duration `yaml:"interval"`    // Statistics update interval
+	MaxSources int           `yaml:"max_sources"` // Maximum number of sources to display (0 = unlimited)
 }
 
 // MaxKeySize defines the maximum key size for obfuscation

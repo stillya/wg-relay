@@ -98,12 +98,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	managerCfg := dataplane.ManagerConfig{
-		Cfg:    cfg.Proxy,
-		Loader: loader,
-	}
-
-	dataplaneManager, err := dataplane.NewManager(managerCfg)
+	dataplaneManager, err := dataplane.NewManager(cfg.Proxy, loader)
 	if err != nil {
 		log.Error("Failed to create dataplane manager", "error", err)
 		os.Exit(1)
@@ -147,8 +142,9 @@ func main() {
 
 		if cfg.Monitoring.Statistics.Enabled {
 			statsMonitor = monitor.NewStatMonitor(monitor.StatMonitorParams{
-				Interval: cfg.Monitoring.Statistics.Interval,
-				Mode:     cfg.Proxy.Mode,
+				Interval:   cfg.Monitoring.Statistics.Interval,
+				Mode:       cfg.Proxy.Mode,
+				MaxSources: cfg.Monitoring.Statistics.MaxSources,
 			}, metricsSource)
 			go statsMonitor.Start(ctx)
 			defer statsMonitor.Stop()
