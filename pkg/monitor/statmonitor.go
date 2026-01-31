@@ -27,8 +27,9 @@ type StatMonitor struct {
 
 // StatMonitorParams contains configuration parameters for StatMonitor.
 type StatMonitorParams struct {
-	Mode     string
-	Interval time.Duration
+	Mode       string
+	Interval   time.Duration
+	MaxSources int
 }
 
 // NewStatMonitor creates a new StatMonitor with the given parameters.
@@ -36,7 +37,7 @@ func NewStatMonitor(params StatMonitorParams, source StatMonitorSource) *StatMon
 	return &StatMonitor{
 		StatMonitorParams: params,
 		source:            source,
-		printer:           &TablePrinter{},
+		printer:           &TablePrinter{params.MaxSources},
 		stopCh:            make(chan struct{}),
 		startTime:         time.Now(),
 	}

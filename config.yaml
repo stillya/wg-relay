@@ -4,7 +4,8 @@ daemon: # Daemon configuration
 monitoring: # Monitoring configuration
   statistics: # vnstat-style console output
     enabled: true                # Enable/disable statistics display
-    interval: "5s"              # Statistics update interval
+    interval: "5s"               # Statistics update interval
+    max_sources: 10              # Maximum number of sources to display (0 = unlimited)
   prometheus: # Prometheus HTTP exporter
     enabled: true               # Enable/disable Prometheus metrics server
     listen: ":8081"              # Address and port for metrics server
