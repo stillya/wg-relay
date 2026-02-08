@@ -35,6 +35,7 @@ covprofile
 # eBPF build artifacts
 ebpf/*.o
 ebpf/*.ll
+ebpf/include/vmlinux.h
 
 # IDE support
 compile_commands.json

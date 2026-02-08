@@ -1,8 +1,6 @@
 #ifndef __STATIC_CONFIG_H__
 #define __STATIC_CONFIG_H__
 
-#include <linux/bpf.h>
-#include <bpf/bpf_helpers.h>
 #include "common.h"
 
 // Helper to stringify tokens

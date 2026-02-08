@@ -1,7 +1,7 @@
 include ../Makefile.defs
 
 BPF := wg_forward_proxy.o wg_reverse_proxy.o
-LIB := $(wildcard include/*.h)
+LIB := $(filter-out include/vmlinux.h,$(wildcard include/*.h) $(wildcard include/**/*.h))
 
 CLANG ?= clang
 LLC ?= llc
@@ -23,17 +23,23 @@ LLC_FLAGS := -march=bpf -mcpu=v3 -filetype=obj
 # Disable built-in implicit rules
 .SUFFIXES:
 
-.PHONY: all generate clean gen_compile_commands format check-format
+.PHONY: all generate clean gen_compile_commands format check-format vmlinux
 
 all: generate
+
+include/vmlinux.h:
+	@echo "  VMLINUX $@"
+	$(QUIET)bpftool btf dump file /sys/kernel/btf/vmlinux format c > $@
+
+vmlinux: include/vmlinux.h
 
 generate: $(BPF)
 	@$(ECHO_GEN)
 	$(QUIET)$(GO_GENERATE) .
 
-wg_forward_proxy.o:: wg_forward_proxy.c $(LIB)
+wg_forward_proxy.o:: wg_forward_proxy.c $(LIB) include/vmlinux.h
 
-wg_reverse_proxy.o:: wg_reverse_proxy.c $(LIB)
+wg_reverse_proxy.o:: wg_reverse_proxy.c $(LIB) include/vmlinux.h
 
 %.ll: %.c
 	@$(ECHO_CC)
@@ -56,8 +62,8 @@ gen_compile_commands:
 
 fmt:
 	@echo "Formatting C code..."
-	$(QUIET)find . include -name '*.c' -o -name '*.h' | xargs clang-format -i
+	$(QUIET)find . include -name '*.c' -o -name '*.h' | grep -v vmlinux.h | xargs clang-format -i
 
 check-format:
 	@echo "Checking C code formatting..."
-	@find . include -name '*.c' -o -name '*.h' | xargs clang-format -n -Werror
+	@find . include -name '*.c' -o -name '*.h' | grep -v vmlinux.h | xargs clang-format -n -Werror
