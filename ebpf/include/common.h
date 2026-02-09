@@ -1,9 +1,9 @@
 #ifndef __COMMON_H__
 #define __COMMON_H__
 
-#include "vmlinux.h"
 #include <bpf/bpf_endian.h>
 #include <bpf/bpf_helpers.h>
+#include "vmlinux.h"
 
 #ifndef __maybe_unused
 #define __maybe_unused __attribute__((__unused__))
