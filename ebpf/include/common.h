@@ -1,6 +1,10 @@
 #ifndef __COMMON_H__
 #define __COMMON_H__
 
+#include <bpf/bpf_endian.h>
+#include <bpf/bpf_helpers.h>
+#include "vmlinux.h"
+
 #ifndef __maybe_unused
 #define __maybe_unused __attribute__((__unused__))
 #endif
@@ -9,12 +13,26 @@
 #define EEXIST 17 // File exists error code, used for BPF map updates
 #endif
 
-#define bool _Bool
+// Macros not available in vmlinux.h (only type/enum definitions come from BTF)
+#ifndef ETH_P_IP
+#define ETH_P_IP 0x0800
+#endif
 
-enum {
-	false = 0,
-	true = 1,
-};
+#ifndef ETH_ALEN
+#define ETH_ALEN 6
+#endif
+
+#ifndef AF_INET
+#define AF_INET 2
+#endif
+
+#ifndef TC_ACT_OK
+#define TC_ACT_OK 0
+#endif
+
+#ifndef TC_ACT_SHOT
+#define TC_ACT_SHOT 2
+#endif
 
 #ifndef likely
 #define likely(X) __builtin_expect(!!(X), 1)

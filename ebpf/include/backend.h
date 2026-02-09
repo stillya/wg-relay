@@ -1,9 +1,6 @@
 #ifndef __BACKEND_H__
 #define __BACKEND_H__
 
-#include <linux/bpf.h>
-#include <linux/types.h>
-#include <bpf/bpf_helpers.h>
 #include "common.h"
 
 // Maximum number of backends

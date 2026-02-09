@@ -1,9 +1,6 @@
 #ifndef __CSUM_H__
 #define __CSUM_H__
 
-#include <linux/ip.h>
-#include <linux/types.h>
-#include <bpf/bpf_helpers.h>
 #include "common.h"
 
 static __always_inline __u16 csum_fold_helper(__u64 csum) {

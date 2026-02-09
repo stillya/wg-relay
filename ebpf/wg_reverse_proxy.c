@@ -1,14 +1,6 @@
 // clang-format off
 //go:build ignore
 //  clang-format on
-#include <linux/bpf.h>
-#include <linux/if_ether.h>
-#include <linux/in.h>
-#include <linux/ip.h>
-#include <linux/pkt_cls.h>
-#include <linux/udp.h>
-#include <bpf/bpf_endian.h>
-#include <bpf/bpf_helpers.h>
 #include "csum.h"
 #include "instrumentation/instrumentation.h"
 #include "instrumentation/xor.h"

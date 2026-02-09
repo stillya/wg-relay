@@ -1,8 +1,6 @@
 #ifndef __INSTRUMENTATION_PADDING_H__
 #define __INSTRUMENTATION_PADDING_H__
 
-#include <linux/bpf.h>
-#include <bpf/bpf_helpers.h>
 #include "common.h"
 #include "context.h"
 #include "instrumentation.h"
