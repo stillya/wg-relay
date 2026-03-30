@@ -77,11 +77,11 @@ Refactor the metrics system from high-cardinality src_addr labels to Envoy-style
 - Modify: ebpf/wg_reverse_proxy.c
 - Modify: ebpf/wg_reverse_proxy_test.go
 
-- [ ] update METRIC_TO_WG path to call update_metrics with direction=downstream (client->proxy) for rx, direction=upstream for tx (proxy->wg)
-- [ ] update METRIC_FROM_WG path to call update_metrics with direction=upstream (wg->proxy) for rx, direction=downstream for tx (proxy->client)
-- [ ] pass backend_index=0 (unused) for reverse mode
-- [ ] update tests to verify downstream/upstream split without backend differentiation
-- [ ] run project test suite - must pass before task 5
+- [x] update METRIC_TO_WG path to call update_metrics with direction=downstream (client->proxy) for rx, direction=upstream for tx (proxy->wg)
+- [x] update METRIC_FROM_WG path to call update_metrics with direction=upstream (wg->proxy) for rx, direction=downstream for tx (proxy->client)
+- [x] pass backend_index=0 (unused) for reverse mode
+- [x] update tests to verify downstream/upstream split without backend differentiation
+- [x] run project test suite - must pass before task 5
 
 ### Task 5: Implement backend name resolution in forward proxy loader
 

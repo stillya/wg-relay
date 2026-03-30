@@ -92,21 +92,27 @@ int wg_reverse_proxy(struct __sk_buff *skb) {
 	__u8 is_from_wg = (src_port == wg_port) ? 1 : 0;
 
 	if (likely(is_from_wg)) {
+		// FROM_WG path: wg->proxy (upstream rx), proxy->client (downstream tx)
+		update_metrics(0, METRIC_UPSTREAM, skb->len, true);
+
 		if (instr_obfuscate_tc(&ctx) < 0) {
 			DEBUG_PRINTK("Obfuscation failed, dropping packet");
 			return TC_ACT_SHOT;
 		}
 
-		update_metrics(METRIC_FROM_WG, METRIC_FORWARDED, skb->len, bpf_ntohl(ctx.ip->daddr));
+		update_metrics(0, METRIC_DOWNSTREAM, skb->len, false);
 	}
 
 	if (unlikely(is_to_wg)) {
+		// TO_WG path: client->proxy (downstream rx), proxy->wg (upstream tx)
+		update_metrics(0, METRIC_DOWNSTREAM, skb->len, true);
+
 		if (instr_deobfuscate_tc(&ctx) < 0) {
 			DEBUG_PRINTK("Deobfuscation failed, dropping packet");
 			return TC_ACT_SHOT;
 		}
 
-		update_metrics(METRIC_TO_WG, METRIC_FORWARDED, skb->len, bpf_ntohl(ctx.ip->saddr));
+		update_metrics(0, METRIC_UPSTREAM, skb->len, false);
 	}
 
 	return TC_ACT_OK;
