@@ -7,30 +7,29 @@ import (
 	"unsafe"
 
 	"github.com/cilium/ebpf"
-	"github.com/stillya/wg-relay/pkg/utils"
 )
 
 const (
 	wgPort = 51820
 
-	metricToWg      = 1
-	metricFromWg    = 2
-	metricForwarded = 1
-	metricDrop      = 2
+	metricDownstream = 0
+	metricUpstream   = 1
 )
 
 // MetricsKey represents the key structure for eBPF metrics map
 type MetricsKey struct {
-	Dir     uint8
-	Reason  uint8
-	Pad     uint16
-	SrcAddr uint32
+	BackendIndex uint8
+	Direction    uint8
+	Pad          uint16
+	Pad2         uint32
 }
 
 // MetricsValue represents the value structure for eBPF metrics map
 type MetricsValue struct {
-	Packets uint64
-	Bytes   uint64
+	RxPackets uint64
+	TxPackets uint64
+	RxBytes   uint64
+	TxBytes   uint64
 }
 
 // packetInfo holds parsed packet information
@@ -187,42 +186,30 @@ func parseUDPPacket(packet []byte) (*packetInfo, error) {
 }
 
 // captureMetrics captures current metrics from an eBPF metrics map
-func captureMetrics(metricsMap *ebpf.Map) map[MetricsKey]uint64 {
-	metrics := make(map[MetricsKey]uint64)
+func captureMetrics(metricsMap *ebpf.Map) map[MetricsKey]MetricsValue {
+	metrics := make(map[MetricsKey]MetricsValue)
 
-	directions := []uint8{metricToWg, metricFromWg}
-	reasons := []uint8{metricForwarded, metricDrop}
+	directions := []uint8{metricDownstream, metricUpstream}
+	backendIndexes := []uint8{0, 1, 2}
 
-	firstAddr, _ := utils.IPToUint32("192.168.1.1")
-	secondAddr, _ := utils.IPToUint32("192.168.1.2")
-	srcAddrs := []uint32{
-		firstAddr,
-		secondAddr,
-		0, // unknown/any
-	}
+	for _, backendIndex := range backendIndexes {
+		for _, direction := range directions {
+			key := MetricsKey{BackendIndex: backendIndex, Direction: direction}
 
-	for _, dir := range directions {
-		for _, reason := range reasons {
-			var dirTotal uint64
-
-			for _, srcAddr := range srcAddrs {
-				key := MetricsKey{Dir: dir, Reason: reason, SrcAddr: srcAddr}
-
-				var perCPUValues []MetricsValue
-				err := metricsMap.Lookup(unsafe.Pointer(&key), &perCPUValues) //nolint:gosec // unsafe.Pointer required for eBPF map lookup
-				if err != nil {
-					continue
-				}
-
-				var totalPackets uint64
-				for _, cpuValue := range perCPUValues {
-					totalPackets += cpuValue.Packets
-				}
-				dirTotal += totalPackets
+			var perCPUValues []MetricsValue
+			err := metricsMap.Lookup(unsafe.Pointer(&key), &perCPUValues) //nolint:gosec // unsafe.Pointer required for eBPF map lookup
+			if err != nil {
+				continue
 			}
 
-			key := MetricsKey{Dir: dir, Reason: reason}
-			metrics[key] = dirTotal
+			var totalValue MetricsValue
+			for _, cpuValue := range perCPUValues {
+				totalValue.RxPackets += cpuValue.RxPackets
+				totalValue.TxPackets += cpuValue.TxPackets
+				totalValue.RxBytes += cpuValue.RxBytes
+				totalValue.TxBytes += cpuValue.TxBytes
+			}
+			metrics[key] = totalValue
 		}
 	}
 
@@ -230,18 +217,34 @@ func captureMetrics(metricsMap *ebpf.Map) map[MetricsKey]uint64 {
 }
 
 // verifyMetrics compares actual metrics against expected values
-func verifyMetrics(t *testing.T, oldMetrics, actual, expected map[MetricsKey]uint64) {
+func verifyMetrics(t *testing.T, oldMetrics, actual, expected map[MetricsKey]MetricsValue) {
 	t.Helper()
 	for metricKey, expectedValue := range expected {
 		if actualValue, exists := actual[metricKey]; !exists {
-			t.Errorf("Expected metric {Dir: %d, Reason: %d} to be %d, but metric key not found",
-				metricKey.Dir, metricKey.Reason, expectedValue)
+			t.Errorf("Expected metric {BackendIndex: %d, Direction: %d} not found",
+				metricKey.BackendIndex, metricKey.Direction)
 		} else {
 			oldValue := oldMetrics[metricKey]
-			deltaValue := actualValue - oldValue
-			if deltaValue != expectedValue {
-				t.Errorf("Metric {Dir: %d, Reason: %d} expected delta %d, got %d (old: %d, new: %d)",
-					metricKey.Dir, metricKey.Reason, expectedValue, deltaValue, oldValue, actualValue)
+			deltaRxPackets := actualValue.RxPackets - oldValue.RxPackets
+			deltaTxPackets := actualValue.TxPackets - oldValue.TxPackets
+			deltaRxBytes := actualValue.RxBytes - oldValue.RxBytes
+			deltaTxBytes := actualValue.TxBytes - oldValue.TxBytes
+
+			if deltaRxPackets != expectedValue.RxPackets {
+				t.Errorf("Metric {BackendIndex: %d, Direction: %d} RxPackets: expected delta %d, got %d",
+					metricKey.BackendIndex, metricKey.Direction, expectedValue.RxPackets, deltaRxPackets)
+			}
+			if deltaTxPackets != expectedValue.TxPackets {
+				t.Errorf("Metric {BackendIndex: %d, Direction: %d} TxPackets: expected delta %d, got %d",
+					metricKey.BackendIndex, metricKey.Direction, expectedValue.TxPackets, deltaTxPackets)
+			}
+			if deltaRxBytes != expectedValue.RxBytes {
+				t.Errorf("Metric {BackendIndex: %d, Direction: %d} RxBytes: expected delta %d, got %d",
+					metricKey.BackendIndex, metricKey.Direction, expectedValue.RxBytes, deltaRxBytes)
+			}
+			if deltaTxBytes != expectedValue.TxBytes {
+				t.Errorf("Metric {BackendIndex: %d, Direction: %d} TxBytes: expected delta %d, got %d",
+					metricKey.BackendIndex, metricKey.Direction, expectedValue.TxBytes, deltaTxBytes)
 			}
 		}
 	}

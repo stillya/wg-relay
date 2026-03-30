@@ -22,7 +22,8 @@ struct connection_key {
 struct connection_value {
 	__u64 timestamp;
 	__u16 nat_port;
-	__u16 pad; // Padding for alignment
+	__u8 backend_index;
+	__u8 pad; // Padding for alignment
 };
 
 // Reverse lookup key for return traffic

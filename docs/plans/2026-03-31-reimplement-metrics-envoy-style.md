@@ -63,13 +63,13 @@ Refactor the metrics system from high-cardinality src_addr labels to Envoy-style
 - Modify: ebpf/wg_forward_proxy.c
 - Modify: ebpf/wg_forward_proxy_test.go
 
-- [ ] update METRIC_TO_WG path to call update_metrics with direction=downstream (client->proxy) for rx, direction=upstream for tx (proxy->backend)
-- [ ] update METRIC_FROM_WG path to call update_metrics with direction=upstream (backend->proxy) for rx, direction=downstream for tx (proxy->client)
-- [ ] pass backend_index from select_backend_hash to metrics calls
-- [ ] store backend_index in connection_value for reverse path lookup
-- [ ] update connection_value struct to include backend_index field
-- [ ] update tests to verify downstream/upstream split
-- [ ] run project test suite - must pass before task 4
+- [x] update METRIC_TO_WG path to call update_metrics with direction=downstream (client->proxy) for rx, direction=upstream for tx (proxy->backend)
+- [x] update METRIC_FROM_WG path to call update_metrics with direction=upstream (backend->proxy) for rx, direction=downstream for tx (proxy->client)
+- [x] pass backend_index from select_backend_hash to metrics calls
+- [x] store backend_index in connection_value for reverse path lookup
+- [x] update connection_value struct to include backend_index field
+- [x] update tests to verify downstream/upstream split
+- [x] run project test suite - must pass before task 4
 
 ### Task 4: Update reverse proxy eBPF code for downstream/upstream tracking
 

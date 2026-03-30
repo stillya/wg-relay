@@ -35,22 +35,23 @@ func TestBasicReversing(t *testing.T) {
 		name            string
 		packet          []byte
 		expectedResult  int
-		expectedMetrics map[MetricsKey]uint64
+		expectedMetrics map[MetricsKey]MetricsValue
 		verifyOutput    bool
 	}{
 		{
 			name:            "non_wg_traffic",
 			packet:          createHTTPPacket("192.168.1.1", "192.168.1.2", 8080, 80),
 			expectedResult:  tcActOk,
-			expectedMetrics: map[MetricsKey]uint64{},
+			expectedMetrics: map[MetricsKey]MetricsValue{},
 			verifyOutput:    false,
 		},
 		{
 			name:           "wg_traffic_from_server",
 			packet:         createWGPacket("192.168.1.2", "192.168.1.1", wgPort, 12345),
 			expectedResult: tcActOk,
-			expectedMetrics: map[MetricsKey]uint64{
-				{Dir: metricFromWg, Reason: metricForwarded}: 1,
+			expectedMetrics: map[MetricsKey]MetricsValue{
+				{BackendIndex: 0, Direction: metricUpstream}:   {RxPackets: 1, RxBytes: 74},
+				{BackendIndex: 0, Direction: metricDownstream}: {TxPackets: 1, TxBytes: 74},
 			},
 			verifyOutput: true,
 		},
@@ -58,8 +59,9 @@ func TestBasicReversing(t *testing.T) {
 			name:           "wg_traffic_to_server",
 			packet:         createWGPacket("192.168.1.1", "192.168.1.2", 12345, wgPort),
 			expectedResult: tcActOk,
-			expectedMetrics: map[MetricsKey]uint64{
-				{Dir: metricToWg, Reason: metricForwarded}: 1,
+			expectedMetrics: map[MetricsKey]MetricsValue{
+				{BackendIndex: 0, Direction: metricDownstream}: {RxPackets: 1, RxBytes: 74},
+				{BackendIndex: 0, Direction: metricUpstream}:   {TxPackets: 1, TxBytes: 74},
 			},
 			verifyOutput: true,
 		},
@@ -67,7 +69,7 @@ func TestBasicReversing(t *testing.T) {
 			name:            "tcp_traffic",
 			packet:          createTCPPacket("192.168.1.1", "192.168.1.2", 12345, 80),
 			expectedResult:  tcActOk,
-			expectedMetrics: map[MetricsKey]uint64{},
+			expectedMetrics: map[MetricsKey]MetricsValue{},
 			verifyOutput:    false,
 		},
 	}

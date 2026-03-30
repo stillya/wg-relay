@@ -40,7 +40,7 @@ struct {
 
 // Create or lookup NAT connection for outgoing packets (client -> server)
 static __always_inline int create_nat_connection(struct wg_ctx *ctx,
-						 struct backend_entry *backend) {
+						 struct backend_entry *backend, __u8 *out_backend_index) {
 	struct connection_key conn_key = {
 		.client_ip = ctx->ip->saddr,
 		.client_port = ctx->src_port,
@@ -48,14 +48,17 @@ static __always_inline int create_nat_connection(struct wg_ctx *ctx,
 		.server_port = ctx->dst_port,
 	};
 
-	if (select_backend_hash(conn_key.client_ip, conn_key.client_port, backend) < 0) {
+	int backend_index = select_backend_hash(conn_key.client_ip, conn_key.client_port, backend);
+	if (backend_index < 0) {
 		return -1;
 	}
+	*out_backend_index = (__u8)backend_index;
 
 	// Check if connection already exists
 	struct connection_value *existing = bpf_map_lookup_elem(&connection_map, &conn_key);
 	if (existing) {
 		existing->timestamp = get_timestamp();
+		*out_backend_index = existing->backend_index;
 		return 0;
 	}
 
@@ -64,6 +67,7 @@ static __always_inline int create_nat_connection(struct wg_ctx *ctx,
 	struct connection_value conn_value = {
 		.timestamp = get_timestamp(),
 		.nat_port = nat_port,
+		.backend_index = (__u8)backend_index,
 	};
 
 	int ret = bpf_map_update_elem(&connection_map, &conn_key, &conn_value, BPF_NOEXIST);
@@ -243,14 +247,22 @@ int wg_forward_proxy(struct xdp_md *xdp_ctx) {
 		if (restore_nat_connection(&ctx, &original_conn) < 0) {
 			DEBUG_PRINTK("Failed to restore NAT connection for FROM WG packet, passing "
 				     "through");
-			update_metrics(METRIC_FROM_WG, METRIC_DROP, pkt_len, 0);
-
 			return XDP_PASS;
 		}
 
+		struct connection_value *conn_value = bpf_map_lookup_elem(&connection_map, &original_conn);
+		if (!conn_value) {
+			DEBUG_PRINTK("No connection value found for FROM WG packet");
+			return XDP_PASS;
+		}
+
+		__u8 backend_index = conn_value->backend_index;
+
+		// FROM_WG path: backend->proxy (upstream rx), proxy->client (downstream tx)
+		update_metrics(backend_index, METRIC_UPSTREAM, pkt_len, true);
+
 		if (instr_deobfuscate_xdp(&ctx) < 0) {
 			DEBUG_PRINTK("Deobfuscation failed, dropping packet");
-			update_metrics(METRIC_FROM_WG, METRIC_DROP, pkt_len, 0);
 			return XDP_DROP;
 		}
 
@@ -259,17 +271,15 @@ int wg_forward_proxy(struct xdp_md *xdp_ctx) {
 		__u16 server_port = original_conn.server_port;
 		__u16 client_port = original_conn.client_port;
 
-		update_metrics(METRIC_FROM_WG, METRIC_FORWARDED, pkt_len, client_ip);
+		update_metrics(backend_index, METRIC_DOWNSTREAM, pkt_len, false);
 		return forward_packet(&ctx, dst_addr, server_port, client_ip, client_port);
 	}
 
 	if (unlikely(is_to_wg)) {
-		__u32 src_addr = bpf_ntohl(ctx.ip->saddr);
-
 		struct backend_entry backend = { 0 };
-		if (create_nat_connection(&ctx, &backend) < 0) {
+		__u8 backend_index = 0;
+		if (create_nat_connection(&ctx, &backend, &backend_index) < 0) {
 			DEBUG_PRINTK("Failed to create NAT connection for TO WG packet");
-			update_metrics(METRIC_TO_WG, METRIC_DROP, pkt_len, src_addr);
 			return XDP_PASS;
 		}
 
@@ -286,13 +296,14 @@ int wg_forward_proxy(struct xdp_md *xdp_ctx) {
 				     "%pI4:%d, passing through",
 				     &conn_key.client_ip, conn_key.client_port, &conn_key.server_ip,
 				     conn_key.server_port);
-			update_metrics(METRIC_TO_WG, METRIC_DROP, pkt_len, src_addr);
 			return XDP_PASS;
 		}
 
+		// TO_WG path: client->proxy (downstream rx), proxy->backend (upstream tx)
+		update_metrics(backend_index, METRIC_DOWNSTREAM, pkt_len, true);
+
 		if (instr_obfuscate_xdp(&ctx) < 0) {
 			DEBUG_PRINTK("Obfuscation failed, dropping packet");
-			update_metrics(METRIC_TO_WG, METRIC_DROP, pkt_len, src_addr);
 			return XDP_DROP;
 		}
 
@@ -300,7 +311,7 @@ int wg_forward_proxy(struct xdp_md *xdp_ctx) {
 		__u32 server_ip = backend.ip; // already in host byte order
 		__u16 target_port = backend.port > 0 ? backend.port : CONFIG(wg_port);
 
-		update_metrics(METRIC_TO_WG, METRIC_FORWARDED, pkt_len, src_addr);
+		update_metrics(backend_index, METRIC_UPSTREAM, pkt_len, false);
 		return forward_packet(&ctx, proxy_ip, conn_value->nat_port, server_ip, target_port);
 	}
 
