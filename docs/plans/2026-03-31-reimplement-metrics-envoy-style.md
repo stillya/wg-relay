@@ -117,12 +117,12 @@ Refactor the metrics system from high-cardinality src_addr labels to Envoy-style
 - Modify: pkg/monitor/tableprinter.go
 - Modify: pkg/monitor/statmonitor_test.go
 
-- [ ] update TablePrinter to accept backend label mapping
-- [ ] update table display to show backend labels instead of src_addr in forward mode
-- [ ] update table display to show downstream/upstream split with rx/tx separation
-- [ ] update table display to aggregate by direction only in reverse mode
-- [ ] update tests to verify new table format
-- [ ] run project test suite - must pass before task 8
+- [x] update TablePrinter to accept backend label mapping
+- [x] update table display to show backend labels instead of src_addr in forward mode
+- [x] update table display to show downstream/upstream split with rx/tx separation
+- [x] update table display to aggregate by direction only in reverse mode
+- [x] update tests to verify new table format
+- [x] run project test suite - must pass before task 8
 
 ### Task 8: Wire up backend labels throughout the system
 

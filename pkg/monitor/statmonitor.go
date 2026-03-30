@@ -33,13 +33,16 @@ type StatMonitorParams struct {
 }
 
 // NewStatMonitor creates a new StatMonitor with the given parameters.
-func NewStatMonitor(params StatMonitorParams, source StatMonitorSource) *StatMonitor {
+func NewStatMonitor(params StatMonitorParams, source StatMonitorSource, backendLabels map[uint8]string) *StatMonitor {
 	return &StatMonitor{
 		StatMonitorParams: params,
 		source:            source,
-		printer:           &TablePrinter{params.MaxSources},
-		stopCh:            make(chan struct{}),
-		startTime:         time.Now(),
+		printer: &TablePrinter{
+			maxSources:    params.MaxSources,
+			backendLabels: backendLabels,
+		},
+		stopCh:    make(chan struct{}),
+		startTime: time.Now(),
 	}
 }
 
