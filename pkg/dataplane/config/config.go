@@ -58,6 +58,7 @@ type PaddingConfig struct {
 
 // BackendServer represents a single backend server
 type BackendServer struct {
+	Name string `yaml:"name"` // Backend server name (optional, for metrics labels)
 	IP   string `yaml:"ip"`   // Backend server IP address
 	Port uint16 `yaml:"port"` // Backend server port (optional, defaults to wg_port)
 }
