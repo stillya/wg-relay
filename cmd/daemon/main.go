@@ -119,7 +119,8 @@ func main() {
 		metricsSource = metricsmap.NewBPFMapSource("wg-relay-metrics", maps.Metrics)
 
 		if cfg.Monitoring.Prometheus.Enabled {
-			bpfCollector = metrics.NewBpfCollector(metricsSource, cfg.Proxy.Mode)
+			backendLabels := make(map[uint8]string)
+			bpfCollector = metrics.NewBpfCollector(metricsSource, cfg.Proxy.Mode, backendLabels)
 			prometheus.MustRegister(bpfCollector)
 
 			// Start Prometheus HTTP server

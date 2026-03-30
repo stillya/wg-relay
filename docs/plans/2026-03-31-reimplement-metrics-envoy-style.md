@@ -100,15 +100,15 @@ Refactor the metrics system from high-cardinality src_addr labels to Envoy-style
 - Modify: pkg/metrics/collector.go
 - Modify: pkg/metrics/collector_test.go
 
-- [ ] define 8 new metrics for forward mode: wg_relay_forward_{downstream,upstream}_rq_{rx,tx}_{packets,bytes}_total with backend label
-- [ ] define 8 new metrics for reverse mode: wg_relay_reverse_{downstream,upstream}_rq_{rx,tx}_{packets,bytes}_total without backend label
-- [ ] remove old wg_relay_{rx,tx}_{packets,bytes}_total metrics
-- [ ] accept backend label mapping in NewBpfCollector constructor
-- [ ] update Collect method to use backend_index to lookup backend label
-- [ ] update Collect method to populate separate rx/tx metrics based on direction
-- [ ] remove mode and reason labels
-- [ ] update tests to verify new metric names and labels
-- [ ] run project test suite - must pass before task 7
+- [x] define 8 new metrics for forward mode: wg_relay_forward_{downstream,upstream}_rq_{rx,tx}_{packets,bytes}_total with backend label
+- [x] define 8 new metrics for reverse mode: wg_relay_reverse_{downstream,upstream}_rq_{rx,tx}_{packets,bytes}_total without backend label
+- [x] remove old wg_relay_{rx,tx}_{packets,bytes}_total metrics
+- [x] accept backend label mapping in NewBpfCollector constructor
+- [x] update Collect method to use backend_index to lookup backend label
+- [x] update Collect method to populate separate rx/tx metrics based on direction
+- [x] remove mode and reason labels
+- [x] update tests to verify new metric names and labels
+- [x] run project test suite - must pass before task 7
 
 ### Task 7: Update statistics monitor for new metrics structure
 
