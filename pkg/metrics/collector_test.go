@@ -57,64 +57,72 @@ func TestBpfCollector_Collect(t *testing.T) {
 			metricsData: []metricsmap.MetricData{
 				{
 					Key: metricsmap.MetricsKey{
-						Dir:     metricsmap.MetricFromWg,
-						Reason:  metricsmap.MetricForwarded,
-						Pad:     0,
-						SrcAddr: 0xC0A80A01,
+						BackendIndex: 1,
+						Direction:    metricsmap.MetricDownstream,
+						Pad:          0,
+						Pad2:         0,
 					},
 					Value: metricsmap.MetricsValue{
-						Packets: 100,
-						Bytes:   5000,
+						RxPackets: 100,
+						TxPackets: 50,
+						RxBytes:   5000,
+						TxBytes:   2500,
 					},
 				},
 			},
 			expectedCount: 2,
 		},
 		{
-			name: "multiple metrics with different src_addr",
+			name: "multiple metrics with different backends",
 			mode: "reverse",
 			metricsData: []metricsmap.MetricData{
 				{
 					Key: metricsmap.MetricsKey{
-						Dir:     metricsmap.MetricFromWg,
-						Reason:  metricsmap.MetricForwarded,
-						Pad:     0,
-						SrcAddr: 0xC0A80A01,
+						BackendIndex: 1,
+						Direction:    metricsmap.MetricDownstream,
+						Pad:          0,
+						Pad2:         0,
 					},
 					Value: metricsmap.MetricsValue{
-						Packets: 100,
-						Bytes:   5000,
+						RxPackets: 100,
+						TxPackets: 50,
+						RxBytes:   5000,
+						TxBytes:   2500,
 					},
 				},
 				{
 					Key: metricsmap.MetricsKey{
-						Dir:     metricsmap.MetricToWg,
-						Reason:  metricsmap.MetricForwarded,
-						Pad:     0,
-						SrcAddr: 0xC0A80A02,
+						BackendIndex: 2,
+						Direction:    metricsmap.MetricUpstream,
+						Pad:          0,
+						Pad2:         0,
 					},
 					Value: metricsmap.MetricsValue{
-						Packets: 200,
-						Bytes:   10000,
+						RxPackets: 200,
+						TxPackets: 100,
+						RxBytes:   10000,
+						TxBytes:   5000,
 					},
 				},
 			},
 			expectedCount: 4,
 		},
 		{
-			name: "metrics with drop reason",
+			name: "metrics with upstream direction",
 			mode: "forward",
 			metricsData: []metricsmap.MetricData{
 				{
 					Key: metricsmap.MetricsKey{
-						Dir:     metricsmap.MetricFromWg,
-						Reason:  metricsmap.MetricDrop,
-						Pad:     0,
-						SrcAddr: 0xC0A80A01,
+						BackendIndex: 1,
+						Direction:    metricsmap.MetricUpstream,
+						Pad:          0,
+						Pad2:         0,
 					},
 					Value: metricsmap.MetricsValue{
-						Packets: 10,
-						Bytes:   500,
+						RxPackets: 10,
+						TxPackets: 5,
+						RxBytes:   500,
+						TxBytes:   250,
 					},
 				},
 			},
@@ -156,8 +164,8 @@ func TestBpfCollector_Collect(t *testing.T) {
 
 				labels := m.GetLabel()
 				foundMode := false
-				foundReason := false
-				foundSrcAddr := false
+				foundDirection := false
+				foundBackend := false
 
 				for _, label := range labels {
 					switch label.GetName() {
@@ -166,21 +174,21 @@ func TestBpfCollector_Collect(t *testing.T) {
 							t.Errorf("Expected mode %s, got %s", tc.mode, label.GetValue())
 						}
 						foundMode = true
-					case "reason":
-						foundReason = true
-					case "src_addr":
-						foundSrcAddr = true
+					case "direction":
+						foundDirection = true
+					case "backend":
+						foundBackend = true
 					}
 				}
 
 				if !foundMode {
 					t.Error("Missing mode label")
 				}
-				if !foundReason {
-					t.Error("Missing reason label")
+				if !foundDirection {
+					t.Error("Missing direction label")
 				}
-				if !foundSrcAddr {
-					t.Error("Missing src_addr label")
+				if !foundBackend {
+					t.Error("Missing backend label")
 				}
 			}
 

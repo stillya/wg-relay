@@ -9,59 +9,37 @@ import (
 
 func TestDirectionToString(t *testing.T) {
 	testCases := []struct {
-		dir      uint8
-		expected string
+		direction uint8
+		expected  string
 	}{
-		{MetricToWg, "to_wg"},
-		{MetricFromWg, "from_wg"},
-		{0, "unknown"},
+		{MetricDownstream, "downstream"},
+		{MetricUpstream, "upstream"},
 		{99, "unknown"},
 	}
 
 	for _, tc := range testCases {
-		result := DirectionToString(tc.dir)
+		result := DirectionToString(tc.direction)
 		if result != tc.expected {
-			t.Errorf("DirectionToString(%d) = %s, expected %s", tc.dir, result, tc.expected)
+			t.Errorf("DirectionToString(%d) = %s, expected %s", tc.direction, result, tc.expected)
 		}
 	}
 }
 
-func TestReasonToString(t *testing.T) {
+func TestBackendIndexToString(t *testing.T) {
 	testCases := []struct {
-		reason   uint8
+		index    uint8
 		expected string
 	}{
-		{MetricForwarded, "forwarded"},
-		{MetricDrop, "drop"},
-		{0, "unknown"},
-		{99, "unknown"},
+		{0, "0"},
+		{1, "1"},
+		{5, "5"},
+		{9, "9"},
 	}
 
 	for _, tc := range testCases {
-		result := ReasonToString(tc.reason)
+		result := BackendIndexToString(tc.index)
 		if result != tc.expected {
-			t.Errorf("ReasonToString(%d) = %s, expected %s", tc.reason, result, tc.expected)
-		}
-	}
-}
-
-func TestSrcAddrToString(t *testing.T) {
-	testCases := []struct {
-		srcAddr  uint32
-		expected string
-	}{
-		{0x00000000, "unknown"},
-		{0xC0A80A01, "192.168.10.1"},
-		{0x7F000001, "127.0.0.1"},
-		{0x0A000001, "10.0.0.1"},
-		{0xFFFFFFFF, "255.255.255.255"},
-		{0x08080808, "8.8.8.8"},
-	}
-
-	for _, tc := range testCases {
-		result := SrcAddrToString(tc.srcAddr)
-		if result != tc.expected {
-			t.Errorf("SrcAddrToString(0x%08X) = %s, expected %s", tc.srcAddr, result, tc.expected)
+			t.Errorf("BackendIndexToString(%d) = %s, expected %s", tc.index, result, tc.expected)
 		}
 	}
 }
@@ -102,14 +80,14 @@ func TestBPFMapSource_Collect(t *testing.T) {
 	defer m.Close()
 
 	testKey := MetricsKey{
-		Dir:     MetricFromWg,
-		Reason:  MetricForwarded,
-		Pad:     0,
-		SrcAddr: 0xC0A80A01,
+		BackendIndex: 1,
+		Direction:    MetricDownstream,
+		Pad:          0,
+		Pad2:         0,
 	}
 
 	testValue := []MetricsValue{
-		{Packets: 100, Bytes: 5000},
+		{RxPackets: 100, TxPackets: 50, RxBytes: 5000, TxBytes: 2500},
 	}
 
 	if err := m.Put(&testKey, testValue); err != nil {
@@ -130,20 +108,23 @@ func TestBPFMapSource_Collect(t *testing.T) {
 
 	result := results[0]
 
-	if result.Key.Dir != MetricFromWg {
-		t.Errorf("Expected Dir=%d, got %d", MetricFromWg, result.Key.Dir)
+	if result.Key.BackendIndex != 1 {
+		t.Errorf("Expected BackendIndex=1, got %d", result.Key.BackendIndex)
 	}
-	if result.Key.Reason != MetricForwarded {
-		t.Errorf("Expected Reason=%d, got %d", MetricForwarded, result.Key.Reason)
+	if result.Key.Direction != MetricDownstream {
+		t.Errorf("Expected Direction=%d, got %d", MetricDownstream, result.Key.Direction)
 	}
-	if result.Key.SrcAddr != 0xC0A80A01 {
-		t.Errorf("Expected SrcAddr=0xC0A80A01, got 0x%08X", result.Key.SrcAddr)
+	if result.Value.RxPackets != 100 {
+		t.Errorf("Expected RxPackets=100, got %d", result.Value.RxPackets)
 	}
-	if result.Value.Packets != 100 {
-		t.Errorf("Expected Packets=100, got %d", result.Value.Packets)
+	if result.Value.TxPackets != 50 {
+		t.Errorf("Expected TxPackets=50, got %d", result.Value.TxPackets)
 	}
-	if result.Value.Bytes != 5000 {
-		t.Errorf("Expected Bytes=5000, got %d", result.Value.Bytes)
+	if result.Value.RxBytes != 5000 {
+		t.Errorf("Expected RxBytes=5000, got %d", result.Value.RxBytes)
+	}
+	if result.Value.TxBytes != 2500 {
+		t.Errorf("Expected TxBytes=2500, got %d", result.Value.TxBytes)
 	}
 }
 
@@ -167,16 +148,16 @@ func TestBPFMapSource_CollectMultipleEntries(t *testing.T) {
 		value []MetricsValue
 	}{
 		{
-			key:   MetricsKey{Dir: MetricFromWg, Reason: MetricForwarded, Pad: 0, SrcAddr: 0xC0A80A01},
-			value: []MetricsValue{{Packets: 100, Bytes: 5000}},
+			key:   MetricsKey{BackendIndex: 1, Direction: MetricDownstream, Pad: 0, Pad2: 0},
+			value: []MetricsValue{{RxPackets: 100, TxPackets: 50, RxBytes: 5000, TxBytes: 2500}},
 		},
 		{
-			key:   MetricsKey{Dir: MetricToWg, Reason: MetricForwarded, Pad: 0, SrcAddr: 0xC0A80A02},
-			value: []MetricsValue{{Packets: 200, Bytes: 10000}},
+			key:   MetricsKey{BackendIndex: 2, Direction: MetricUpstream, Pad: 0, Pad2: 0},
+			value: []MetricsValue{{RxPackets: 200, TxPackets: 100, RxBytes: 10000, TxBytes: 5000}},
 		},
 		{
-			key:   MetricsKey{Dir: MetricFromWg, Reason: MetricDrop, Pad: 0, SrcAddr: 0xC0A80A01},
-			value: []MetricsValue{{Packets: 10, Bytes: 500}},
+			key:   MetricsKey{BackendIndex: 0, Direction: MetricDownstream, Pad: 0, Pad2: 0},
+			value: []MetricsValue{{RxPackets: 10, TxPackets: 5, RxBytes: 500, TxBytes: 250}},
 		},
 	}
 
@@ -215,15 +196,15 @@ func TestBPFMapSource_CollectPerCPUAggregation(t *testing.T) {
 	defer m.Close()
 
 	testKey := MetricsKey{
-		Dir:     MetricFromWg,
-		Reason:  MetricForwarded,
-		Pad:     0,
-		SrcAddr: 0xC0A80A01,
+		BackendIndex: 1,
+		Direction:    MetricDownstream,
+		Pad:          0,
+		Pad2:         0,
 	}
 
 	perCPUValues := []MetricsValue{
-		{Packets: 100, Bytes: 5000},
-		{Packets: 200, Bytes: 10000},
+		{RxPackets: 100, TxPackets: 50, RxBytes: 5000, TxBytes: 2500},
+		{RxPackets: 200, TxPackets: 100, RxBytes: 10000, TxBytes: 5000},
 	}
 
 	if err := m.Put(&testKey, perCPUValues); err != nil {
@@ -244,14 +225,22 @@ func TestBPFMapSource_CollectPerCPUAggregation(t *testing.T) {
 
 	result := results[0]
 
-	expectedPackets := uint64(300)
-	expectedBytes := uint64(15000)
+	expectedRxPackets := uint64(300)
+	expectedTxPackets := uint64(150)
+	expectedRxBytes := uint64(15000)
+	expectedTxBytes := uint64(7500)
 
-	if result.Value.Packets != expectedPackets {
-		t.Errorf("Expected aggregated Packets=%d, got %d", expectedPackets, result.Value.Packets)
+	if result.Value.RxPackets != expectedRxPackets {
+		t.Errorf("Expected aggregated RxPackets=%d, got %d", expectedRxPackets, result.Value.RxPackets)
 	}
-	if result.Value.Bytes != expectedBytes {
-		t.Errorf("Expected aggregated Bytes=%d, got %d", expectedBytes, result.Value.Bytes)
+	if result.Value.TxPackets != expectedTxPackets {
+		t.Errorf("Expected aggregated TxPackets=%d, got %d", expectedTxPackets, result.Value.TxPackets)
+	}
+	if result.Value.RxBytes != expectedRxBytes {
+		t.Errorf("Expected aggregated RxBytes=%d, got %d", expectedRxBytes, result.Value.RxBytes)
+	}
+	if result.Value.TxBytes != expectedTxBytes {
+		t.Errorf("Expected aggregated TxBytes=%d, got %d", expectedTxBytes, result.Value.TxBytes)
 	}
 }
 

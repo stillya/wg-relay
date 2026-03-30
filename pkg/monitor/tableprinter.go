@@ -27,21 +27,23 @@ func (tp *TablePrinter) PrintTrafficTable(mode string, metricsData []metricsmap.
 	var rxBytes, txBytes uint64
 
 	for _, metric := range metricsData {
-		if metric.Key.Reason == metricsmap.MetricForwarded {
-			srcAddr := metricsmap.SrcAddrToString(metric.Key.SrcAddr)
+		backendKey := metricsmap.BackendIndexToString(metric.Key.BackendIndex)
 
-			if _, exists := perSrcStats[srcAddr]; !exists {
-				perSrcStats[srcAddr] = &srcStats{}
-			}
+		if _, exists := perSrcStats[backendKey]; !exists {
+			perSrcStats[backendKey] = &srcStats{}
+		}
 
-			switch metric.Key.Dir {
-			case metricsmap.MetricFromWg:
-				rxBytes += metric.Value.Bytes
-				perSrcStats[srcAddr].rxBytes += metric.Value.Bytes
-			case metricsmap.MetricToWg:
-				txBytes += metric.Value.Bytes
-				perSrcStats[srcAddr].txBytes += metric.Value.Bytes
-			}
+		switch metric.Key.Direction {
+		case metricsmap.MetricDownstream:
+			rxBytes += metric.Value.RxBytes
+			perSrcStats[backendKey].rxBytes += metric.Value.RxBytes
+			txBytes += metric.Value.TxBytes
+			perSrcStats[backendKey].txBytes += metric.Value.TxBytes
+		case metricsmap.MetricUpstream:
+			rxBytes += metric.Value.RxBytes
+			perSrcStats[backendKey].rxBytes += metric.Value.RxBytes
+			txBytes += metric.Value.TxBytes
+			perSrcStats[backendKey].txBytes += metric.Value.TxBytes
 		}
 	}
 

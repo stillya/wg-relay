@@ -33,25 +33,25 @@ func NewBpfCollector(source MetricCollectorSource, mode string) *BpfCollector {
 		rxPacketsDesc: prometheus.NewDesc(
 			"wg_relay_rx_packets_total",
 			"Total number of WireGuard packets received",
-			[]string{"mode", "reason", "src_addr"},
+			[]string{"mode", "direction", "backend"},
 			nil,
 		),
 		txPacketsDesc: prometheus.NewDesc(
 			"wg_relay_tx_packets_total",
 			"Total number of WireGuard packets transmitted",
-			[]string{"mode", "reason", "src_addr"},
+			[]string{"mode", "direction", "backend"},
 			nil,
 		),
 		rxBytesDesc: prometheus.NewDesc(
 			"wg_relay_rx_bytes_total",
 			"Total bytes of WireGuard packets received",
-			[]string{"mode", "reason", "src_addr"},
+			[]string{"mode", "direction", "backend"},
 			nil,
 		),
 		txBytesDesc: prometheus.NewDesc(
 			"wg_relay_tx_bytes_total",
 			"Total bytes of WireGuard packets transmitted",
-			[]string{"mode", "reason", "src_addr"},
+			[]string{"mode", "direction", "backend"},
 			nil,
 		),
 	}
@@ -75,30 +75,30 @@ func (c *BpfCollector) Collect(ch chan<- prometheus.Metric) {
 	}
 
 	for _, metric := range metricsData {
-		reasonLabel := metricsmap.ReasonToString(metric.Key.Reason)
-		srcAddrLabel := metricsmap.SrcAddrToString(metric.Key.SrcAddr)
+		backendLabel := metricsmap.BackendIndexToString(metric.Key.BackendIndex)
+		directionLabel := metricsmap.DirectionToString(metric.Key.Direction)
 
 		var packetsDesc, bytesDesc *prometheus.Desc
-		if metric.Key.Dir == metricsmap.MetricFromWg {
-			packetsDesc = c.txPacketsDesc
-			bytesDesc = c.txBytesDesc
-		} else {
+		if metric.Key.Direction == metricsmap.MetricDownstream {
 			packetsDesc = c.rxPacketsDesc
 			bytesDesc = c.rxBytesDesc
+		} else {
+			packetsDesc = c.txPacketsDesc
+			bytesDesc = c.txBytesDesc
 		}
 
 		ch <- prometheus.MustNewConstMetric(
 			packetsDesc,
 			prometheus.CounterValue,
-			float64(metric.Value.Packets),
-			c.mode, reasonLabel, srcAddrLabel,
+			float64(metric.Value.RxPackets+metric.Value.TxPackets),
+			c.mode, directionLabel, backendLabel,
 		)
 
 		ch <- prometheus.MustNewConstMetric(
 			bytesDesc,
 			prometheus.CounterValue,
-			float64(metric.Value.Bytes),
-			c.mode, reasonLabel, srcAddrLabel,
+			float64(metric.Value.RxBytes+metric.Value.TxBytes),
+			c.mode, directionLabel, backendLabel,
 		)
 	}
 }

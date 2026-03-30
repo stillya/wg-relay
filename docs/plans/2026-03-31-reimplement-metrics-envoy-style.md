@@ -47,15 +47,15 @@ Refactor the metrics system from high-cardinality src_addr labels to Envoy-style
 - Modify: ebpf/include/metrics.h
 - Modify: pkg/maps/metricsmap/metricsmap.go
 
-- [ ] change metrics_key struct to replace src_addr with backend_index (u8)
-- [ ] add direction field to distinguish downstream vs upstream (u8: 0=downstream, 1=upstream)
-- [ ] update metrics_value struct to track rx_packets, tx_packets, rx_bytes, tx_bytes separately
-- [ ] update update_metrics function signature to accept backend_index and direction
-- [ ] update MetricsKey and MetricsValue structs in metricsmap.go to match eBPF structure
-- [ ] remove SrcAddrToString function from metricsmap.go
-- [ ] add BackendIndexToString and DirectionToString functions to metricsmap.go
-- [ ] update tests in metricsmap_test.go
-- [ ] run project test suite - must pass before task 3
+- [x] change metrics_key struct to replace src_addr with backend_index (u8)
+- [x] add direction field to distinguish downstream vs upstream (u8: 0=downstream, 1=upstream)
+- [x] update metrics_value struct to track rx_packets, tx_packets, rx_bytes, tx_bytes separately
+- [x] update update_metrics function signature to accept backend_index and direction
+- [x] update MetricsKey and MetricsValue structs in metricsmap.go to match eBPF structure
+- [x] remove SrcAddrToString function from metricsmap.go
+- [x] add BackendIndexToString and DirectionToString functions to metricsmap.go
+- [x] update tests in metricsmap_test.go
+- [x] run project test suite - must pass before task 3
 
 ### Task 3: Update forward proxy eBPF code for downstream/upstream tracking
 

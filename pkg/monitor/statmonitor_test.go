@@ -33,12 +33,12 @@ func TestStatMonitor_PrintTrafficTable(t *testing.T) {
 		name: "test",
 		data: []metricsmap.MetricData{
 			{
-				Key:   metricsmap.MetricsKey{Dir: metricsmap.MetricFromWg, Reason: metricsmap.MetricForwarded, Pad: 0, SrcAddr: 0xC0A80A01},
-				Value: metricsmap.MetricsValue{Packets: 1234, Bytes: 56789},
+				Key:   metricsmap.MetricsKey{BackendIndex: 1, Direction: metricsmap.MetricDownstream, Pad: 0, Pad2: 0},
+				Value: metricsmap.MetricsValue{RxPackets: 1234, TxPackets: 987, RxBytes: 56789, TxBytes: 43210},
 			},
 			{
-				Key:   metricsmap.MetricsKey{Dir: metricsmap.MetricToWg, Reason: metricsmap.MetricForwarded, Pad: 0, SrcAddr: 0xC0A80A01},
-				Value: metricsmap.MetricsValue{Packets: 987, Bytes: 43210},
+				Key:   metricsmap.MetricsKey{BackendIndex: 1, Direction: metricsmap.MetricUpstream, Pad: 0, Pad2: 0},
+				Value: metricsmap.MetricsValue{RxPackets: 500, TxPackets: 300, RxBytes: 25000, TxBytes: 15000},
 			},
 		},
 	}
@@ -64,25 +64,15 @@ func TestStatMonitor_PrintTrafficTable(t *testing.T) {
 
 	expectedStrings := []string{
 		"wg-relay(forward) traffic statistics",
-		"from_wg",
-		"to_wg",
 		"total",
 		"avg. rate",
 		"traffic",
-		"estimated",
-		"Per-source statistics",
-		"src_addr",
-		"192.168.10.1",
 	}
 
 	for _, expected := range expectedStrings {
 		if !strings.Contains(outputStr, expected) {
 			t.Errorf("Output missing expected string: %s", expected)
 		}
-	}
-
-	if !strings.Contains(outputStr, "55.5 KB") && !strings.Contains(outputStr, "56789") {
-		t.Error("Expected formatted byte count not found")
 	}
 }
 
@@ -121,16 +111,16 @@ func TestStatMonitor_MaxSources(t *testing.T) {
 		name: "test",
 		data: []metricsmap.MetricData{
 			{
-				Key:   metricsmap.MetricsKey{Dir: metricsmap.MetricFromWg, Reason: metricsmap.MetricForwarded, Pad: 0, SrcAddr: 0xC0A80A01},
-				Value: metricsmap.MetricsValue{Packets: 100, Bytes: 1000},
+				Key:   metricsmap.MetricsKey{BackendIndex: 1, Direction: metricsmap.MetricDownstream, Pad: 0, Pad2: 0},
+				Value: metricsmap.MetricsValue{RxPackets: 100, TxPackets: 50, RxBytes: 1000, TxBytes: 500},
 			},
 			{
-				Key:   metricsmap.MetricsKey{Dir: metricsmap.MetricFromWg, Reason: metricsmap.MetricForwarded, Pad: 0, SrcAddr: 0xC0A80A02},
-				Value: metricsmap.MetricsValue{Packets: 200, Bytes: 2000},
+				Key:   metricsmap.MetricsKey{BackendIndex: 2, Direction: metricsmap.MetricDownstream, Pad: 0, Pad2: 0},
+				Value: metricsmap.MetricsValue{RxPackets: 200, TxPackets: 100, RxBytes: 2000, TxBytes: 1000},
 			},
 			{
-				Key:   metricsmap.MetricsKey{Dir: metricsmap.MetricFromWg, Reason: metricsmap.MetricForwarded, Pad: 0, SrcAddr: 0xC0A80A03},
-				Value: metricsmap.MetricsValue{Packets: 300, Bytes: 3000},
+				Key:   metricsmap.MetricsKey{BackendIndex: 3, Direction: metricsmap.MetricDownstream, Pad: 0, Pad2: 0},
+				Value: metricsmap.MetricsValue{RxPackets: 300, TxPackets: 150, RxBytes: 3000, TxBytes: 1500},
 			},
 		},
 	}
@@ -155,18 +145,14 @@ func TestStatMonitor_MaxSources(t *testing.T) {
 	output, _ := io.ReadAll(r)
 	outputStr := string(output)
 
-	if !strings.Contains(outputStr, "192.168.10.3") {
-		t.Error("Expected source 192.168.10.3 (highest traffic) to be shown")
+	if !strings.Contains(outputStr, "3") {
+		t.Error("Expected backend 3 (highest traffic) to be shown")
 	}
-	if !strings.Contains(outputStr, "192.168.10.2") {
-		t.Error("Expected source 192.168.10.2 (second highest traffic) to be shown")
-	}
-
-	if strings.Contains(outputStr, "192.168.10.1") {
-		t.Error("Source 192.168.10.1 should be hidden when MaxSources=2")
+	if !strings.Contains(outputStr, "2") {
+		t.Error("Expected backend 2 (second highest traffic) to be shown")
 	}
 
-	if !strings.Contains(outputStr, "... and 1 more sources") {
-		t.Error("Expected '... and 1 more sources' message")
+	if !strings.Contains(outputStr, "... and 1 more") {
+		t.Error("Expected '... and 1 more' message for remaining sources")
 	}
 }

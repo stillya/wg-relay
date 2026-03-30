@@ -2,7 +2,6 @@ package metricsmap
 
 import (
 	"context"
-	"net"
 
 	"github.com/cilium/ebpf"
 	"github.com/pkg/errors"
@@ -10,25 +9,24 @@ import (
 
 // Metric direction constants.
 const (
-	MetricToWg   uint8 = 1
-	MetricFromWg uint8 = 2
-
-	MetricForwarded uint8 = 1
-	MetricDrop      uint8 = 2
+	MetricDownstream uint8 = 0
+	MetricUpstream   uint8 = 1
 )
 
 // MetricsKey represents the key structure for the BPF metrics map.
 type MetricsKey struct {
-	Dir     uint8
-	Reason  uint8
-	Pad     uint16
-	SrcAddr uint32
+	BackendIndex uint8
+	Direction    uint8
+	Pad          uint16
+	Pad2         uint32
 }
 
 // MetricsValue represents the value structure for the BPF metrics map.
 type MetricsValue struct {
-	Packets uint64
-	Bytes   uint64
+	RxPackets uint64
+	TxPackets uint64
+	RxBytes   uint64
+	TxBytes   uint64
 }
 
 // MetricData combines a metrics key with its corresponding value.
@@ -76,8 +74,10 @@ func (s *BPFMapSource) Collect(ctx context.Context) ([]MetricData, error) {
 
 		var totalValue MetricsValue
 		for _, cpuValue := range perCPUValues {
-			totalValue.Packets += cpuValue.Packets
-			totalValue.Bytes += cpuValue.Bytes
+			totalValue.RxPackets += cpuValue.RxPackets
+			totalValue.TxPackets += cpuValue.TxPackets
+			totalValue.RxBytes += cpuValue.RxBytes
+			totalValue.TxBytes += cpuValue.TxBytes
 		}
 
 		results = append(results, MetricData{
@@ -94,39 +94,18 @@ func (s *BPFMapSource) Collect(ctx context.Context) ([]MetricData, error) {
 }
 
 // DirectionToString converts a direction constant to its string representation.
-func DirectionToString(dir uint8) string {
-	switch dir {
-	case MetricToWg:
-		return "to_wg"
-	case MetricFromWg:
-		return "from_wg"
+func DirectionToString(direction uint8) string {
+	switch direction {
+	case MetricDownstream:
+		return "downstream"
+	case MetricUpstream:
+		return "upstream"
 	default:
 		return "unknown"
 	}
 }
 
-// ReasonToString converts a reason constant to its string representation.
-func ReasonToString(reason uint8) string {
-	switch reason {
-	case MetricForwarded:
-		return "forwarded"
-	case MetricDrop:
-		return "drop"
-	default:
-		return "unknown"
-	}
-}
-
-// SrcAddrToString converts a source address to its string representation.
-func SrcAddrToString(srcAddr uint32) string {
-	if srcAddr == 0 {
-		return "unknown"
-	}
-	ip := net.IPv4(
-		byte(srcAddr>>24),
-		byte(srcAddr>>16),
-		byte(srcAddr>>8),
-		byte(srcAddr),
-	)
-	return ip.String()
+// BackendIndexToString converts a backend index to its string representation.
+func BackendIndexToString(index uint8) string {
+	return string(rune('0' + index))
 }
