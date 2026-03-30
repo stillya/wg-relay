@@ -88,11 +88,11 @@ Refactor the metrics system from high-cardinality src_addr labels to Envoy-style
 **Files:**
 - Modify: pkg/dataplane/proxy/forward.go
 
-- [ ] create method to generate backend labels (name or fallback to index)
-- [ ] store backend label mapping (index -> label string)
-- [ ] expose backend label mapping for metrics collector and stat monitor
-- [ ] update tests to verify backend label generation
-- [ ] run project test suite - must pass before task 6
+- [x] create method to generate backend labels (name or fallback to index)
+- [x] store backend label mapping (index -> label string)
+- [x] expose backend label mapping for metrics collector and stat monitor
+- [x] update tests to verify backend label generation
+- [x] run project test suite - must pass before task 6
 
 ### Task 6: Update Prometheus collector with new metric names
 
