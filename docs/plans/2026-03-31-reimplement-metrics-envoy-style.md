@@ -131,11 +131,11 @@ Refactor the metrics system from high-cardinality src_addr labels to Envoy-style
 - Modify: pkg/dataplane/proxy/forward.go
 - Modify: pkg/dataplane/proxy/reverse.go
 
-- [ ] pass backend label mapping from proxy loader to metrics collector
-- [ ] pass backend label mapping from proxy loader to stat monitor
-- [ ] ensure both Prometheus and console stats receive the mapping
-- [ ] update integration to verify end-to-end metric flow
-- [ ] run project test suite - must pass before task 9
+- [x] pass backend label mapping from proxy loader to metrics collector
+- [x] pass backend label mapping from proxy loader to stat monitor
+- [x] ensure both Prometheus and console stats receive the mapping
+- [x] update integration to verify end-to-end metric flow
+- [x] run project test suite - must pass before task 9
 
 ### Task 9: Verify acceptance criteria
 

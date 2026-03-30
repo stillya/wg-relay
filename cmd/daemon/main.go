@@ -114,12 +114,13 @@ func main() {
 	var bpfCollector *metrics.BpfCollector
 	var statsMonitor *monitor.StatMonitor
 
+	backendLabels := getBackendLabels(loader)
+
 	maps := dataplaneManager.Maps()
 	if maps != nil && maps.Metrics != nil {
 		metricsSource = metricsmap.NewBPFMapSource("wg-relay-metrics", maps.Metrics)
 
 		if cfg.Monitoring.Prometheus.Enabled {
-			backendLabels := make(map[uint8]string)
 			bpfCollector = metrics.NewBpfCollector(metricsSource, cfg.Proxy.Mode, backendLabels)
 			prometheus.MustRegister(bpfCollector)
 
@@ -146,7 +147,7 @@ func main() {
 				Interval:   cfg.Monitoring.Statistics.Interval,
 				Mode:       cfg.Proxy.Mode,
 				MaxSources: cfg.Monitoring.Statistics.MaxSources,
-			}, metricsSource)
+			}, metricsSource, backendLabels)
 			go statsMonitor.Start(ctx)
 			defer statsMonitor.Stop()
 		}
@@ -174,4 +175,11 @@ func loadConfig(opts Opts) (*config.Config, error) {
 	}
 
 	return configData, nil
+}
+
+func getBackendLabels(loader dataplane.Loader) map[uint8]string {
+	if fwdLoader, ok := loader.(*proxy.ForwardLoader); ok {
+		return fwdLoader.BackendLabels()
+	}
+	return make(map[uint8]string)
 }
