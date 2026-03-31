@@ -127,6 +127,7 @@ type WgForwardProxyMapSpecs struct {
 //
 // It can be passed ebpf.CollectionSpec.Assign.
 type WgForwardProxyVariableSpecs struct {
+	CfgLinkMtu        *ebpf.VariableSpec `ebpf:"__cfg_link_mtu"`
 	CfgPaddingEnabled *ebpf.VariableSpec `ebpf:"__cfg_padding_enabled"`
 	CfgPaddingSize    *ebpf.VariableSpec `ebpf:"__cfg_padding_size"`
 	CfgWgPort         *ebpf.VariableSpec `ebpf:"__cfg_wg_port"`
@@ -177,6 +178,7 @@ func (m *WgForwardProxyMaps) Close() error {
 //
 // It can be passed to LoadWgForwardProxyObjects or ebpf.CollectionSpec.LoadAndAssign.
 type WgForwardProxyVariables struct {
+	CfgLinkMtu        *ebpf.Variable `ebpf:"__cfg_link_mtu"`
 	CfgPaddingEnabled *ebpf.Variable `ebpf:"__cfg_padding_enabled"`
 	CfgPaddingSize    *ebpf.Variable `ebpf:"__cfg_padding_size"`
 	CfgWgPort         *ebpf.Variable `ebpf:"__cfg_wg_port"`
