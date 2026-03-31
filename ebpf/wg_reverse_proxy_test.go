@@ -382,7 +382,7 @@ func TestReverseProxyCombinedObfuscation(t *testing.T) {
 }
 
 // TestReverseProxyMalformedPaddingDrop verifies that malformed padded packets are dropped
-// (INSTR_ERROR path: pkt_len < padding_size) instead of being passed through.
+// (INSTR_ERROR path: pkt_len <= padding_size) instead of being passed through.
 func TestReverseProxyMalformedPaddingDrop(t *testing.T) {
 	spec, err := LoadWgReverseProxy()
 	if err != nil {
@@ -395,8 +395,9 @@ func TestReverseProxyMalformedPaddingDrop(t *testing.T) {
 	if err := spec.Variables["__cfg_padding_enabled"].Set(true); err != nil {
 		t.Fatalf("Failed to set padding_enabled: %v", err)
 	}
-	// Claimed padding size of 200 but only 1 byte is actually appended, so pkt_len < padding_size.
-	if err := spec.Variables["__cfg_padding_size"].Set(uint8(200)); err != nil {
+	// padding_size config controls obfuscation, not deobfuscation. The deobfuscate path
+	// reads the padding marker byte from the packet itself (set by createMalformedPaddedWGPacket).
+	if err := spec.Variables["__cfg_padding_size"].Set(uint8(8)); err != nil {
 		t.Fatalf("Failed to set padding_size: %v", err)
 	}
 	if err := spec.Variables["__cfg_wg_port"].Set(uint16(wgPort)); err != nil {
@@ -410,8 +411,8 @@ func TestReverseProxyMalformedPaddingDrop(t *testing.T) {
 	defer objs.Close()
 
 	// TO_WG direction: client sends a malformed padded packet to the WG server.
-	// The last byte claims padding_size=200 but the packet only has 1 extra byte,
-	// so pkt_len < padding_size, which must result in TC_ACT_SHOT (drop).
+	// The last byte marker claims padding_size=200 but the packet only has 1 extra byte,
+	// so pkt_len <= padding_size triggers INSTR_ERROR → TC_ACT_SHOT (drop).
 	inputPacket := createMalformedPaddedWGPacket("192.168.1.1", "192.168.1.2", 12345, wgPort, 200)
 
 	result, _, err := objs.WgReverseProxy.Test(inputPacket)

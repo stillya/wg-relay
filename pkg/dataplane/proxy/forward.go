@@ -65,6 +65,9 @@ func (fp *ForwardLoader) loadEBPF() error {
 			return errors.Wrap(err, "failed to detect interface MTU")
 		}
 		fp.cfg.Instrumentations.Padding.LinkMTU = mtu
+		if err := fp.cfg.Instrumentations.Padding.ValidateMTU(); err != nil {
+			return errors.Wrap(err, "padding MTU validation failed")
+		}
 		log.Info("Detected minimum MTU for padding", "mtu", mtu)
 	}
 

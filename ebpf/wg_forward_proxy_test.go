@@ -529,7 +529,7 @@ func TestPaddingDeobfuscateMalformedDrop(t *testing.T) {
 	}
 
 	// Now send a malformed FROM_WG packet with a claimed padding_size of 200
-	// but only 1 byte of actual padding appended. pkt_len < padding_size → INSTR_ERROR → XDP_DROP.
+	// but only 1 byte of actual padding appended. pkt_len <= padding_size → INSTR_ERROR → XDP_DROP.
 	malformedPacket := createMalformedPaddedWGPacket("10.0.0.1", "192.168.1.2", 51820, natInfo.srcPort, 200)
 
 	result, _, err := objs.WgForwardProxy.Test(malformedPacket)

@@ -162,7 +162,7 @@ func createMalformedPaddedWGPacket(srcIP, dstIP string, srcPort, dstPort uint16,
 	packet := createWGPacket(srcIP, dstIP, srcPort, dstPort)
 
 	// Append only 1 byte of padding but set the marker to claim a larger size.
-	// This makes pkt_len < padding_size true, which should be dropped.
+	// This makes pkt_len <= padding_size true, which should be dropped.
 	padding := make([]byte, 1)
 	padding[0] = claimedPaddingSize
 	packet = append(packet, padding...)

@@ -43,12 +43,8 @@ static __always_inline __maybe_unused int padding_obfuscate_xdp(struct wg_ctx *c
 		return INSTR_ERROR;
 	}
 
-	if (data + 1 > data_end) {
-		return INSTR_ERROR;
-	}
-
 	__u64 pkt_len = (data_end - data);
-	if (pkt_len <= 0 || pkt_len > 65535) {
+	if (pkt_len == 0 || pkt_len > 65535) {
 		return INSTR_ERROR;
 	}
 
@@ -94,7 +90,7 @@ static __always_inline __maybe_unused int padding_deobfuscate_xdp(struct wg_ctx 
 		return INSTR_OK;
 	}
 
-	if (pkt_len < padding_size) {
+	if (pkt_len <= padding_size) {
 		return INSTR_ERROR;
 	}
 
@@ -136,10 +132,6 @@ static __always_inline __maybe_unused int padding_obfuscate_tc(struct wg_ctx *ct
 	void *data_end = (void *)(long)ctx->skb->data_end;
 
 	if (data + cfg_padding_size > data_end) {
-		return INSTR_ERROR;
-	}
-
-	if (data + 1 > data_end) {
 		return INSTR_ERROR;
 	}
 
@@ -190,7 +182,7 @@ static __always_inline __maybe_unused int padding_deobfuscate_tc(struct wg_ctx *
 		return INSTR_OK;
 	}
 
-	if (pkt_len < padding_size) {
+	if (pkt_len <= padding_size) {
 		return INSTR_ERROR;
 	}
 
