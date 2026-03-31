@@ -482,6 +482,67 @@ func TestDownstreamUpstreamMetrics(t *testing.T) {
 	verifyMetrics(t, oldMetrics, currentMetrics, expectedMetrics)
 }
 
+// TestPaddingDeobfuscateMalformedDrop verifies that malformed padded packets arriving
+// from the WG server (FROM_WG path) are dropped instead of passed through.
+// A malformed packet has a padding_size marker larger than the actual packet length.
+func TestPaddingDeobfuscateMalformedDrop(t *testing.T) {
+	spec, err := LoadWgForwardProxy()
+	if err != nil {
+		t.Fatalf("Failed to load spec: %v", err)
+	}
+
+	if err := spec.Variables["__cfg_xor_enabled"].Set(false); err != nil {
+		t.Fatalf("Failed to set xor_enabled: %v", err)
+	}
+	if err := spec.Variables["__cfg_padding_enabled"].Set(true); err != nil {
+		t.Fatalf("Failed to set padding_enabled: %v", err)
+	}
+	if err := spec.Variables["__cfg_padding_size"].Set(uint8(32)); err != nil {
+		t.Fatalf("Failed to set padding_size: %v", err)
+	}
+	if err := spec.Variables["__cfg_wg_port"].Set(uint16(wgPort)); err != nil {
+		t.Fatalf("Failed to set wg_port: %v", err)
+	}
+
+	objs := &WgForwardProxyObjects{}
+	if err := spec.LoadAndAssign(objs, nil); err != nil {
+		t.Fatalf("Failed to load objects: %v", err)
+	}
+	defer objs.Close()
+
+	if err := configureBackends(objs, []config.BackendServer{
+		{IP: "10.0.0.1", Port: 51820},
+	}); err != nil {
+		t.Fatalf("Failed to configure backends: %v", err)
+	}
+
+	// Establish a NAT connection by sending a TO_WG packet first.
+	toWgPacket := createWGPacket("192.168.1.1", "192.168.1.2", 12345, wgPort)
+	_, outputPacket, err := objs.WgForwardProxy.Test(toWgPacket)
+	if err != nil {
+		t.Fatalf("Failed to run TO_WG packet: %v", err)
+	}
+
+	natInfo, err := parseUDPPacket(outputPacket)
+	if err != nil || natInfo == nil {
+		t.Fatalf("Failed to parse TO_WG output: %v", err)
+	}
+
+	// Now send a malformed FROM_WG packet with a claimed padding_size of 200
+	// but only 1 byte of actual padding appended. pkt_len < padding_size → INSTR_ERROR → XDP_DROP.
+	malformedPacket := createMalformedPaddedWGPacket("10.0.0.1", "192.168.1.2", 51820, natInfo.srcPort, 200)
+
+	result, _, err := objs.WgForwardProxy.Test(malformedPacket)
+	if err != nil {
+		t.Fatalf("Failed to run FROM_WG malformed packet: %v", err)
+	}
+
+	const xdpDrop = 1
+	if int(result) != xdpDrop {
+		t.Errorf("Expected malformed padded packet to be dropped (XDP_DROP=%d), got %d", xdpDrop, result)
+	}
+}
+
 // verifyPacket is a forward-proxy specific wrapper that uses the shared verifyPacketDestination
 func verifyPacket(t *testing.T, outputPacket []byte, expectedIP string, expectedPort int) {
 	t.Helper()

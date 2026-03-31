@@ -59,18 +59,18 @@ static __always_inline __maybe_unused int padding_deobfuscate_xdp(struct wg_ctx 
 	void *data_end = (void *)(long)ctx->xdp->data_end;
 
 	if (data + 1 > data_end) {
-		return INSTR_OK;
+		return INSTR_ERROR;
 	}
 
 	__u64 pkt_len = (data_end - data);
 	if (pkt_len == 0 || pkt_len > 65535) {
-		return INSTR_OK;
+		return INSTR_ERROR;
 	}
 
 	__u32 mrk_offset = (__u32)(pkt_len - 1);
 
 	if (data + mrk_offset + 1 > data_end) {
-		return INSTR_OK;
+		return INSTR_ERROR;
 	}
 
 	__u8 *mrk = (__u8 *)data + mrk_offset;
@@ -81,7 +81,7 @@ static __always_inline __maybe_unused int padding_deobfuscate_xdp(struct wg_ctx 
 	}
 
 	if (pkt_len < padding_size) {
-		return INSTR_OK;
+		return INSTR_ERROR;
 	}
 
 	if (bpf_xdp_adjust_tail(ctx->xdp, -((int)padding_size)) != 0) {
@@ -147,18 +147,18 @@ static __always_inline __maybe_unused int padding_deobfuscate_tc(struct wg_ctx *
 	void *data_end = (void *)(long)ctx->skb->data_end;
 
 	if (data + 1 > data_end) {
-		return INSTR_OK;
+		return INSTR_ERROR;
 	}
 
 	__u64 pkt_len = (data_end - data);
 	if (pkt_len == 0 || pkt_len > 65535) {
-		return INSTR_OK;
+		return INSTR_ERROR;
 	}
 
 	__u32 mrk_offset = (__u32)(pkt_len - 1);
 
 	if (data + mrk_offset + 1 > data_end) {
-		return INSTR_OK;
+		return INSTR_ERROR;
 	}
 
 	__u8 *mrk = (__u8 *)data + mrk_offset;
@@ -169,7 +169,7 @@ static __always_inline __maybe_unused int padding_deobfuscate_tc(struct wg_ctx *
 	}
 
 	if (pkt_len < padding_size) {
-		return INSTR_OK;
+		return INSTR_ERROR;
 	}
 
 	__u32 current_len = ctx->skb->len;
