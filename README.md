@@ -89,9 +89,15 @@ proxy:
     - "eth0"
   forward:                       # Forward proxy configuration (forward mode)
     backends:
-      - ip: "192.168.200.2"      # Backend 1
+      - name: "wg-gateway-1"     # Optional: backend name for metrics (defaults to backend_<index>)
+        ip: "192.168.200.2"      # Backend 1 IP address
         port: 51820              # Optional: port (defaults to wg_port)
+      - name: "wg-gateway-2"     # Named backend for low-cardinality metrics
+        ip: "192.168.200.3"      # Backend 2 IP address
+        port: 51820
 ```
+
+Backend names: The optional name field allows you to assign human-readable labels to backends for Prometheus metrics and console statistics. If omitted, backends are labeled as backend_0, backend_1, etc. Named backends help with metric clarity and dashboard creation.
 
 ### 3. Run
 
@@ -127,25 +133,33 @@ sudo make run-reverse-proxy    # wg-server namespace
 
 ### Console Statistics (vnstat-style)
 
-The daemon provides real-time traffic statistics in a vnstat-style table format:
+The daemon provides real-time traffic statistics with downstream/upstream split:
+
+Forward Mode (shows per-backend statistics):
 
 ```
-                         wg-relay traffic statistics
+                         wg-relay(forward) traffic statistics
 
-                    |      from_wg |        to_wg |        total |    avg. rate
- ------------------+--------------+--------------+--------------+--------------
- traffic            |       7.4 GB |     480.9 MB |       7.9 GB |   68.1 KB/s
- ------------------+--------------+--------------+--------------+--------------
- estimated          |       5.3 GB |     341.6 MB |       5.6 GB |
+                    |      down_rx |      down_tx |        up_rx |        up_tx |        total |    avg. rate
+ ------------------+--------------+--------------+--------------+--------------+--------------+--------------
+ traffic            |       7.4 GB |     480.9 MB |       3.2 GB |       1.8 GB |      13.3 GB |   68.1 KB/s
+ ------------------+--------------+--------------+--------------+--------------+--------------+--------------
+ estimated          |       5.3 GB |     341.6 MB |       2.3 GB |       1.3 GB |       9.2 GB |
 
- Per-source statistics:
- src_addr           |      from_wg |        to_wg |        total
- ------------------+--------------+--------------+--------------
- 192.0.2.10         |      35.3 KB |      12.5 KB |      47.8 KB
- 192.0.2.20         |      29.0 KB |       7.1 KB |      36.1 KB
- 192.0.2.30         |      33.1 KB |       8.4 KB |      41.5 KB
- 203.0.113.100      |       5.1 GB |      73.9 MB |       5.2 GB
+ Per-backend statistics:
+ backend            |      down_rx |      down_tx |        up_rx |        up_tx |        total
+ ------------------+--------------+--------------+--------------+--------------+--------------
+ wg-gateway-1       |      35.3 KB |      12.5 KB |      18.2 KB |       9.1 KB |      75.1 KB
+ wg-gateway-2       |      29.0 KB |       7.1 KB |      15.3 KB |       7.6 KB |      59.0 KB
+ backend_2          |      33.1 KB |       8.4 KB |      17.1 KB |       8.5 KB |      67.1 KB
 ```
+
+Column meanings:
+
+- down_rx: Bytes received from client (downstream receive)
+- down_tx: Bytes sent to client (downstream transmit)
+- up_rx: Bytes received from backend/WireGuard (upstream receive)
+- up_tx: Bytes sent to backend/WireGuard (upstream transmit)
 
 Enable statistics monitoring in config:
 
@@ -169,16 +183,38 @@ monitoring:
 
 Available metrics:
 
-- `wg_relay_rx_packets_total{mode, reason, src_addr}` - Total packets received
-- `wg_relay_tx_packets_total{mode, reason, src_addr}` - Total packets transmitted
-- `wg_relay_rx_bytes_total{mode, reason, src_addr}` - Total bytes received
-- `wg_relay_tx_bytes_total{mode, reason, src_addr}` - Total bytes transmitted
+Forward Mode (with backend label):
+
+- `wg_relay_forward_downstream_rq_rx_packets_total{backend}` - Packets received from client
+- `wg_relay_forward_downstream_rq_tx_packets_total{backend}` - Packets sent to client
+- `wg_relay_forward_downstream_rq_rx_bytes_total{backend}` - Bytes received from client
+- `wg_relay_forward_downstream_rq_tx_bytes_total{backend}` - Bytes sent to client
+- `wg_relay_forward_upstream_rq_rx_packets_total{backend}` - Packets received from backend
+- `wg_relay_forward_upstream_rq_tx_packets_total{backend}` - Packets sent to backend
+- `wg_relay_forward_upstream_rq_rx_bytes_total{backend}` - Bytes received from backend
+- `wg_relay_forward_upstream_rq_tx_bytes_total{backend}` - Bytes sent to backend
+
+Reverse Mode (no labels):
+
+- `wg_relay_reverse_downstream_rq_rx_packets_total` - Packets received from client
+- `wg_relay_reverse_downstream_rq_tx_packets_total` - Packets sent to client
+- `wg_relay_reverse_downstream_rq_rx_bytes_total` - Bytes received from client
+- `wg_relay_reverse_downstream_rq_tx_bytes_total` - Bytes sent to client
+- `wg_relay_reverse_upstream_rq_rx_packets_total` - Packets received from WireGuard server
+- `wg_relay_reverse_upstream_rq_tx_packets_total` - Packets sent to WireGuard server
+- `wg_relay_reverse_upstream_rq_rx_bytes_total` - Bytes received from WireGuard server
+- `wg_relay_reverse_upstream_rq_tx_bytes_total` - Bytes sent to WireGuard server
 
 Labels:
 
-- `mode`: "forward" or "reverse"
-- `reason`: "forwarded" or "drop"
-- `src_addr`: Source IP address (e.g., "192.168.1.100")
+- `backend`: Backend server name (forward mode only) - either the configured name from config or backend_<index> fallback
+
+Terminology:
+
+- Downstream: Client to proxy direction
+- Upstream: Proxy to backend/WireGuard direction
+- rx: Received by proxy
+- tx: Transmitted by proxy
 
 ## Development
 

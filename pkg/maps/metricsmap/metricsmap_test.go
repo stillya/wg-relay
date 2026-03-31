@@ -30,10 +30,12 @@ func TestBackendIndexToString(t *testing.T) {
 		index    uint8
 		expected string
 	}{
-		{0, "0"},
-		{1, "1"},
-		{5, "5"},
-		{9, "9"},
+		{0, "backend_0"},
+		{1, "backend_1"},
+		{5, "backend_5"},
+		{9, "backend_9"},
+		{10, "backend_10"},
+		{255, "backend_255"},
 	}
 
 	for _, tc := range testCases {
@@ -68,7 +70,7 @@ func TestBPFMapSource_Collect(t *testing.T) {
 	spec := &ebpf.MapSpec{
 		Type:       ebpf.PerCPUHash,
 		KeySize:    8,
-		ValueSize:  16,
+		ValueSize:  32,
 		MaxEntries: 16,
 	}
 
@@ -132,7 +134,7 @@ func TestBPFMapSource_CollectMultipleEntries(t *testing.T) {
 	spec := &ebpf.MapSpec{
 		Type:       ebpf.PerCPUHash,
 		KeySize:    8,
-		ValueSize:  16,
+		ValueSize:  32,
 		MaxEntries: 16,
 	}
 

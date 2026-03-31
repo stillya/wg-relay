@@ -2,6 +2,7 @@ package metricsmap
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/cilium/ebpf"
 	"github.com/pkg/errors"
@@ -107,5 +108,5 @@ func DirectionToString(direction uint8) string {
 
 // BackendIndexToString converts a backend index to its string representation.
 func BackendIndexToString(index uint8) string {
-	return string(rune('0' + index))
+	return fmt.Sprintf("backend_%d", index)
 }

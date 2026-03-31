@@ -60,14 +60,20 @@ func (tp *TablePrinter) PrintTrafficTable(mode string, metricsData []metricsmap.
 	}
 
 	totalBytes := totalDownstreamRx + totalDownstreamTx + totalUpstreamRx + totalUpstreamTx
-	avgRate := float64(totalBytes) / elapsed.Seconds()
 
-	secondsInDay := float64(24 * 60 * 60)
-	estimatedDownstreamRxDaily := uint64(float64(totalDownstreamRx) / elapsed.Seconds() * secondsInDay)
-	estimatedDownstreamTxDaily := uint64(float64(totalDownstreamTx) / elapsed.Seconds() * secondsInDay)
-	estimatedUpstreamRxDaily := uint64(float64(totalUpstreamRx) / elapsed.Seconds() * secondsInDay)
-	estimatedUpstreamTxDaily := uint64(float64(totalUpstreamTx) / elapsed.Seconds() * secondsInDay)
-	estimatedTotalDaily := estimatedDownstreamRxDaily + estimatedDownstreamTxDaily + estimatedUpstreamRxDaily + estimatedUpstreamTxDaily
+	var avgRate float64
+	var estimatedDownstreamRxDaily, estimatedDownstreamTxDaily, estimatedUpstreamRxDaily, estimatedUpstreamTxDaily, estimatedTotalDaily uint64
+
+	if elapsed.Seconds() > 0 {
+		avgRate = float64(totalBytes) / elapsed.Seconds()
+
+		secondsInDay := float64(24 * 60 * 60)
+		estimatedDownstreamRxDaily = uint64(float64(totalDownstreamRx) / elapsed.Seconds() * secondsInDay)
+		estimatedDownstreamTxDaily = uint64(float64(totalDownstreamTx) / elapsed.Seconds() * secondsInDay)
+		estimatedUpstreamRxDaily = uint64(float64(totalUpstreamRx) / elapsed.Seconds() * secondsInDay)
+		estimatedUpstreamTxDaily = uint64(float64(totalUpstreamTx) / elapsed.Seconds() * secondsInDay)
+		estimatedTotalDaily = estimatedDownstreamRxDaily + estimatedDownstreamTxDaily + estimatedUpstreamRxDaily + estimatedUpstreamTxDaily
+	}
 
 	fmt.Printf("\n")
 	fmt.Printf("                         wg-relay(%s) traffic statistics\n", mode)

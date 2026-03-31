@@ -46,8 +46,8 @@ static __always_inline __maybe_unused __u16 generate_nat_port() {
 
 	__u32 port = NAT_PORT_START;
 	if (counter) {
-		__sync_fetch_and_add(counter, 1);
-		port = NAT_PORT_START + (*counter % NAT_PORT_RANGE);
+		__u32 val = __sync_fetch_and_add(counter, 1);
+		port = NAT_PORT_START + (val % NAT_PORT_RANGE);
 	} else {
 		__u32 initial = 1;
 		bpf_map_update_elem(&nat_port_counter, &counter_key, &initial, BPF_NOEXIST);

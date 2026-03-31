@@ -41,3 +41,4 @@ ebpf/*.ll
 compile_commands.json
 .clangd/
 .cache/
+daemon

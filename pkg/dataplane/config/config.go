@@ -203,6 +203,10 @@ func (fc *ForwardConfig) validate() error {
 		return errors.New("at least one backend is required in forward mode")
 	}
 
+	if len(fc.Backends) > 256 {
+		return errors.Errorf("maximum 256 backends allowed, got %d", len(fc.Backends))
+	}
+
 	for i, backend := range fc.Backends {
 		if backend.IP == "" {
 			return errors.Errorf("backend[%d]: ip is required", i)
