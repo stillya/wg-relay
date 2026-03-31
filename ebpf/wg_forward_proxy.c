@@ -48,7 +48,7 @@ static __always_inline int create_nat_connection(struct wg_ctx *ctx,
 		.server_port = ctx->dst_port,
 	};
 
-	int backend_index = select_backend_hash(conn_key.client_ip, conn_key.client_port, backend);
+	int backend_index = select_backend_hash(bpf_ntohl(conn_key.client_ip), conn_key.client_port, backend);
 	if (backend_index < 0) {
 		return -1;
 	}
@@ -91,7 +91,10 @@ static __always_inline int create_nat_connection(struct wg_ctx *ctx,
 		}
 	}
 
-	// If all retries exhausted, the last port will be used (may overwrite)
+	// If all retries exhausted, fail to avoid port collision
+	if (retry >= 8) {
+		return -1;
+	}
 
 	struct connection_value conn_value = {
 		.timestamp = get_timestamp(),
@@ -306,12 +309,15 @@ int wg_forward_proxy(struct xdp_md *xdp_ctx) {
 			return XDP_DROP;
 		}
 
+		// Recalculate packet length after deobfuscation
+		__u32 tx_pkt_len = (void *)(long)xdp_ctx->data_end - (void *)(long)xdp_ctx->data;
+
 		__u32 dst_addr = bpf_ntohl(ctx.ip->daddr);
 		__u32 client_ip = bpf_ntohl(original_conn.client_ip);
 		__u16 server_port = original_conn.server_port;
 		__u16 client_port = original_conn.client_port;
 
-		update_metrics(backend_index, METRIC_DOWNSTREAM, pkt_len, false);
+		update_metrics(backend_index, METRIC_DOWNSTREAM, tx_pkt_len, false);
 		return forward_packet(&ctx, dst_addr, server_port, client_ip, client_port);
 	}
 
@@ -347,11 +353,14 @@ int wg_forward_proxy(struct xdp_md *xdp_ctx) {
 			return XDP_DROP;
 		}
 
+		// Recalculate packet length after obfuscation
+		__u32 tx_pkt_len = (void *)(long)xdp_ctx->data_end - (void *)(long)xdp_ctx->data;
+
 		__u32 proxy_ip = bpf_ntohl(ctx.ip->daddr);
 		__u32 server_ip = backend.ip; // already in host byte order
 		__u16 target_port = backend.port > 0 ? backend.port : CONFIG(wg_port);
 
-		update_metrics(backend_index, METRIC_UPSTREAM, pkt_len, false);
+		update_metrics(backend_index, METRIC_UPSTREAM, tx_pkt_len, false);
 		return forward_packet(&ctx, proxy_ip, conn_value->nat_port, server_ip, target_port);
 	}
 

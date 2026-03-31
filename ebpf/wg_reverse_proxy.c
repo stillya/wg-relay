@@ -93,7 +93,8 @@ int wg_reverse_proxy(struct __sk_buff *skb) {
 
 	if (likely(is_from_wg)) {
 		// FROM_WG path: wg->proxy (upstream rx), proxy->client (downstream tx)
-		update_metrics(0, METRIC_UPSTREAM, skb->len, true);
+		__u32 rx_len = skb->len;
+		update_metrics(0, METRIC_UPSTREAM, rx_len, true);
 
 		if (instr_obfuscate_tc(&ctx) < 0) {
 			DEBUG_PRINTK("Obfuscation failed, dropping packet");
@@ -105,7 +106,8 @@ int wg_reverse_proxy(struct __sk_buff *skb) {
 
 	if (unlikely(is_to_wg)) {
 		// TO_WG path: client->proxy (downstream rx), proxy->wg (upstream tx)
-		update_metrics(0, METRIC_DOWNSTREAM, skb->len, true);
+		__u32 rx_len = skb->len;
+		update_metrics(0, METRIC_DOWNSTREAM, rx_len, true);
 
 		if (instr_deobfuscate_tc(&ctx) < 0) {
 			DEBUG_PRINTK("Deobfuscation failed, dropping packet");

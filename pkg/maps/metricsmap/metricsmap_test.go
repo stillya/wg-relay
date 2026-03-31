@@ -186,7 +186,7 @@ func TestBPFMapSource_CollectPerCPUAggregation(t *testing.T) {
 	spec := &ebpf.MapSpec{
 		Type:       ebpf.PerCPUHash,
 		KeySize:    8,
-		ValueSize:  16,
+		ValueSize:  32,
 		MaxEntries: 16,
 	}
 

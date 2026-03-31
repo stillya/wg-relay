@@ -46,8 +46,10 @@ static __always_inline __maybe_unused __u16 generate_nat_port() {
 
 	__u32 port = NAT_PORT_START;
 	if (counter) {
-		__u32 val = __sync_fetch_and_add(counter, 1);
-		port = NAT_PORT_START + (val % NAT_PORT_RANGE);
+		__sync_fetch_and_add(
+			counter,
+			1); // Using return value of sync_add generates invalid usage of the XADD(https://github.com/llvm/llvm-project/issues/91888)
+		port = NAT_PORT_START + (*counter % NAT_PORT_RANGE);
 	} else {
 		__u32 initial = 1;
 		bpf_map_update_elem(&nat_port_counter, &counter_key, &initial, BPF_NOEXIST);

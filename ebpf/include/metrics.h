@@ -48,7 +48,7 @@ static __always_inline __maybe_unused void update_metrics(__u8 backend_index, __
 			value->tx_bytes += bytes;
 		}
 	} else {
-		struct metrics_value new_value = {0};
+		struct metrics_value new_value = { 0 };
 		if (is_rx) {
 			new_value.rx_packets = 1;
 			new_value.rx_bytes = bytes;

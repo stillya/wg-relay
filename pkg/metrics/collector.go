@@ -16,9 +16,9 @@ type MetricCollectorSource interface {
 
 // BpfCollector implements prometheus.Collector for BPF metrics.
 type BpfCollector struct {
-	source         MetricCollectorSource
-	mode           string
-	backendLabels  map[uint8]string
+	source        MetricCollectorSource
+	mode          string
+	backendLabels map[uint8]string
 
 	forwardDownstreamRxPacketsDesc *prometheus.Desc
 	forwardDownstreamTxPacketsDesc *prometheus.Desc
