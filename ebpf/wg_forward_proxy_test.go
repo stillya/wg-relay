@@ -549,6 +549,62 @@ func verifyPacket(t *testing.T, outputPacket []byte, expectedIP string, expected
 	verifyPacketDestination(t, outputPacket, expectedIP, uint16(expectedPort)) //nolint:gosec // G115: it's fine
 }
 
+// TestPaddingObfuscateMTUExceededDrop verifies that a packet is dropped when adding padding
+// would cause it to exceed the configured link MTU.
+func TestPaddingObfuscateMTUExceededDrop(t *testing.T) {
+	spec, err := LoadWgForwardProxy()
+	if err != nil {
+		t.Fatalf("Failed to load spec: %v", err)
+	}
+
+	if spec.Variables["__cfg_link_mtu"] == nil {
+		t.Skip("__cfg_link_mtu variable not present in compiled eBPF object; recompile after updating padding.h")
+	}
+
+	if err := spec.Variables["__cfg_xor_enabled"].Set(false); err != nil {
+		t.Fatalf("Failed to set xor_enabled: %v", err)
+	}
+	if err := spec.Variables["__cfg_padding_enabled"].Set(true); err != nil {
+		t.Fatalf("Failed to set padding_enabled: %v", err)
+	}
+	if err := spec.Variables["__cfg_padding_size"].Set(uint8(64)); err != nil {
+		t.Fatalf("Failed to set padding_size: %v", err)
+	}
+	if err := spec.Variables["__cfg_wg_port"].Set(uint16(wgPort)); err != nil {
+		t.Fatalf("Failed to set wg_port: %v", err)
+	}
+	// Set MTU small enough that adding 64 bytes of padding would exceed it.
+	// A WG packet is 74 bytes; 74 + 64 = 138 > 100.
+	if err := spec.Variables["__cfg_link_mtu"].Set(uint16(100)); err != nil {
+		t.Fatalf("Failed to set link_mtu: %v", err)
+	}
+
+	objs := &WgForwardProxyObjects{}
+	if err := spec.LoadAndAssign(objs, nil); err != nil {
+		t.Fatalf("Failed to load objects: %v", err)
+	}
+	defer objs.Close()
+
+	if err := configureBackends(objs, []config.BackendServer{
+		{IP: "10.0.0.1", Port: 51820},
+	}); err != nil {
+		t.Fatalf("Failed to configure backends: %v", err)
+	}
+
+	// This packet is 74 bytes. With 64 bytes padding it would be 138, exceeding MTU of 100.
+	inputPacket := createWGPacket("192.168.1.1", "192.168.1.2", 12345, wgPort)
+
+	result, _, err := objs.WgForwardProxy.Test(inputPacket)
+	if err != nil {
+		t.Fatalf("Failed to run program: %v", err)
+	}
+
+	const xdpDrop = 1
+	if int(result) != xdpDrop {
+		t.Errorf("Expected packet to be dropped (XDP_DROP=%d) when padding exceeds MTU, got %d", xdpDrop, result)
+	}
+}
+
 // configureBackends configures backend servers for the forward proxy
 func configureBackends(objs *WgForwardProxyObjects, backends []config.BackendServer) error {
 	for i, backend := range backends {

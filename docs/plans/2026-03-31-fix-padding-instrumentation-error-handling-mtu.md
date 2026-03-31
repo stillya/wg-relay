@@ -52,11 +52,11 @@ Add a `link_mtu` config variable to the eBPF padding header so the obfuscate fun
 **Files:**
 - Modify: `ebpf/include/instrumentation/padding.h`
 
-- [ ] Add `DECLARE_CONFIG(__u16, link_mtu, "Link MTU for padding size validation")` at the top of padding.h alongside existing DECLARE_CONFIG declarations
-- [ ] In `padding_obfuscate_xdp`: before calling `bpf_xdp_adjust_tail`, compute the current packet length from `(data_end - data)` and check `current_len + cfg_padding_size > CONFIG(link_mtu)`; if so, return `INSTR_ERROR`
-- [ ] In `padding_obfuscate_tc`: before calling `bpf_skb_change_tail`, check `current_len + cfg_padding_size > CONFIG(link_mtu)`; if so, return `INSTR_ERROR`
-- [ ] Write eBPF unit tests verifying that a packet which would exceed MTU after padding is dropped
-- [ ] Run `go test ./ebpf/...` - must pass
+- [x] Add `DECLARE_CONFIG(__u16, link_mtu, "Link MTU for padding size validation")` at the top of padding.h alongside existing DECLARE_CONFIG declarations
+- [x] In `padding_obfuscate_xdp`: before calling `bpf_xdp_adjust_tail`, compute the current packet length from `(data_end - data)` and check `current_len + cfg_padding_size > CONFIG(link_mtu)`; if so, return `INSTR_ERROR`
+- [x] In `padding_obfuscate_tc`: before calling `bpf_skb_change_tail`, check `current_len + cfg_padding_size > CONFIG(link_mtu)`; if so, return `INSTR_ERROR`
+- [x] Write eBPF unit tests verifying that a packet which would exceed MTU after padding is dropped
+- [x] Run `go test ./ebpf/...` - must pass
 
 ### Task 3: MTU detection in Go control plane and config propagation
 
