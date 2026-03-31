@@ -89,7 +89,7 @@
             "uid": "${ds_prometheus}"
           },
           "editorMode": "code",
-          "expr": "sum(wg_relay_forward_downstream_rq_rx_packets_total{reason=\"forwarded\"}) + sum(wg_relay_forward_upstream_rq_rx_packets_total{reason=\"forwarded\"})",
+          "expr": "sum(wg_relay_forward_downstream_rq_rx_packets_total{reason=\"forwarded\", host=~\"$host\"}) + sum(wg_relay_forward_upstream_rq_rx_packets_total{reason=\"forwarded\", host=~\"$host\"})",
           "instant": false,
           "legendFormat": "RX Packets",
           "range": true,
@@ -153,7 +153,7 @@
             "uid": "${ds_prometheus}"
           },
           "editorMode": "code",
-          "expr": "sum(wg_relay_forward_downstream_rq_tx_packets_total{reason=\"forwarded\"}) + sum(wg_relay_forward_upstream_rq_tx_packets_total{reason=\"forwarded\"})",
+          "expr": "sum(wg_relay_forward_downstream_rq_tx_packets_total{reason=\"forwarded\", host=~\"$host\"}) + sum(wg_relay_forward_upstream_rq_tx_packets_total{reason=\"forwarded\", host=~\"$host\"})",
           "instant": false,
           "legendFormat": "TX Packets",
           "range": true,
@@ -217,7 +217,7 @@
             "uid": "${ds_prometheus}"
           },
           "editorMode": "code",
-          "expr": "sum(wg_relay_forward_downstream_rq_rx_bytes_total{reason=\"forwarded\"}) + sum(wg_relay_forward_upstream_rq_rx_bytes_total{reason=\"forwarded\"})",
+          "expr": "sum(wg_relay_forward_downstream_rq_rx_bytes_total{reason=\"forwarded\", host=~\"$host\"}) + sum(wg_relay_forward_upstream_rq_rx_bytes_total{reason=\"forwarded\", host=~\"$host\"})",
           "instant": false,
           "legendFormat": "RX Bytes",
           "range": true,
@@ -281,7 +281,7 @@
             "uid": "${ds_prometheus}"
           },
           "editorMode": "code",
-          "expr": "sum(wg_relay_forward_downstream_rq_tx_bytes_total{reason=\"forwarded\"}) + sum(wg_relay_forward_upstream_rq_tx_bytes_total{reason=\"forwarded\"})",
+          "expr": "sum(wg_relay_forward_downstream_rq_tx_bytes_total{reason=\"forwarded\", host=~\"$host\"}) + sum(wg_relay_forward_upstream_rq_tx_bytes_total{reason=\"forwarded\", host=~\"$host\"})",
           "instant": false,
           "legendFormat": "TX Bytes",
           "range": true,
@@ -376,7 +376,7 @@
             "uid": "${ds_prometheus}"
           },
           "editorMode": "code",
-          "expr": "sum by (backend) (rate(wg_relay_forward_upstream_rq_tx_bytes_total{reason=\"forwarded\"}[$__rate_interval]))",
+          "expr": "sum by (backend) (rate(wg_relay_forward_upstream_rq_tx_bytes_total{reason=\"forwarded\", host=~\"$host\"}[$__rate_interval]))",
           "instant": false,
           "legendFormat": "{{backend}} - TX",
           "range": true,
@@ -388,7 +388,7 @@
             "uid": "${ds_prometheus}"
           },
           "editorMode": "code",
-          "expr": "-sum by (backend) (rate(wg_relay_forward_upstream_rq_rx_bytes_total{reason=\"forwarded\"}[$__rate_interval]))",
+          "expr": "-sum by (backend) (rate(wg_relay_forward_upstream_rq_rx_bytes_total{reason=\"forwarded\", host=~\"$host\"}[$__rate_interval]))",
           "instant": false,
           "legendFormat": "{{backend}} - RX",
           "range": true,
@@ -465,7 +465,7 @@
             "uid": "${ds_prometheus}"
           },
           "editorMode": "code",
-          "expr": "sum(wg_relay_reverse_downstream_rq_rx_packets_total{reason=\"forwarded\"}) + sum(wg_relay_reverse_upstream_rq_rx_packets_total{reason=\"forwarded\"})",
+          "expr": "sum(wg_relay_reverse_downstream_rq_rx_packets_total{reason=\"forwarded\", host=~\"$host\"}) + sum(wg_relay_reverse_upstream_rq_rx_packets_total{reason=\"forwarded\", host=~\"$host\"})",
           "instant": false,
           "legendFormat": "RX Packets",
           "range": true,
@@ -529,7 +529,7 @@
             "uid": "${ds_prometheus}"
           },
           "editorMode": "code",
-          "expr": "sum(wg_relay_reverse_downstream_rq_tx_packets_total{reason=\"forwarded\"}) + sum(wg_relay_reverse_upstream_rq_tx_packets_total{reason=\"forwarded\"})",
+          "expr": "sum(wg_relay_reverse_downstream_rq_tx_packets_total{reason=\"forwarded\", host=~\"$host\"}) + sum(wg_relay_reverse_upstream_rq_tx_packets_total{reason=\"forwarded\", host=~\"$host\"})",
           "instant": false,
           "legendFormat": "TX Packets",
           "range": true,
@@ -593,7 +593,7 @@
             "uid": "${ds_prometheus}"
           },
           "editorMode": "code",
-          "expr": "sum(wg_relay_reverse_downstream_rq_rx_bytes_total{reason=\"forwarded\"}) + sum(wg_relay_reverse_upstream_rq_rx_bytes_total{reason=\"forwarded\"})",
+          "expr": "sum(wg_relay_reverse_downstream_rq_rx_bytes_total{reason=\"forwarded\", host=~\"$host\"}) + sum(wg_relay_reverse_upstream_rq_rx_bytes_total{reason=\"forwarded\", host=~\"$host\"})",
           "instant": false,
           "legendFormat": "RX Bytes",
           "range": true,
@@ -657,7 +657,7 @@
             "uid": "${ds_prometheus}"
           },
           "editorMode": "code",
-          "expr": "sum(wg_relay_reverse_downstream_rq_tx_bytes_total{reason=\"forwarded\"}) + sum(wg_relay_reverse_upstream_rq_tx_bytes_total{reason=\"forwarded\"})",
+          "expr": "sum(wg_relay_reverse_downstream_rq_tx_bytes_total{reason=\"forwarded\", host=~\"$host\"}) + sum(wg_relay_reverse_upstream_rq_tx_bytes_total{reason=\"forwarded\", host=~\"$host\"})",
           "instant": false,
           "legendFormat": "TX Bytes",
           "range": true,
@@ -752,7 +752,7 @@
             "uid": "${ds_prometheus}"
           },
           "editorMode": "code",
-          "expr": "sum(rate(wg_relay_reverse_upstream_rq_tx_bytes_total{reason=\"forwarded\"}[$__rate_interval]))",
+          "expr": "sum(rate(wg_relay_reverse_upstream_rq_tx_bytes_total{reason=\"forwarded\", host=~\"$host\"}[$__rate_interval]))",
           "instant": false,
           "legendFormat": "TX (from WG)",
           "range": true,
@@ -764,7 +764,7 @@
             "uid": "${ds_prometheus}"
           },
           "editorMode": "code",
-          "expr": "-sum(rate(wg_relay_reverse_upstream_rq_rx_bytes_total{reason=\"forwarded\"}[$__rate_interval]))",
+          "expr": "-sum(rate(wg_relay_reverse_upstream_rq_rx_bytes_total{reason=\"forwarded\", host=~\"$host\"}[$__rate_interval]))",
           "instant": false,
           "legendFormat": "RX (to WG)",
           "range": true,
@@ -1560,6 +1560,33 @@
         "regex": "",
         "skipUrlSync": false,
         "type": "datasource"
+      },
+      {
+        "current": {
+          "selected": true,
+          "text": "All",
+          "value": "$__all"
+        },
+        "datasource": {
+          "type": "prometheus",
+          "uid": "${ds_prometheus}"
+        },
+        "definition": "label_values(wg_relay_forward_upstream_rq_tx_bytes_total, host)",
+        "hide": 0,
+        "includeAll": true,
+        "label": "Host",
+        "multi": true,
+        "name": "host",
+        "options": [],
+        "query": {
+          "query": "label_values(wg_relay_forward_upstream_rq_tx_bytes_total, host)",
+          "refId": "PrometheusVariableQueryEditor-VariableQuery"
+        },
+        "refresh": 1,
+        "regex": "",
+        "skipUrlSync": false,
+        "sort": 1,
+        "type": "query"
       },
       {
         "current": {

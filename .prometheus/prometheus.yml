@@ -12,3 +12,8 @@ scrape_configs:
       - targets: [ "192.168.100.2:8081" ]
     scrape_interval: 5s
     metrics_path: /metrics
+    relabel_configs:
+      - source_labels: [__address__]
+        regex: '([^:]+)(?::\d+)?'
+        target_label: host
+        replacement: '$1'
