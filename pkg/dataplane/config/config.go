@@ -52,8 +52,9 @@ type XORConfig struct {
 
 // PaddingConfig represents padding obfuscation configuration
 type PaddingConfig struct {
-	Enabled bool  `yaml:"enabled" ebpf:"padding_enabled"`
-	Size    uint8 `yaml:"size" ebpf:"padding_size"`
+	Enabled bool   `yaml:"enabled" ebpf:"padding_enabled"`
+	Size    uint8  `yaml:"size" ebpf:"padding_size"`
+	LinkMTU uint16 `yaml:"-" ebpf:"link_mtu"` // computed at runtime, not yaml-exposed
 }
 
 // BackendServer represents a single backend server
@@ -186,6 +187,10 @@ func (cfg *ProxyConfig) validate(mode string) error {
 	if cfg.Instrumentations.Padding != nil && cfg.Instrumentations.Padding.Enabled {
 		if cfg.Instrumentations.Padding.Size < 1 {
 			return errors.New("padding size must be at least 1")
+		}
+		p := cfg.Instrumentations.Padding
+		if p.LinkMTU > 0 && uint16(p.Size) >= p.LinkMTU {
+			return errors.Errorf("padding size %d must be less than link MTU %d", p.Size, p.LinkMTU)
 		}
 	}
 

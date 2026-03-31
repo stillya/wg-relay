@@ -67,13 +67,13 @@ Detect the MTU of each configured interface in Go, and pass the minimum MTU acro
 - Modify: `pkg/dataplane/proxy/forward.go` - detect MTU before loadEBPF, set cfg field
 - Modify: `pkg/dataplane/proxy/reverse.go` - detect MTU before loadEBPF, set cfg field
 
-- [ ] Add `LinkMTU uint16 \`ebpf:"link_mtu"\`` to `PaddingConfig` in `config.go` (not yaml-exposed, computed at runtime)
-- [ ] Add a helper function `detectMinMTU(interfaces []string) (uint16, error)` in a shared location (e.g., a new small function in `pkg/utils/ip.go` or inline in each loader) that calls `net.InterfaceByName` and reads `iface.MTU`, returns the minimum across all interfaces
-- [ ] In `ForwardLoader.loadEBPF()`: before calling `bpf.Configure`, if `cfg.Instrumentations.Padding != nil`, detect MTU and set `cfg.Instrumentations.Padding.LinkMTU`
-- [ ] In `ReverseLoader.loadEBPF()`: same
-- [ ] Add config validation: if padding enabled and `LinkMTU > 0` and `padding_size >= LinkMTU`, return error
-- [ ] Write tests in `pkg/dataplane/proxy/` (or `pkg/dataplane/config/config_test.go`) verifying MTU is propagated correctly and validation catches oversized padding
-- [ ] Run `go test ./pkg/...` - must pass
+- [x] Add `LinkMTU uint16 \`ebpf:"link_mtu"\`` to `PaddingConfig` in `config.go` (not yaml-exposed, computed at runtime)
+- [x] Add a helper function `detectMinMTU(interfaces []string) (uint16, error)` in a shared location (e.g., a new small function in `pkg/utils/ip.go` or inline in each loader) that calls `net.InterfaceByName` and reads `iface.MTU`, returns the minimum across all interfaces
+- [x] In `ForwardLoader.loadEBPF()`: before calling `bpf.Configure`, if `cfg.Instrumentations.Padding != nil`, detect MTU and set `cfg.Instrumentations.Padding.LinkMTU`
+- [x] In `ReverseLoader.loadEBPF()`: same
+- [x] Add config validation: if padding enabled and `LinkMTU > 0` and `padding_size >= LinkMTU`, return error
+- [x] Write tests in `pkg/dataplane/proxy/` (or `pkg/dataplane/config/config_test.go`) verifying MTU is propagated correctly and validation catches oversized padding
+- [x] Run `go test ./pkg/...` - must pass
 
 ### Task 4: Verify acceptance criteria
 

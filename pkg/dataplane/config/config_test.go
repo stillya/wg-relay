@@ -58,6 +58,42 @@ func TestPaddingConfig_Validation(t *testing.T) {
 			},
 			wantErr: "padding size must be at least 1",
 		},
+		{
+			name: "padding size equals link MTU is invalid",
+			padding: &PaddingConfig{
+				Enabled: true,
+				Size:    100,
+				LinkMTU: 100,
+			},
+			wantErr: "padding size 100 must be less than link MTU 100",
+		},
+		{
+			name: "padding size exceeds link MTU is invalid",
+			padding: &PaddingConfig{
+				Enabled: true,
+				Size:    200,
+				LinkMTU: 100,
+			},
+			wantErr: "padding size 200 must be less than link MTU 100",
+		},
+		{
+			name: "padding size less than link MTU is valid",
+			padding: &PaddingConfig{
+				Enabled: true,
+				Size:    100,
+				LinkMTU: 1500,
+			},
+			wantErr: "",
+		},
+		{
+			name: "link MTU zero skips MTU validation",
+			padding: &PaddingConfig{
+				Enabled: true,
+				Size:    200,
+				LinkMTU: 0,
+			},
+			wantErr: "",
+		},
 	}
 
 	for _, tt := range tests {
