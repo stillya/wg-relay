@@ -19,6 +19,7 @@ import (
 	"github.com/stillya/wg-relay/pkg/metrics"
 
 	"github.com/stillya/wg-relay/pkg/dataplane"
+	"github.com/stillya/wg-relay/pkg/discovery"
 	"github.com/stillya/wg-relay/pkg/maps/metricsmap"
 	"github.com/stillya/wg-relay/pkg/monitor"
 )
@@ -114,12 +115,14 @@ func main() {
 	var bpfCollector *metrics.BpfCollector
 	var statsMonitor *monitor.StatMonitor
 
+	backends := discovery.NewStaticBackendDiscovery(buildBackendLabels(&cfg.Proxy))
+
 	maps := dataplaneManager.Maps()
 	if maps != nil && maps.Metrics != nil {
 		metricsSource = metricsmap.NewBPFMapSource("wg-relay-metrics", maps.Metrics)
 
 		if cfg.Monitoring.Prometheus.Enabled {
-			bpfCollector = metrics.NewBpfCollector(metricsSource, cfg.Proxy.Mode)
+			bpfCollector = metrics.NewBpfCollector(metricsSource, cfg.Proxy.Mode, backends)
 			prometheus.MustRegister(bpfCollector)
 
 			// Start Prometheus HTTP server
@@ -145,7 +148,7 @@ func main() {
 				Interval:   cfg.Monitoring.Statistics.Interval,
 				Mode:       cfg.Proxy.Mode,
 				MaxSources: cfg.Monitoring.Statistics.MaxSources,
-			}, metricsSource)
+			}, metricsSource, backends)
 			go statsMonitor.Start(ctx)
 			defer statsMonitor.Stop()
 		}
@@ -173,4 +176,18 @@ func loadConfig(opts Opts) (*config.Config, error) {
 	}
 
 	return configData, nil
+}
+
+func buildBackendLabels(cfg *config.ProxyConfig) map[uint8]string {
+	backends := cfg.GetBackends()
+	labels := make(map[uint8]string, len(backends))
+	for i, backend := range backends {
+		index := uint8(i) //nolint:gosec // index is controlled and bounded
+		if backend.Name != "" {
+			labels[index] = backend.Name
+		} else {
+			labels[index] = fmt.Sprintf("backend_%d", i)
+		}
+	}
+	return labels
 }

@@ -41,39 +41,38 @@ func TestBasicForwarding(t *testing.T) {
 		name            string
 		packet          []byte
 		expectedResult  int
-		expectedMetrics map[MetricsKey]uint64
+		expectedMetrics map[MetricsKey]MetricsValue
 		verifyOutput    bool
 	}{
 		{
 			name:            "non_wg_traffic",
 			packet:          createHTTPPacket("192.168.1.1", "192.168.1.2", 8080, 80),
 			expectedResult:  xdpPass,
-			expectedMetrics: map[MetricsKey]uint64{},
+			expectedMetrics: map[MetricsKey]MetricsValue{},
 			verifyOutput:    false,
 		},
 		{
 			name:           "wg_traffic_to_server",
 			packet:         createWGPacket("192.168.1.1", "192.168.1.2", 12345, wgPort),
 			expectedResult: xdpRedirect,
-			expectedMetrics: map[MetricsKey]uint64{
-				{Dir: metricToWg, Reason: metricForwarded}: 1,
+			expectedMetrics: map[MetricsKey]MetricsValue{
+				{BackendIndex: 0, Direction: metricDownstream}: {RxPackets: 1, RxBytes: 74},
+				{BackendIndex: 0, Direction: metricUpstream}:   {TxPackets: 1, TxBytes: 74},
 			},
 			verifyOutput: true,
 		},
 		{
-			name:           "wg_reverse_traffic_no_nat",
-			packet:         createWGPacket("192.168.1.2", "192.168.1.1", wgPort, 12345),
-			expectedResult: xdpPass,
-			expectedMetrics: map[MetricsKey]uint64{
-				{Dir: metricFromWg, Reason: metricDrop}: 1,
-			},
-			verifyOutput: false,
+			name:            "wg_reverse_traffic_no_nat",
+			packet:          createWGPacket("192.168.1.2", "192.168.1.1", wgPort, 12345),
+			expectedResult:  xdpPass,
+			expectedMetrics: map[MetricsKey]MetricsValue{},
+			verifyOutput:    false,
 		},
 		{
 			name:            "tcp_traffic",
 			packet:          createTCPPacket("192.168.1.1", "192.168.1.2", 12345, 80),
 			expectedResult:  xdpPass,
-			expectedMetrics: map[MetricsKey]uint64{},
+			expectedMetrics: map[MetricsKey]MetricsValue{},
 			verifyOutput:    false,
 		},
 	}
@@ -423,6 +422,64 @@ func TestWgPortConfig(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestDownstreamUpstreamMetrics(t *testing.T) {
+	spec, err := LoadWgForwardProxy()
+	if err != nil {
+		t.Fatalf("Failed to load spec: %v", err)
+	}
+
+	if err := spec.Variables["__cfg_xor_enabled"].Set(false); err != nil {
+		t.Fatalf("Failed to set xor_enabled: %v", err)
+	}
+	if err := spec.Variables["__cfg_wg_port"].Set(uint16(wgPort)); err != nil {
+		t.Fatalf("Failed to set wg_port: %v", err)
+	}
+
+	objs := &WgForwardProxyObjects{}
+	if err := spec.LoadAndAssign(objs, nil); err != nil {
+		t.Fatalf("Failed to load objects: %v", err)
+	}
+	defer objs.Close()
+
+	if err := configureBackends(objs, []config.BackendServer{
+		{IP: "10.0.0.1", Port: 51820},
+	}); err != nil {
+		t.Fatalf("Failed to configure backends: %v", err)
+	}
+
+	oldMetrics := captureMetrics(objs.MetricsMap)
+
+	toWgPacket := createWGPacket("192.168.1.1", "192.168.1.2", 12345, wgPort)
+	result, toWgOutput, err := objs.WgForwardProxy.Test(toWgPacket)
+	if err != nil {
+		t.Fatalf("Failed to run TO_WG: %v", err)
+	}
+	if int(result) != xdpRedirect {
+		t.Errorf("TO_WG: Expected XDP_REDIRECT, got %d", result)
+	}
+	verifyPacket(t, toWgOutput, "10.0.0.1", 51820)
+
+	info, _ := parseUDPPacket(toWgOutput)
+	fromWgPacket := createWGPacket("10.0.0.1", "192.168.1.2", 51820, info.srcPort)
+	result, fromWgOutput, err := objs.WgForwardProxy.Test(fromWgPacket)
+	if err != nil {
+		t.Fatalf("Failed to run FROM_WG: %v", err)
+	}
+	if int(result) != xdpRedirect {
+		t.Errorf("FROM_WG: Expected XDP_REDIRECT, got %d", result)
+	}
+	verifyPacket(t, fromWgOutput, "192.168.1.1", 12345)
+
+	currentMetrics := captureMetrics(objs.MetricsMap)
+
+	pktLen := uint64(len(toWgPacket))
+	expectedMetrics := map[MetricsKey]MetricsValue{
+		{BackendIndex: 0, Direction: metricDownstream}: {RxPackets: 1, TxPackets: 1, RxBytes: pktLen, TxBytes: pktLen},
+		{BackendIndex: 0, Direction: metricUpstream}:   {RxPackets: 1, TxPackets: 1, RxBytes: pktLen, TxBytes: pktLen},
+	}
+	verifyMetrics(t, oldMetrics, currentMetrics, expectedMetrics)
 }
 
 // verifyPacket is a forward-proxy specific wrapper that uses the shared verifyPacketDestination

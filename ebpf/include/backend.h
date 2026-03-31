@@ -12,7 +12,8 @@
 struct backend_entry {
 	__u32 ip;
 	__u16 port;
-	__u16 pad;
+	__u8 index;
+	__u8 pad;
 };
 
 // Backend map: array of backend entries
@@ -80,6 +81,7 @@ static __always_inline __maybe_unused int select_backend_hash(__u32 client_ip, _
 
 	backend->ip = entry->ip;
 	backend->port = entry->port;
+	backend->index = (__u8)idx;
 
 	return (__s32)idx;
 }

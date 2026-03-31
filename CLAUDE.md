@@ -69,6 +69,16 @@ Client → Obfuscator Proxy → WireGuard Server
 - **Dependency Injection**: Prefer constructor injection for better testability
 - **Error Wrapping**: Always wrap errors with context using pkg/errors
 
+### Metrics Architecture
+
+- **Low Cardinality**: Metrics use backend labels instead of src_addr to prevent cardinality explosion
+- **Directional Split**: All metrics split into downstream (client to proxy) and upstream (proxy to backend/WireGuard)
+- **RX/TX Separation**: Each direction tracks received (rx) and transmitted (tx) separately
+- **Metric Naming**: Follow pattern `wg_relay_{mode}_{direction}_rq_{rx|tx}_{packets|bytes}_total`
+  - Forward mode: Uses backend label with values from BackendServer.Name or backend_<index>
+  - Reverse mode: No labels (aggregated by direction only)
+- **Backend Labels**: Map from backend index (uint8) to human-readable name, passed from loader to collector/monitor
+
 ## Key Constraints
 
 - **Security Focus**: This is a defensive security tool for bypassing censorship

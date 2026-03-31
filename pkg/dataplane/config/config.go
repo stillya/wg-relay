@@ -58,6 +58,7 @@ type PaddingConfig struct {
 
 // BackendServer represents a single backend server
 type BackendServer struct {
+	Name string `yaml:"name"` // Backend server name (optional, for metrics labels)
 	IP   string `yaml:"ip"`   // Backend server IP address
 	Port uint16 `yaml:"port"` // Backend server port (optional, defaults to wg_port)
 }
@@ -200,6 +201,10 @@ func (cfg *ProxyConfig) validate(mode string) error {
 func (fc *ForwardConfig) validate() error {
 	if len(fc.Backends) == 0 {
 		return errors.New("at least one backend is required in forward mode")
+	}
+
+	if len(fc.Backends) > 256 {
+		return errors.Errorf("maximum 256 backends allowed, got %d", len(fc.Backends))
 	}
 
 	for i, backend := range fc.Backends {

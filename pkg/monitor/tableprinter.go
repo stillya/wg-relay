@@ -12,116 +12,160 @@ import (
 // TablePrinter formats and prints traffic statistics tables.
 type TablePrinter struct {
 	maxSources int
+	backends   BackendDiscovery
 }
 
 // PrintTrafficTable prints a formatted table of traffic statistics.
 func (tp *TablePrinter) PrintTrafficTable(mode string, metricsData []metricsmap.MetricData, elapsed time.Duration) {
 	tp.clearScreen()
 
-	type srcStats struct {
-		rxBytes uint64
-		txBytes uint64
+	type directionStats struct {
+		downstreamRxBytes uint64
+		downstreamTxBytes uint64
+		upstreamRxBytes   uint64
+		upstreamTxBytes   uint64
 	}
 
-	perSrcStats := make(map[string]*srcStats)
-	var rxBytes, txBytes uint64
+	perBackendStats := make(map[string]*directionStats)
+	var totalDownstreamRx, totalDownstreamTx, totalUpstreamRx, totalUpstreamTx uint64
+
+	var backendLabels map[uint8]string
+	if tp.backends != nil {
+		backendLabels = tp.backends.Backends()
+	}
 
 	for _, metric := range metricsData {
-		if metric.Key.Reason == metricsmap.MetricForwarded {
-			srcAddr := metricsmap.SrcAddrToString(metric.Key.SrcAddr)
-
-			if _, exists := perSrcStats[srcAddr]; !exists {
-				perSrcStats[srcAddr] = &srcStats{}
+		var backendKey string
+		if mode == "forward" {
+			if label, exists := backendLabels[metric.Key.BackendIndex]; exists {
+				backendKey = label
+			} else {
+				backendKey = fmt.Sprintf("backend_%d", metric.Key.BackendIndex)
 			}
+		} else {
+			backendKey = metricsmap.DirectionToString(metric.Key.Direction)
+		}
 
-			switch metric.Key.Dir {
-			case metricsmap.MetricFromWg:
-				rxBytes += metric.Value.Bytes
-				perSrcStats[srcAddr].rxBytes += metric.Value.Bytes
-			case metricsmap.MetricToWg:
-				txBytes += metric.Value.Bytes
-				perSrcStats[srcAddr].txBytes += metric.Value.Bytes
-			}
+		if _, exists := perBackendStats[backendKey]; !exists {
+			perBackendStats[backendKey] = &directionStats{}
+		}
+
+		switch metric.Key.Direction {
+		case metricsmap.MetricDownstream:
+			totalDownstreamRx += metric.Value.RxBytes
+			totalDownstreamTx += metric.Value.TxBytes
+			perBackendStats[backendKey].downstreamRxBytes += metric.Value.RxBytes
+			perBackendStats[backendKey].downstreamTxBytes += metric.Value.TxBytes
+		case metricsmap.MetricUpstream:
+			totalUpstreamRx += metric.Value.RxBytes
+			totalUpstreamTx += metric.Value.TxBytes
+			perBackendStats[backendKey].upstreamRxBytes += metric.Value.RxBytes
+			perBackendStats[backendKey].upstreamTxBytes += metric.Value.TxBytes
 		}
 	}
 
-	totalBytes := rxBytes + txBytes
-	avgRate := float64(totalBytes) / elapsed.Seconds()
+	totalBytes := totalDownstreamRx + totalDownstreamTx + totalUpstreamRx + totalUpstreamTx
 
-	secondsInDay := float64(24 * 60 * 60)
-	estimatedRxDaily := uint64(float64(rxBytes) / elapsed.Seconds() * secondsInDay)
-	estimatedTxDaily := uint64(float64(txBytes) / elapsed.Seconds() * secondsInDay)
-	estimatedTotalDaily := estimatedRxDaily + estimatedTxDaily
+	var avgRate float64
+	var estimatedDownstreamRxDaily, estimatedDownstreamTxDaily, estimatedUpstreamRxDaily, estimatedUpstreamTxDaily, estimatedTotalDaily uint64
+
+	if elapsed.Seconds() > 0 {
+		avgRate = float64(totalBytes) / elapsed.Seconds()
+
+		secondsInDay := float64(24 * 60 * 60)
+		estimatedDownstreamRxDaily = uint64(float64(totalDownstreamRx) / elapsed.Seconds() * secondsInDay)
+		estimatedDownstreamTxDaily = uint64(float64(totalDownstreamTx) / elapsed.Seconds() * secondsInDay)
+		estimatedUpstreamRxDaily = uint64(float64(totalUpstreamRx) / elapsed.Seconds() * secondsInDay)
+		estimatedUpstreamTxDaily = uint64(float64(totalUpstreamTx) / elapsed.Seconds() * secondsInDay)
+		estimatedTotalDaily = estimatedDownstreamRxDaily + estimatedDownstreamTxDaily + estimatedUpstreamRxDaily + estimatedUpstreamTxDaily
+	}
 
 	fmt.Printf("\n")
 	fmt.Printf("                         wg-relay(%s) traffic statistics\n", mode)
 	fmt.Printf("\n")
-	fmt.Printf(" %-18s | %12s | %12s | %12s | %12s\n", "", "from_wg", "to_wg", "total", "avg. rate")
-	fmt.Printf(" %s+%s+%s+%s+%s\n",
+	fmt.Printf(" %-18s | %12s | %12s | %12s | %12s | %12s | %12s\n", "", "down_rx", "down_tx", "up_rx", "up_tx", "total", "avg. rate")
+	fmt.Printf(" %s+%s+%s+%s+%s+%s+%s\n",
 		strings.Repeat("-", 18),
 		strings.Repeat("-", 14),
 		strings.Repeat("-", 14),
 		strings.Repeat("-", 14),
+		strings.Repeat("-", 14),
+		strings.Repeat("-", 14),
 		strings.Repeat("-", 14))
-	fmt.Printf(" %-18s | %12s | %12s | %12s | %9s/s\n", "traffic",
-		formatBytes(rxBytes),
-		formatBytes(txBytes),
+	fmt.Printf(" %-18s | %12s | %12s | %12s | %12s | %12s | %9s/s\n", "traffic",
+		formatBytes(totalDownstreamRx),
+		formatBytes(totalDownstreamTx),
+		formatBytes(totalUpstreamRx),
+		formatBytes(totalUpstreamTx),
 		formatBytes(totalBytes),
 		formatBytes(uint64(avgRate)))
-	fmt.Printf(" %s+%s+%s+%s+%s\n",
+	fmt.Printf(" %s+%s+%s+%s+%s+%s+%s\n",
 		strings.Repeat("-", 18),
 		strings.Repeat("-", 14),
 		strings.Repeat("-", 14),
 		strings.Repeat("-", 14),
+		strings.Repeat("-", 14),
+		strings.Repeat("-", 14),
 		strings.Repeat("-", 14))
-	fmt.Printf(" %-18s | %12s | %12s | %12s |\n", "estimated",
-		formatBytes(estimatedRxDaily),
-		formatBytes(estimatedTxDaily),
+	fmt.Printf(" %-18s | %12s | %12s | %12s | %12s | %12s |\n", "estimated",
+		formatBytes(estimatedDownstreamRxDaily),
+		formatBytes(estimatedDownstreamTxDaily),
+		formatBytes(estimatedUpstreamRxDaily),
+		formatBytes(estimatedUpstreamTxDaily),
 		formatBytes(estimatedTotalDaily))
 
-	if len(perSrcStats) > 0 {
+	if len(perBackendStats) > 0 {
 		fmt.Printf("\n")
-		fmt.Printf(" Per-source statistics:\n")
-		fmt.Printf(" %-18s | %12s | %12s | %12s\n", "src_addr", "from_wg", "to_wg", "total")
-		fmt.Printf(" %s+%s+%s+%s\n",
+		if mode == "forward" {
+			fmt.Printf(" Per-backend statistics:\n")
+			fmt.Printf(" %-18s | %12s | %12s | %12s | %12s | %12s\n", "backend", "down_rx", "down_tx", "up_rx", "up_tx", "total")
+		} else {
+			fmt.Printf(" Per-direction statistics:\n")
+			fmt.Printf(" %-18s | %12s | %12s | %12s | %12s | %12s\n", "direction", "down_rx", "down_tx", "up_rx", "up_tx", "total")
+		}
+		fmt.Printf(" %s+%s+%s+%s+%s+%s\n",
 			strings.Repeat("-", 18),
+			strings.Repeat("-", 14),
+			strings.Repeat("-", 14),
 			strings.Repeat("-", 14),
 			strings.Repeat("-", 14),
 			strings.Repeat("-", 14))
 
-		type srcEntry struct {
-			addr  string
-			stats *srcStats
+		type backendEntry struct {
+			label string
+			stats *directionStats
 			total uint64
 		}
-		sortedSources := make([]srcEntry, 0, len(perSrcStats))
-		for addr, stats := range perSrcStats {
-			sortedSources = append(sortedSources, srcEntry{
-				addr:  addr,
+		sortedBackends := make([]backendEntry, 0, len(perBackendStats))
+		for label, stats := range perBackendStats {
+			sortedBackends = append(sortedBackends, backendEntry{
+				label: label,
 				stats: stats,
-				total: stats.rxBytes + stats.txBytes,
+				total: stats.downstreamRxBytes + stats.downstreamTxBytes + stats.upstreamRxBytes + stats.upstreamTxBytes,
 			})
 		}
-		sort.Slice(sortedSources, func(i, j int) bool {
-			return sortedSources[i].total > sortedSources[j].total
+		sort.Slice(sortedBackends, func(i, j int) bool {
+			return sortedBackends[i].total > sortedBackends[j].total
 		})
 
-		displayCount := len(sortedSources)
+		displayCount := len(sortedBackends)
 		if tp.maxSources > 0 && displayCount > tp.maxSources {
 			displayCount = tp.maxSources
 		}
 
 		for i := 0; i < displayCount; i++ {
-			entry := sortedSources[i]
-			fmt.Printf(" %-18s | %12s | %12s | %12s\n",
-				entry.addr,
-				formatBytes(entry.stats.rxBytes),
-				formatBytes(entry.stats.txBytes),
+			entry := sortedBackends[i]
+			fmt.Printf(" %-18s | %12s | %12s | %12s | %12s | %12s\n",
+				entry.label,
+				formatBytes(entry.stats.downstreamRxBytes),
+				formatBytes(entry.stats.downstreamTxBytes),
+				formatBytes(entry.stats.upstreamRxBytes),
+				formatBytes(entry.stats.upstreamTxBytes),
 				formatBytes(entry.total))
 		}
 
-		if tp.maxSources > 0 && len(sortedSources) > tp.maxSources {
-			fmt.Printf(" ... and %d more sources\n", len(sortedSources)-tp.maxSources)
+		if tp.maxSources > 0 && len(sortedBackends) > tp.maxSources {
+			fmt.Printf(" ... and %d more backends\n", len(sortedBackends)-tp.maxSources)
 		}
 	}
 

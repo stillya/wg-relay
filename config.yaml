@@ -28,5 +28,9 @@ proxy:
     - "eth0"
   forward: # Forward proxy configuration (forward mode)
     backends:
-      - ip: "192.168.200.2"   # Backend 1
+      - name: "wg-gateway-1"  # Optional: backend name for metrics (defaults to index)
+        ip: "192.168.200.2"   # Backend 1
         port: 51820           # Optional: port (defaults to wg_port)
+      - name: "wg-gateway-2"  # Named backend for low-cardinality metrics
+        ip: "192.168.200.3"   # Backend 2
+        port: 51820

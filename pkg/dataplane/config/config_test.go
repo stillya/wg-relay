@@ -1,6 +1,8 @@
 package config
 
 import (
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 )
@@ -176,5 +178,64 @@ func TestInstrumentationConfig_Combined(t *testing.T) {
 				}
 			}
 		})
+	}
+}
+
+func TestBackendServer_NameField(t *testing.T) {
+	namedCfg := &ProxyConfig{
+		Mode:       "forward",
+		Interfaces: []string{"eth0"},
+		Forward:    ForwardConfig{Backends: []BackendServer{{Name: "backend-1", IP: "10.0.0.1", Port: 51820}}},
+	}
+	if err := namedCfg.validate("forward"); err != nil {
+		t.Errorf("named backend: unexpected error: %v", err)
+	}
+
+	unnamedCfg := &ProxyConfig{
+		Mode:       "forward",
+		Interfaces: []string{"eth0"},
+		Forward:    ForwardConfig{Backends: []BackendServer{{IP: "10.0.0.2", Port: 51820}}},
+	}
+	if err := unnamedCfg.validate("forward"); err != nil {
+		t.Errorf("unnamed backend: unexpected error: %v", err)
+	}
+}
+
+func TestLoad_BackendNames(t *testing.T) {
+	namedYAML := `
+daemon:
+  listen: ":8080"
+proxy:
+  enabled: true
+  mode: forward
+  wg_port: 51820
+  interfaces:
+    - eth0
+  forward:
+    backends:
+      - name: backend-1
+        ip: 10.0.0.1
+        port: 51820
+      - ip: 10.0.0.2
+        port: 51821
+`
+	tmpDir := t.TempDir()
+	configPath := filepath.Join(tmpDir, "config.yaml")
+	if err := os.WriteFile(configPath, []byte(namedYAML), 0600); err != nil {
+		t.Fatalf("failed to write test config: %v", err)
+	}
+
+	cfg, err := Load(configPath)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(cfg.Proxy.Forward.Backends) != 2 {
+		t.Fatalf("expected 2 backends, got %d", len(cfg.Proxy.Forward.Backends))
+	}
+	if cfg.Proxy.Forward.Backends[0].Name != "backend-1" {
+		t.Errorf("expected backend name 'backend-1', got %q", cfg.Proxy.Forward.Backends[0].Name)
+	}
+	if cfg.Proxy.Forward.Backends[1].Name != "" {
+		t.Errorf("expected empty backend name, got %q", cfg.Proxy.Forward.Backends[1].Name)
 	}
 }

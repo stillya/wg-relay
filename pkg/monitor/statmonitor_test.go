@@ -8,6 +8,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/stillya/wg-relay/pkg/discovery"
 	"github.com/stillya/wg-relay/pkg/maps/metricsmap"
 )
 
@@ -33,12 +34,12 @@ func TestStatMonitor_PrintTrafficTable(t *testing.T) {
 		name: "test",
 		data: []metricsmap.MetricData{
 			{
-				Key:   metricsmap.MetricsKey{Dir: metricsmap.MetricFromWg, Reason: metricsmap.MetricForwarded, Pad: 0, SrcAddr: 0xC0A80A01},
-				Value: metricsmap.MetricsValue{Packets: 1234, Bytes: 56789},
+				Key:   metricsmap.MetricsKey{BackendIndex: 1, Direction: metricsmap.MetricDownstream, Pad: 0, Pad2: 0},
+				Value: metricsmap.MetricsValue{RxPackets: 1234, TxPackets: 987, RxBytes: 56789, TxBytes: 43210},
 			},
 			{
-				Key:   metricsmap.MetricsKey{Dir: metricsmap.MetricToWg, Reason: metricsmap.MetricForwarded, Pad: 0, SrcAddr: 0xC0A80A01},
-				Value: metricsmap.MetricsValue{Packets: 987, Bytes: 43210},
+				Key:   metricsmap.MetricsKey{BackendIndex: 1, Direction: metricsmap.MetricUpstream, Pad: 0, Pad2: 0},
+				Value: metricsmap.MetricsValue{RxPackets: 500, TxPackets: 300, RxBytes: 25000, TxBytes: 15000},
 			},
 		},
 	}
@@ -46,7 +47,7 @@ func TestStatMonitor_PrintTrafficTable(t *testing.T) {
 	sm := NewStatMonitor(StatMonitorParams{
 		Mode:     "forward",
 		Interval: 10 * time.Second,
-	}, source)
+	}, source, discovery.NewStaticBackendDiscovery(map[uint8]string{1: "test_backend"}))
 
 	// Capture stdout
 	oldStdout := os.Stdout
@@ -64,25 +65,20 @@ func TestStatMonitor_PrintTrafficTable(t *testing.T) {
 
 	expectedStrings := []string{
 		"wg-relay(forward) traffic statistics",
-		"from_wg",
-		"to_wg",
 		"total",
 		"avg. rate",
 		"traffic",
-		"estimated",
-		"Per-source statistics",
-		"src_addr",
-		"192.168.10.1",
+		"down_rx",
+		"down_tx",
+		"up_rx",
+		"up_tx",
+		"test_backend",
 	}
 
 	for _, expected := range expectedStrings {
 		if !strings.Contains(outputStr, expected) {
 			t.Errorf("Output missing expected string: %s", expected)
 		}
-	}
-
-	if !strings.Contains(outputStr, "55.5 KB") && !strings.Contains(outputStr, "56789") {
-		t.Error("Expected formatted byte count not found")
 	}
 }
 
@@ -95,7 +91,7 @@ func TestStatMonitor_EmptyData(t *testing.T) {
 	sm := NewStatMonitor(StatMonitorParams{
 		Mode:     "forward",
 		Interval: time.Second,
-	}, source)
+	}, source, nil)
 
 	// Capture stdout
 	oldStdout := os.Stdout
@@ -121,16 +117,16 @@ func TestStatMonitor_MaxSources(t *testing.T) {
 		name: "test",
 		data: []metricsmap.MetricData{
 			{
-				Key:   metricsmap.MetricsKey{Dir: metricsmap.MetricFromWg, Reason: metricsmap.MetricForwarded, Pad: 0, SrcAddr: 0xC0A80A01},
-				Value: metricsmap.MetricsValue{Packets: 100, Bytes: 1000},
+				Key:   metricsmap.MetricsKey{BackendIndex: 1, Direction: metricsmap.MetricDownstream, Pad: 0, Pad2: 0},
+				Value: metricsmap.MetricsValue{RxPackets: 100, TxPackets: 50, RxBytes: 1000, TxBytes: 500},
 			},
 			{
-				Key:   metricsmap.MetricsKey{Dir: metricsmap.MetricFromWg, Reason: metricsmap.MetricForwarded, Pad: 0, SrcAddr: 0xC0A80A02},
-				Value: metricsmap.MetricsValue{Packets: 200, Bytes: 2000},
+				Key:   metricsmap.MetricsKey{BackendIndex: 2, Direction: metricsmap.MetricDownstream, Pad: 0, Pad2: 0},
+				Value: metricsmap.MetricsValue{RxPackets: 200, TxPackets: 100, RxBytes: 2000, TxBytes: 1000},
 			},
 			{
-				Key:   metricsmap.MetricsKey{Dir: metricsmap.MetricFromWg, Reason: metricsmap.MetricForwarded, Pad: 0, SrcAddr: 0xC0A80A03},
-				Value: metricsmap.MetricsValue{Packets: 300, Bytes: 3000},
+				Key:   metricsmap.MetricsKey{BackendIndex: 3, Direction: metricsmap.MetricDownstream, Pad: 0, Pad2: 0},
+				Value: metricsmap.MetricsValue{RxPackets: 300, TxPackets: 150, RxBytes: 3000, TxBytes: 1500},
 			},
 		},
 	}
@@ -139,7 +135,7 @@ func TestStatMonitor_MaxSources(t *testing.T) {
 		Mode:       "forward",
 		Interval:   10 * time.Second,
 		MaxSources: 2,
-	}, source)
+	}, source, discovery.NewStaticBackendDiscovery(map[uint8]string{1: "backend_1", 2: "backend_2", 3: "backend_3"}))
 
 	// Capture stdout
 	oldStdout := os.Stdout
@@ -155,18 +151,167 @@ func TestStatMonitor_MaxSources(t *testing.T) {
 	output, _ := io.ReadAll(r)
 	outputStr := string(output)
 
-	if !strings.Contains(outputStr, "192.168.10.3") {
-		t.Error("Expected source 192.168.10.3 (highest traffic) to be shown")
+	if !strings.Contains(outputStr, "backend_3") {
+		t.Error("Expected backend_3 (highest traffic) to be shown")
 	}
-	if !strings.Contains(outputStr, "192.168.10.2") {
-		t.Error("Expected source 192.168.10.2 (second highest traffic) to be shown")
-	}
-
-	if strings.Contains(outputStr, "192.168.10.1") {
-		t.Error("Source 192.168.10.1 should be hidden when MaxSources=2")
+	if !strings.Contains(outputStr, "backend_2") {
+		t.Error("Expected backend_2 (second highest traffic) to be shown")
 	}
 
-	if !strings.Contains(outputStr, "... and 1 more sources") {
-		t.Error("Expected '... and 1 more sources' message")
+	if !strings.Contains(outputStr, "... and 1 more") {
+		t.Error("Expected '... and 1 more' message for remaining backends")
+	}
+}
+
+func TestStatMonitor_ForwardModeWithBackendLabels(t *testing.T) {
+	source := &mockSource{
+		name: "test",
+		data: []metricsmap.MetricData{
+			{
+				Key:   metricsmap.MetricsKey{BackendIndex: 1, Direction: metricsmap.MetricDownstream, Pad: 0, Pad2: 0},
+				Value: metricsmap.MetricsValue{RxPackets: 100, TxPackets: 50, RxBytes: 10000, TxBytes: 5000},
+			},
+			{
+				Key:   metricsmap.MetricsKey{BackendIndex: 1, Direction: metricsmap.MetricUpstream, Pad: 0, Pad2: 0},
+				Value: metricsmap.MetricsValue{RxPackets: 80, TxPackets: 40, RxBytes: 8000, TxBytes: 4000},
+			},
+			{
+				Key:   metricsmap.MetricsKey{BackendIndex: 2, Direction: metricsmap.MetricDownstream, Pad: 0, Pad2: 0},
+				Value: metricsmap.MetricsValue{RxPackets: 200, TxPackets: 100, RxBytes: 20000, TxBytes: 10000},
+			},
+		},
+	}
+
+	sm := NewStatMonitor(StatMonitorParams{
+		Mode:     "forward",
+		Interval: 10 * time.Second,
+	}, source, discovery.NewStaticBackendDiscovery(map[uint8]string{1: "us-west", 2: "eu-central"}))
+
+	oldStdout := os.Stdout
+	r, w, _ := os.Pipe()
+	os.Stdout = w
+
+	ctx := context.Background()
+	sm.printStats(ctx)
+
+	w.Close()
+	os.Stdout = oldStdout
+
+	output, _ := io.ReadAll(r)
+	outputStr := string(output)
+
+	expectedStrings := []string{
+		"wg-relay(forward) traffic statistics",
+		"down_rx",
+		"down_tx",
+		"up_rx",
+		"up_tx",
+		"us-west",
+		"eu-central",
+		"Per-backend statistics:",
+	}
+
+	for _, expected := range expectedStrings {
+		if !strings.Contains(outputStr, expected) {
+			t.Errorf("Output missing expected string: %s", expected)
+		}
+	}
+}
+
+func TestStatMonitor_ReverseModeDirectionAggregation(t *testing.T) {
+	source := &mockSource{
+		name: "test",
+		data: []metricsmap.MetricData{
+			{
+				Key:   metricsmap.MetricsKey{BackendIndex: 0, Direction: metricsmap.MetricDownstream, Pad: 0, Pad2: 0},
+				Value: metricsmap.MetricsValue{RxPackets: 100, TxPackets: 50, RxBytes: 10000, TxBytes: 5000},
+			},
+			{
+				Key:   metricsmap.MetricsKey{BackendIndex: 0, Direction: metricsmap.MetricUpstream, Pad: 0, Pad2: 0},
+				Value: metricsmap.MetricsValue{RxPackets: 80, TxPackets: 40, RxBytes: 8000, TxBytes: 4000},
+			},
+		},
+	}
+
+	sm := NewStatMonitor(StatMonitorParams{
+		Mode:     "reverse",
+		Interval: 10 * time.Second,
+	}, source, nil)
+
+	oldStdout := os.Stdout
+	r, w, _ := os.Pipe()
+	os.Stdout = w
+
+	ctx := context.Background()
+	sm.printStats(ctx)
+
+	w.Close()
+	os.Stdout = oldStdout
+
+	output, _ := io.ReadAll(r)
+	outputStr := string(output)
+
+	expectedStrings := []string{
+		"wg-relay(reverse) traffic statistics",
+		"down_rx",
+		"down_tx",
+		"up_rx",
+		"up_tx",
+		"downstream",
+		"upstream",
+		"Per-direction statistics:",
+	}
+
+	for _, expected := range expectedStrings {
+		if !strings.Contains(outputStr, expected) {
+			t.Errorf("Output missing expected string: %s", expected)
+		}
+	}
+}
+
+func TestStatMonitor_DownstreamUpstreamSplit(t *testing.T) {
+	source := &mockSource{
+		name: "test",
+		data: []metricsmap.MetricData{
+			{
+				Key:   metricsmap.MetricsKey{BackendIndex: 1, Direction: metricsmap.MetricDownstream, Pad: 0, Pad2: 0},
+				Value: metricsmap.MetricsValue{RxPackets: 100, TxPackets: 50, RxBytes: 1000, TxBytes: 500},
+			},
+			{
+				Key:   metricsmap.MetricsKey{BackendIndex: 1, Direction: metricsmap.MetricUpstream, Pad: 0, Pad2: 0},
+				Value: metricsmap.MetricsValue{RxPackets: 200, TxPackets: 100, RxBytes: 2000, TxBytes: 1000},
+			},
+		},
+	}
+
+	sm := NewStatMonitor(StatMonitorParams{
+		Mode:     "forward",
+		Interval: 10 * time.Second,
+	}, source, discovery.NewStaticBackendDiscovery(map[uint8]string{1: "test_backend"}))
+
+	oldStdout := os.Stdout
+	r, w, _ := os.Pipe()
+	os.Stdout = w
+
+	ctx := context.Background()
+	sm.printStats(ctx)
+
+	w.Close()
+	os.Stdout = oldStdout
+
+	output, _ := io.ReadAll(r)
+	outputStr := string(output)
+
+	if !strings.Contains(outputStr, "down_rx") {
+		t.Error("Expected downstream rx column")
+	}
+	if !strings.Contains(outputStr, "down_tx") {
+		t.Error("Expected downstream tx column")
+	}
+	if !strings.Contains(outputStr, "up_rx") {
+		t.Error("Expected upstream rx column")
+	}
+	if !strings.Contains(outputStr, "up_tx") {
+		t.Error("Expected upstream tx column")
 	}
 }

@@ -15,6 +15,11 @@ type StatMonitorSource interface {
 	Name() string
 }
 
+// BackendDiscovery provides backend label resolution.
+type BackendDiscovery interface {
+	Backends() map[uint8]string
+}
+
 // StatMonitor periodically collects and displays traffic statistics.
 type StatMonitor struct {
 	StatMonitorParams
@@ -33,13 +38,16 @@ type StatMonitorParams struct {
 }
 
 // NewStatMonitor creates a new StatMonitor with the given parameters.
-func NewStatMonitor(params StatMonitorParams, source StatMonitorSource) *StatMonitor {
+func NewStatMonitor(params StatMonitorParams, source StatMonitorSource, backends BackendDiscovery) *StatMonitor {
 	return &StatMonitor{
 		StatMonitorParams: params,
 		source:            source,
-		printer:           &TablePrinter{params.MaxSources},
-		stopCh:            make(chan struct{}),
-		startTime:         time.Now(),
+		printer: &TablePrinter{
+			maxSources: params.MaxSources,
+			backends:   backends,
+		},
+		stopCh:    make(chan struct{}),
+		startTime: time.Now(),
 	}
 }
 

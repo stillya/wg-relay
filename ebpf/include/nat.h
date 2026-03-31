@@ -22,7 +22,8 @@ struct connection_key {
 struct connection_value {
 	__u64 timestamp;
 	__u16 nat_port;
-	__u16 pad; // Padding for alignment
+	__u8 backend_index;
+	__u8 pad; // Padding for alignment
 };
 
 // Reverse lookup key for return traffic
@@ -45,7 +46,9 @@ static __always_inline __maybe_unused __u16 generate_nat_port() {
 
 	__u32 port = NAT_PORT_START;
 	if (counter) {
-		__sync_fetch_and_add(counter, 1);
+		__sync_fetch_and_add(
+			counter,
+			1); // Using return value of sync_add generates invalid usage of the XADD(https://github.com/llvm/llvm-project/issues/91888)
 		port = NAT_PORT_START + (*counter % NAT_PORT_RANGE);
 	} else {
 		__u32 initial = 1;
