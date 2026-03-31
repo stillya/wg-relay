@@ -147,6 +147,6 @@ Refactor the metrics system from high-cardinality src_addr labels to Envoy-style
 
 ### Task 10: Update documentation
 
-- [ ] update config.yaml with example backend names
-- [ ] update CLAUDE.md if metrics patterns changed
-- [ ] move this plan to docs/plans/completed/
+- [x] update config.yaml with example backend names
+- [x] update CLAUDE.md if metrics patterns changed
+- [x] move this plan to docs/plans/completed/

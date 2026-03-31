@@ -29,25 +29,28 @@ type WgForwardProxyConnectionKey struct {
 }
 
 type WgForwardProxyConnectionValue struct {
-	_         structs.HostLayout
-	Timestamp uint64
-	NatPort   uint16
-	Pad       uint16
-	_         [4]byte
+	_            structs.HostLayout
+	Timestamp    uint64
+	NatPort      uint16
+	BackendIndex uint8
+	Pad          uint8
+	_            [4]byte
 }
 
 type WgForwardProxyMetricsKey struct {
-	_       structs.HostLayout
-	Dir     uint8
-	Reason  uint8
-	Pad     uint16
-	SrcAddr uint32
+	_            structs.HostLayout
+	BackendIndex uint8
+	Direction    uint8
+	Pad          uint16
+	Pad2         uint32
 }
 
 type WgForwardProxyMetricsValue struct {
-	_       structs.HostLayout
-	Packets uint64
-	Bytes   uint64
+	_         structs.HostLayout
+	RxPackets uint64
+	TxPackets uint64
+	RxBytes   uint64
+	TxBytes   uint64
 }
 
 type WgForwardProxyNatKey struct {
