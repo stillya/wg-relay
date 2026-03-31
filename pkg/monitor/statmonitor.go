@@ -7,6 +7,7 @@ import (
 	log "log/slog"
 
 	"github.com/stillya/wg-relay/pkg/maps/metricsmap"
+	"github.com/stillya/wg-relay/pkg/metrics"
 )
 
 // StatMonitorSource defines the interface for collecting metrics data.
@@ -33,13 +34,13 @@ type StatMonitorParams struct {
 }
 
 // NewStatMonitor creates a new StatMonitor with the given parameters.
-func NewStatMonitor(params StatMonitorParams, source StatMonitorSource, backendLabels map[uint8]string) *StatMonitor {
+func NewStatMonitor(params StatMonitorParams, source StatMonitorSource, backends metrics.BackendDiscovery) *StatMonitor {
 	return &StatMonitor{
 		StatMonitorParams: params,
 		source:            source,
 		printer: &TablePrinter{
-			maxSources:    params.MaxSources,
-			backendLabels: backendLabels,
+			maxSources: params.MaxSources,
+			backends:   backends,
 		},
 		stopCh:    make(chan struct{}),
 		startTime: time.Now(),

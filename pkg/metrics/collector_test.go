@@ -48,8 +48,7 @@ func TestBpfCollector_Describe(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			source := &mockMetricSource{name: "test"}
-			backendLabels := map[uint8]string{0: "backend_0", 1: "backend_1"}
-			collector := NewBpfCollector(source, tc.mode, backendLabels)
+			collector := NewBpfCollector(source, tc.mode, NewStaticBackendDiscovery(map[uint8]string{0: "backend_0", 1: "backend_1"}))
 
 			ch := make(chan *prometheus.Desc, 10)
 			collector.Describe(ch)
@@ -214,7 +213,7 @@ func TestBpfCollector_Collect(t *testing.T) {
 				name: "test",
 				data: tc.metricsData,
 			}
-			collector := NewBpfCollector(source, tc.mode, tc.backendLabels)
+			collector := NewBpfCollector(source, tc.mode, NewStaticBackendDiscovery(tc.backendLabels))
 
 			ch := make(chan prometheus.Metric, 20)
 			collector.Collect(ch)
@@ -266,8 +265,7 @@ func TestBpfCollector_CollectWithError(t *testing.T) {
 		name: "test",
 		err:  context.DeadlineExceeded,
 	}
-	backendLabels := map[uint8]string{0: "backend_0"}
-	collector := NewBpfCollector(source, "forward", backendLabels)
+	collector := NewBpfCollector(source, "forward", NewStaticBackendDiscovery(map[uint8]string{0: "backend_0"}))
 
 	ch := make(chan prometheus.Metric, 10)
 	collector.Collect(ch)
@@ -302,8 +300,7 @@ func TestBpfCollector_BackendLabelFallback(t *testing.T) {
 		},
 	}
 
-	backendLabels := map[uint8]string{0: "backend_0", 1: "backend_1"}
-	collector := NewBpfCollector(source, "forward", backendLabels)
+	collector := NewBpfCollector(source, "forward", NewStaticBackendDiscovery(map[uint8]string{0: "backend_0", 1: "backend_1"}))
 
 	ch := make(chan prometheus.Metric, 10)
 	collector.Collect(ch)
@@ -351,8 +348,7 @@ func TestBpfCollector_MetricValues(t *testing.T) {
 		},
 	}
 
-	backendLabels := map[uint8]string{1: "backend_1"}
-	collector := NewBpfCollector(source, "forward", backendLabels)
+	collector := NewBpfCollector(source, "forward", NewStaticBackendDiscovery(map[uint8]string{1: "backend_1"}))
 
 	ch := make(chan prometheus.Metric, 10)
 	collector.Collect(ch)
@@ -385,5 +381,32 @@ func TestBpfCollector_MetricValues(t *testing.T) {
 
 	if count != 4 {
 		t.Errorf("Expected 4 metrics, got %d", count)
+	}
+}
+
+func TestStaticBackendDiscovery_BackendLabels(t *testing.T) {
+	labels := map[uint8]string{0: "wg-server-1", 1: "wg-server-2"}
+	d := NewStaticBackendDiscovery(labels)
+
+	got := d.BackendLabels()
+	if len(got) != 2 {
+		t.Fatalf("expected 2 labels, got %d", len(got))
+	}
+	if got[0] != "wg-server-1" {
+		t.Errorf("expected backend 0 = wg-server-1, got %s", got[0])
+	}
+	if got[1] != "wg-server-2" {
+		t.Errorf("expected backend 1 = wg-server-2, got %s", got[1])
+	}
+}
+
+func TestNewStaticBackendDiscovery_NilMap(t *testing.T) {
+	d := NewStaticBackendDiscovery(nil)
+	got := d.BackendLabels()
+	if got == nil {
+		t.Error("expected non-nil map, got nil")
+	}
+	if len(got) != 0 {
+		t.Errorf("expected empty map, got %d entries", len(got))
 	}
 }

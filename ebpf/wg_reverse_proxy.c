@@ -93,28 +93,28 @@ int wg_reverse_proxy(struct __sk_buff *skb) {
 
 	if (likely(is_from_wg)) {
 		// FROM_WG path: wg->proxy (upstream rx), proxy->client (downstream tx)
-		__u32 rx_len = skb->len;
-		update_metrics(0, METRIC_UPSTREAM, rx_len, true);
+		update_metrics(0, METRIC_UPSTREAM, skb->len, 1, METRIC_REASON_FORWARDED);
 
 		if (instr_obfuscate_tc(&ctx) < 0) {
 			DEBUG_PRINTK("Obfuscation failed, dropping packet");
+			update_metrics(0, METRIC_UPSTREAM, skb->len, 1, METRIC_REASON_DROPPED);
 			return TC_ACT_SHOT;
 		}
 
-		update_metrics(0, METRIC_DOWNSTREAM, skb->len, false);
+		update_metrics(0, METRIC_DOWNSTREAM, skb->len, 0, METRIC_REASON_FORWARDED);
 	}
 
 	if (unlikely(is_to_wg)) {
 		// TO_WG path: client->proxy (downstream rx), proxy->wg (upstream tx)
-		__u32 rx_len = skb->len;
-		update_metrics(0, METRIC_DOWNSTREAM, rx_len, true);
+		update_metrics(0, METRIC_DOWNSTREAM, skb->len, 1, METRIC_REASON_FORWARDED);
 
 		if (instr_deobfuscate_tc(&ctx) < 0) {
 			DEBUG_PRINTK("Deobfuscation failed, dropping packet");
+			update_metrics(0, METRIC_DOWNSTREAM, skb->len, 1, METRIC_REASON_DROPPED);
 			return TC_ACT_SHOT;
 		}
 
-		update_metrics(0, METRIC_UPSTREAM, skb->len, false);
+		update_metrics(0, METRIC_UPSTREAM, skb->len, 0, METRIC_REASON_FORWARDED);
 	}
 
 	return TC_ACT_OK;

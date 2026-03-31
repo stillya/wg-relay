@@ -209,13 +209,6 @@ Labels:
 
 - `backend`: Backend server name (forward mode only) - either the configured name from config or backend_<index> fallback
 
-Terminology:
-
-- Downstream: Client to proxy direction
-- Upstream: Proxy to backend/WireGuard direction
-- rx: Received by proxy
-- tx: Transmitted by proxy
-
 ## Development
 
 ### Devcontainer Setup

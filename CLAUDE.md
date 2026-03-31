@@ -71,7 +71,7 @@ Client → Obfuscator Proxy → WireGuard Server
 
 ### Metrics Architecture
 
-- **Envoy-Style Low Cardinality**: Metrics use backend labels instead of src_addr to prevent cardinality explosion
+- **Low Cardinality**: Metrics use backend labels instead of src_addr to prevent cardinality explosion
 - **Directional Split**: All metrics split into downstream (client to proxy) and upstream (proxy to backend/WireGuard)
 - **RX/TX Separation**: Each direction tracks received (rx) and transmitted (tx) separately
 - **Metric Naming**: Follow pattern `wg_relay_{mode}_{direction}_rq_{rx|tx}_{packets|bytes}_total`

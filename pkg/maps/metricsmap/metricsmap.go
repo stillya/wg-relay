@@ -14,11 +14,30 @@ const (
 	MetricUpstream   uint8 = 1
 )
 
+// Metric reason constants.
+const (
+	MetricReasonForwarded uint8 = 0
+	MetricReasonDropped   uint8 = 1
+)
+
+// Direction label constants.
+const (
+	DirectionLabelDownstream = "downstream"
+	DirectionLabelUpstream   = "upstream"
+)
+
+// Reason label constants.
+const (
+	ReasonLabelForwarded = "forwarded"
+	ReasonLabelDropped   = "dropped"
+)
+
 // MetricsKey represents the key structure for the BPF metrics map.
 type MetricsKey struct {
 	BackendIndex uint8
 	Direction    uint8
-	Pad          uint16
+	Reason       uint8
+	Pad          uint8
 	Pad2         uint32
 }
 
@@ -98,9 +117,21 @@ func (s *BPFMapSource) Collect(ctx context.Context) ([]MetricData, error) {
 func DirectionToString(direction uint8) string {
 	switch direction {
 	case MetricDownstream:
-		return "downstream"
+		return DirectionLabelDownstream
 	case MetricUpstream:
-		return "upstream"
+		return DirectionLabelUpstream
+	default:
+		return "unknown"
+	}
+}
+
+// ReasonToString converts a reason constant to its string representation.
+func ReasonToString(reason uint8) string {
+	switch reason {
+	case MetricReasonForwarded:
+		return ReasonLabelForwarded
+	case MetricReasonDropped:
+		return ReasonLabelDropped
 	default:
 		return "unknown"
 	}

@@ -114,14 +114,14 @@ func main() {
 	var bpfCollector *metrics.BpfCollector
 	var statsMonitor *monitor.StatMonitor
 
-	backendLabels := getBackendLabels(loader)
+	backends := metrics.NewStaticBackendDiscovery(buildBackendLabels(cfg.Proxy))
 
 	maps := dataplaneManager.Maps()
 	if maps != nil && maps.Metrics != nil {
 		metricsSource = metricsmap.NewBPFMapSource("wg-relay-metrics", maps.Metrics)
 
 		if cfg.Monitoring.Prometheus.Enabled {
-			bpfCollector = metrics.NewBpfCollector(metricsSource, cfg.Proxy.Mode, backendLabels)
+			bpfCollector = metrics.NewBpfCollector(metricsSource, cfg.Proxy.Mode, backends)
 			prometheus.MustRegister(bpfCollector)
 
 			// Start Prometheus HTTP server
@@ -147,7 +147,7 @@ func main() {
 				Interval:   cfg.Monitoring.Statistics.Interval,
 				Mode:       cfg.Proxy.Mode,
 				MaxSources: cfg.Monitoring.Statistics.MaxSources,
-			}, metricsSource, backendLabels)
+			}, metricsSource, backends)
 			go statsMonitor.Start(ctx)
 			defer statsMonitor.Stop()
 		}
@@ -177,9 +177,16 @@ func loadConfig(opts Opts) (*config.Config, error) {
 	return configData, nil
 }
 
-func getBackendLabels(loader dataplane.Loader) map[uint8]string {
-	if fwdLoader, ok := loader.(*proxy.ForwardLoader); ok {
-		return fwdLoader.BackendLabels()
+func buildBackendLabels(cfg config.ProxyConfig) map[uint8]string {
+	backends := cfg.GetBackends()
+	labels := make(map[uint8]string, len(backends))
+	for i, backend := range backends {
+		index := uint8(i) //nolint:gosec // index is controlled and bounded
+		if backend.Name != "" {
+			labels[index] = backend.Name
+		} else {
+			labels[index] = fmt.Sprintf("backend_%d", i)
+		}
 	}
-	return make(map[uint8]string)
+	return labels
 }

@@ -7,12 +7,13 @@ import (
 	"time"
 
 	"github.com/stillya/wg-relay/pkg/maps/metricsmap"
+	"github.com/stillya/wg-relay/pkg/metrics"
 )
 
 // TablePrinter formats and prints traffic statistics tables.
 type TablePrinter struct {
-	maxSources    int
-	backendLabels map[uint8]string
+	maxSources int
+	backends   metrics.BackendDiscovery
 }
 
 // PrintTrafficTable prints a formatted table of traffic statistics.
@@ -29,10 +30,15 @@ func (tp *TablePrinter) PrintTrafficTable(mode string, metricsData []metricsmap.
 	perBackendStats := make(map[string]*directionStats)
 	var totalDownstreamRx, totalDownstreamTx, totalUpstreamRx, totalUpstreamTx uint64
 
+	var backendLabels map[uint8]string
+	if tp.backends != nil {
+		backendLabels = tp.backends.BackendLabels()
+	}
+
 	for _, metric := range metricsData {
 		var backendKey string
 		if mode == "forward" {
-			if label, exists := tp.backendLabels[metric.Key.BackendIndex]; exists {
+			if label, exists := backendLabels[metric.Key.BackendIndex]; exists {
 				backendKey = label
 			} else {
 				backendKey = fmt.Sprintf("backend_%d", metric.Key.BackendIndex)

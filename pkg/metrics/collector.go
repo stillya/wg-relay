@@ -8,6 +8,29 @@ import (
 	"github.com/stillya/wg-relay/pkg/maps/metricsmap"
 )
 
+// BackendDiscovery provides backend label resolution.
+type BackendDiscovery interface {
+	BackendLabels() map[uint8]string
+}
+
+// StaticBackendDiscovery implements BackendDiscovery with a fixed labels map.
+type StaticBackendDiscovery struct {
+	labels map[uint8]string
+}
+
+// NewStaticBackendDiscovery creates a new StaticBackendDiscovery.
+func NewStaticBackendDiscovery(labels map[uint8]string) *StaticBackendDiscovery {
+	if labels == nil {
+		labels = make(map[uint8]string)
+	}
+	return &StaticBackendDiscovery{labels: labels}
+}
+
+// BackendLabels returns the fixed backend labels map.
+func (s *StaticBackendDiscovery) BackendLabels() map[uint8]string {
+	return s.labels
+}
+
 // MetricCollectorSource defines the interface for collecting metrics from BPF maps.
 type MetricCollectorSource interface {
 	Collect(ctx context.Context) ([]metricsmap.MetricData, error)
@@ -16,9 +39,9 @@ type MetricCollectorSource interface {
 
 // BpfCollector implements prometheus.Collector for BPF metrics.
 type BpfCollector struct {
-	source        MetricCollectorSource
-	mode          string
-	backendLabels map[uint8]string
+	source   MetricCollectorSource
+	mode     string
+	backends BackendDiscovery
 
 	forwardDownstreamRxPacketsDesc *prometheus.Desc
 	forwardDownstreamTxPacketsDesc *prometheus.Desc
@@ -39,112 +62,112 @@ type BpfCollector struct {
 	reverseUpstreamTxBytesDesc     *prometheus.Desc
 }
 
-// NewBpfCollector creates a new BpfCollector with the given source, mode, and backend labels.
-func NewBpfCollector(source MetricCollectorSource, mode string, backendLabels map[uint8]string) *BpfCollector {
-	if backendLabels == nil {
-		backendLabels = make(map[uint8]string)
+// NewBpfCollector creates a new BpfCollector with the given source, mode, and backend discovery.
+func NewBpfCollector(source MetricCollectorSource, mode string, backends BackendDiscovery) *BpfCollector {
+	if backends == nil {
+		backends = NewStaticBackendDiscovery(nil)
 	}
 
 	return &BpfCollector{
-		source:        source,
-		mode:          mode,
-		backendLabels: backendLabels,
+		source:   source,
+		mode:     mode,
+		backends: backends,
 
 		forwardDownstreamRxPacketsDesc: prometheus.NewDesc(
 			"wg_relay_forward_downstream_rq_rx_packets_total",
 			"Total packets received on downstream (client to proxy) in forward mode",
-			[]string{"backend"},
+			[]string{"backend", "reason"},
 			nil,
 		),
 		forwardDownstreamTxPacketsDesc: prometheus.NewDesc(
 			"wg_relay_forward_downstream_rq_tx_packets_total",
 			"Total packets transmitted on downstream (proxy to client) in forward mode",
-			[]string{"backend"},
+			[]string{"backend", "reason"},
 			nil,
 		),
 		forwardDownstreamRxBytesDesc: prometheus.NewDesc(
 			"wg_relay_forward_downstream_rq_rx_bytes_total",
 			"Total bytes received on downstream (client to proxy) in forward mode",
-			[]string{"backend"},
+			[]string{"backend", "reason"},
 			nil,
 		),
 		forwardDownstreamTxBytesDesc: prometheus.NewDesc(
 			"wg_relay_forward_downstream_rq_tx_bytes_total",
 			"Total bytes transmitted on downstream (proxy to client) in forward mode",
-			[]string{"backend"},
+			[]string{"backend", "reason"},
 			nil,
 		),
 		forwardUpstreamRxPacketsDesc: prometheus.NewDesc(
 			"wg_relay_forward_upstream_rq_rx_packets_total",
 			"Total packets received on upstream (backend to proxy) in forward mode",
-			[]string{"backend"},
+			[]string{"backend", "reason"},
 			nil,
 		),
 		forwardUpstreamTxPacketsDesc: prometheus.NewDesc(
 			"wg_relay_forward_upstream_rq_tx_packets_total",
 			"Total packets transmitted on upstream (proxy to backend) in forward mode",
-			[]string{"backend"},
+			[]string{"backend", "reason"},
 			nil,
 		),
 		forwardUpstreamRxBytesDesc: prometheus.NewDesc(
 			"wg_relay_forward_upstream_rq_rx_bytes_total",
 			"Total bytes received on upstream (backend to proxy) in forward mode",
-			[]string{"backend"},
+			[]string{"backend", "reason"},
 			nil,
 		),
 		forwardUpstreamTxBytesDesc: prometheus.NewDesc(
 			"wg_relay_forward_upstream_rq_tx_bytes_total",
 			"Total bytes transmitted on upstream (proxy to backend) in forward mode",
-			[]string{"backend"},
+			[]string{"backend", "reason"},
 			nil,
 		),
 
 		reverseDownstreamRxPacketsDesc: prometheus.NewDesc(
 			"wg_relay_reverse_downstream_rq_rx_packets_total",
 			"Total packets received on downstream (client to proxy) in reverse mode",
-			nil,
+			[]string{"reason"},
 			nil,
 		),
 		reverseDownstreamTxPacketsDesc: prometheus.NewDesc(
 			"wg_relay_reverse_downstream_rq_tx_packets_total",
 			"Total packets transmitted on downstream (proxy to client) in reverse mode",
-			nil,
+			[]string{"reason"},
 			nil,
 		),
 		reverseDownstreamRxBytesDesc: prometheus.NewDesc(
 			"wg_relay_reverse_downstream_rq_rx_bytes_total",
 			"Total bytes received on downstream (client to proxy) in reverse mode",
-			nil,
+			[]string{"reason"},
 			nil,
 		),
 		reverseDownstreamTxBytesDesc: prometheus.NewDesc(
 			"wg_relay_reverse_downstream_rq_tx_bytes_total",
 			"Total bytes transmitted on downstream (proxy to client) in reverse mode",
-			nil,
+			[]string{"reason"},
 			nil,
 		),
 		reverseUpstreamRxPacketsDesc: prometheus.NewDesc(
 			"wg_relay_reverse_upstream_rq_rx_packets_total",
 			"Total packets received on upstream (WireGuard to proxy) in reverse mode",
-			nil,
+			[]string{"reason"},
 			nil,
 		),
 		reverseUpstreamTxPacketsDesc: prometheus.NewDesc(
 			"wg_relay_reverse_upstream_rq_tx_packets_total",
 			"Total packets transmitted on upstream (proxy to WireGuard) in reverse mode",
-			nil,
+			[]string{"reason"},
 			nil,
 		),
 		reverseUpstreamRxBytesDesc: prometheus.NewDesc(
 			"wg_relay_reverse_upstream_rq_rx_bytes_total",
 			"Total bytes received on upstream (WireGuard to proxy) in reverse mode",
-			nil,
+			[]string{"reason"},
 			nil,
 		),
 		reverseUpstreamTxBytesDesc: prometheus.NewDesc(
 			"wg_relay_reverse_upstream_rq_tx_bytes_total",
 			"Total bytes transmitted on upstream (proxy to WireGuard) in reverse mode",
-			nil,
+			[]string{"reason"},
 			nil,
 		),
 	}
@@ -182,16 +205,20 @@ func (c *BpfCollector) Collect(ch chan<- prometheus.Metric) {
 		return
 	}
 
+	backendLabels := c.backends.BackendLabels()
+
 	for _, metric := range metricsData {
 		var rxPacketsDesc, txPacketsDesc, rxBytesDesc, txBytesDesc *prometheus.Desc
 		var labels []string
 
+		reasonLabel := metricsmap.ReasonToString(metric.Key.Reason)
+
 		if c.mode == "forward" {
-			backendLabel := c.backendLabels[metric.Key.BackendIndex]
+			backendLabel := backendLabels[metric.Key.BackendIndex]
 			if backendLabel == "" {
 				backendLabel = metricsmap.BackendIndexToString(metric.Key.BackendIndex)
 			}
-			labels = []string{backendLabel}
+			labels = []string{backendLabel, reasonLabel}
 
 			if metric.Key.Direction == metricsmap.MetricDownstream {
 				rxPacketsDesc = c.forwardDownstreamRxPacketsDesc
@@ -205,7 +232,7 @@ func (c *BpfCollector) Collect(ch chan<- prometheus.Metric) {
 				txBytesDesc = c.forwardUpstreamTxBytesDesc
 			}
 		} else {
-			labels = nil
+			labels = []string{reasonLabel}
 
 			if metric.Key.Direction == metricsmap.MetricDownstream {
 				rxPacketsDesc = c.reverseDownstreamRxPacketsDesc

@@ -14,10 +14,11 @@ import (
 )
 
 type WgForwardProxyBackendEntry struct {
-	_    structs.HostLayout
-	Ip   uint32
-	Port uint16
-	Pad  uint16
+	_     structs.HostLayout
+	Ip    uint32
+	Port  uint16
+	Index uint8
+	Pad   uint8
 }
 
 type WgForwardProxyConnectionKey struct {
@@ -41,7 +42,8 @@ type WgForwardProxyMetricsKey struct {
 	_            structs.HostLayout
 	BackendIndex uint8
 	Direction    uint8
-	Pad          uint16
+	Reason       uint8
+	Pad          uint8
 	Pad2         uint32
 }
 

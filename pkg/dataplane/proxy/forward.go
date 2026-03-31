@@ -20,10 +20,9 @@ import (
 
 // ForwardLoader manages XDP-based forward proxy
 type ForwardLoader struct {
-	cfg           config.ProxyConfig
-	objs          *wgebpf.WgForwardProxyObjects
-	links         []link.Link
-	backendLabels map[uint8]string // Map of backend index to label (name or index-based)
+	cfg   config.ProxyConfig
+	objs  *wgebpf.WgForwardProxyObjects
+	links []link.Link
 }
 
 // NewForwardLoader creates a new forward proxy loader
@@ -34,8 +33,6 @@ func NewForwardLoader() (*ForwardLoader, error) {
 // LoadAndAttach loads the eBPF program and attaches it to the configured interfaces.
 func (fp *ForwardLoader) LoadAndAttach(ctx context.Context, cfg config.ProxyConfig) error {
 	fp.cfg = cfg
-
-	fp.generateBackendLabels()
 
 	if err := fp.loadEBPF(); err != nil {
 		return errors.Wrap(err, "failed to load eBPF objects")
@@ -243,31 +240,4 @@ func (fp *ForwardLoader) Maps() *maps.Maps {
 	}
 
 	return mapsCollection
-}
-
-// generateBackendLabels creates labels for each backend based on configured name or index
-func (fp *ForwardLoader) generateBackendLabels() {
-	backends := fp.cfg.GetBackends()
-	fp.backendLabels = make(map[uint8]string, len(backends))
-
-	for i, backend := range backends {
-		index := uint8(i) //nolint:gosec // G304: index is controlled and bounded
-		if backend.Name != "" {
-			fp.backendLabels[index] = backend.Name
-		} else {
-			fp.backendLabels[index] = fmt.Sprintf("backend_%d", i)
-		}
-	}
-}
-
-// BackendLabels returns the mapping of backend indices to their labels
-func (fp *ForwardLoader) BackendLabels() map[uint8]string {
-	if fp.backendLabels == nil {
-		return make(map[uint8]string)
-	}
-	result := make(map[uint8]string, len(fp.backendLabels))
-	for k, v := range fp.backendLabels {
-		result[k] = v
-	}
-	return result
 }

@@ -17,7 +17,8 @@ type WgReverseProxyMetricsKey struct {
 	_            structs.HostLayout
 	BackendIndex uint8
 	Direction    uint8
-	Pad          uint16
+	Reason       uint8
+	Pad          uint8
 	Pad2         uint32
 }
 

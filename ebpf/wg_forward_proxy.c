@@ -39,8 +39,7 @@ struct {
 } nat_reverse_map SEC(".maps");
 
 // Create or lookup NAT connection for outgoing packets (client -> server)
-static __always_inline int create_nat_connection(struct wg_ctx *ctx,
-						 struct backend_entry *backend, __u8 *out_backend_index) {
+static __always_inline int create_nat_connection(struct wg_ctx *ctx, struct backend_entry *backend) {
 	struct connection_key conn_key = {
 		.client_ip = ctx->ip->saddr,
 		.client_port = ctx->src_port,
@@ -52,13 +51,11 @@ static __always_inline int create_nat_connection(struct wg_ctx *ctx,
 	if (backend_index < 0) {
 		return -1;
 	}
-	*out_backend_index = (__u8)backend_index;
 
 	// Check if connection already exists
 	struct connection_value *existing = bpf_map_lookup_elem(&connection_map, &conn_key);
 	if (existing) {
 		existing->timestamp = get_timestamp();
-		*out_backend_index = existing->backend_index;
 
 		// Populate backend struct from the existing connection's backend
 		__u32 idx = existing->backend_index;
@@ -68,63 +65,23 @@ static __always_inline int create_nat_connection(struct wg_ctx *ctx,
 		}
 		backend->ip = entry->ip;
 		backend->port = entry->port;
+		backend->index = existing->backend_index;
 
 		return 0;
 	}
 
-	// Try to allocate a NAT port, retrying up to MAX_NAT_RETRIES times on collision
-	__u16 nat_port = 0;
-	int retry;
-	#pragma unroll
-	for (retry = 0; retry < 8; retry++) {
-		nat_port = generate_nat_port();
-
-		// Check if this NAT port is already in use
-		struct nat_key check_key = {
-			.server_ip = bpf_htonl(backend->ip),
-			.nat_port = nat_port,
-		};
-
-		if (!bpf_map_lookup_elem(&nat_reverse_map, &check_key)) {
-			// Port is available
-			break;
-		}
-	}
-
-	// If all retries exhausted, fail to avoid port collision
-	if (retry >= 8) {
-		return -1;
-	}
+	__u16 nat_port = generate_nat_port();
 
 	struct connection_value conn_value = {
 		.timestamp = get_timestamp(),
 		.nat_port = nat_port,
-		.backend_index = (__u8)backend_index,
+		.backend_index = backend->index,
 	};
 
-	int ret = bpf_map_update_elem(&connection_map, &conn_key, &conn_value, BPF_NOEXIST);
-	if (ret == -EEXIST) {
-		existing = bpf_map_lookup_elem(&connection_map, &conn_key);
-		if (existing) {
-			existing->timestamp = get_timestamp();
-			*out_backend_index = existing->backend_index;
-
-			// Populate backend struct from the existing connection's backend
-			__u32 idx = existing->backend_index;
-			struct backend_entry *entry = bpf_map_lookup_elem(&backend_map, &idx);
-			if (!entry) {
-				return -1;
-			}
-			backend->ip = entry->ip;
-			backend->port = entry->port;
-
-			return 0;
-		}
-		return -1;
-	} else if (ret != 0) {
+	int ret = bpf_map_update_elem(&connection_map, &conn_key, &conn_value, BPF_ANY);
+	if (ret != 0) {
 		return -1;
 	}
-
 
 	struct nat_key nat_key = {
 		.server_ip = bpf_htonl(backend->ip),
@@ -302,14 +259,14 @@ int wg_forward_proxy(struct xdp_md *xdp_ctx) {
 		__u8 backend_index = conn_value->backend_index;
 
 		// FROM_WG path: backend->proxy (upstream rx), proxy->client (downstream tx)
-		update_metrics(backend_index, METRIC_UPSTREAM, pkt_len, true);
+		update_metrics(backend_index, METRIC_UPSTREAM, pkt_len, 1, METRIC_REASON_FORWARDED);
 
 		if (instr_deobfuscate_xdp(&ctx) < 0) {
 			DEBUG_PRINTK("Deobfuscation failed, dropping packet");
+			update_metrics(backend_index, METRIC_UPSTREAM, pkt_len, 1, METRIC_REASON_DROPPED);
 			return XDP_DROP;
 		}
 
-		// Recalculate packet length after deobfuscation
 		__u32 tx_pkt_len = (void *)(long)xdp_ctx->data_end - (void *)(long)xdp_ctx->data;
 
 		__u32 dst_addr = bpf_ntohl(ctx.ip->daddr);
@@ -317,14 +274,13 @@ int wg_forward_proxy(struct xdp_md *xdp_ctx) {
 		__u16 server_port = original_conn.server_port;
 		__u16 client_port = original_conn.client_port;
 
-		update_metrics(backend_index, METRIC_DOWNSTREAM, tx_pkt_len, false);
+		update_metrics(backend_index, METRIC_DOWNSTREAM, tx_pkt_len, 0, METRIC_REASON_FORWARDED);
 		return forward_packet(&ctx, dst_addr, server_port, client_ip, client_port);
 	}
 
 	if (unlikely(is_to_wg)) {
 		struct backend_entry backend = { 0 };
-		__u8 backend_index = 0;
-		if (create_nat_connection(&ctx, &backend, &backend_index) < 0) {
+		if (create_nat_connection(&ctx, &backend) < 0) {
 			DEBUG_PRINTK("Failed to create NAT connection for TO WG packet");
 			return XDP_PASS;
 		}
@@ -346,21 +302,21 @@ int wg_forward_proxy(struct xdp_md *xdp_ctx) {
 		}
 
 		// TO_WG path: client->proxy (downstream rx), proxy->backend (upstream tx)
-		update_metrics(backend_index, METRIC_DOWNSTREAM, pkt_len, true);
+		update_metrics(conn_value->backend_index, METRIC_DOWNSTREAM, pkt_len, 1, METRIC_REASON_FORWARDED);
 
 		if (instr_obfuscate_xdp(&ctx) < 0) {
 			DEBUG_PRINTK("Obfuscation failed, dropping packet");
+			update_metrics(conn_value->backend_index, METRIC_DOWNSTREAM, pkt_len, 1, METRIC_REASON_DROPPED);
 			return XDP_DROP;
 		}
 
-		// Recalculate packet length after obfuscation
 		__u32 tx_pkt_len = (void *)(long)xdp_ctx->data_end - (void *)(long)xdp_ctx->data;
 
 		__u32 proxy_ip = bpf_ntohl(ctx.ip->daddr);
 		__u32 server_ip = backend.ip; // already in host byte order
 		__u16 target_port = backend.port > 0 ? backend.port : CONFIG(wg_port);
 
-		update_metrics(backend_index, METRIC_UPSTREAM, tx_pkt_len, false);
+		update_metrics(conn_value->backend_index, METRIC_UPSTREAM, tx_pkt_len, 0, METRIC_REASON_FORWARDED);
 		return forward_packet(&ctx, proxy_ip, conn_value->nat_port, server_ip, target_port);
 	}
 
