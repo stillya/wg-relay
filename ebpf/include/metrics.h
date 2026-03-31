@@ -56,7 +56,20 @@ static __always_inline __maybe_unused void update_metrics(__u8 backend_index, __
 			new_value.tx_packets = 1;
 			new_value.tx_bytes = bytes;
 		}
-		bpf_map_update_elem(&metrics_map, &key, &new_value, BPF_NOEXIST);
+		int ret = bpf_map_update_elem(&metrics_map, &key, &new_value, BPF_NOEXIST);
+		if (ret == -EEXIST) {
+			// Race condition: another packet created the entry, retry update
+			value = bpf_map_lookup_elem(&metrics_map, &key);
+			if (value) {
+				if (is_rx) {
+					value->rx_packets += 1;
+					value->rx_bytes += bytes;
+				} else {
+					value->tx_packets += 1;
+					value->tx_bytes += bytes;
+				}
+			}
+		}
 	}
 }
 

@@ -59,10 +59,39 @@ static __always_inline int create_nat_connection(struct wg_ctx *ctx,
 	if (existing) {
 		existing->timestamp = get_timestamp();
 		*out_backend_index = existing->backend_index;
+
+		// Populate backend struct from the existing connection's backend
+		__u32 idx = existing->backend_index;
+		struct backend_entry *entry = bpf_map_lookup_elem(&backend_map, &idx);
+		if (!entry) {
+			return -1;
+		}
+		backend->ip = entry->ip;
+		backend->port = entry->port;
+
 		return 0;
 	}
 
-	__u16 nat_port = generate_nat_port();
+	// Try to allocate a NAT port, retrying up to MAX_NAT_RETRIES times on collision
+	__u16 nat_port = 0;
+	int retry;
+	#pragma unroll
+	for (retry = 0; retry < 8; retry++) {
+		nat_port = generate_nat_port();
+
+		// Check if this NAT port is already in use
+		struct nat_key check_key = {
+			.server_ip = bpf_htonl(backend->ip),
+			.nat_port = nat_port,
+		};
+
+		if (!bpf_map_lookup_elem(&nat_reverse_map, &check_key)) {
+			// Port is available
+			break;
+		}
+	}
+
+	// If all retries exhausted, the last port will be used (may overwrite)
 
 	struct connection_value conn_value = {
 		.timestamp = get_timestamp(),
@@ -75,6 +104,17 @@ static __always_inline int create_nat_connection(struct wg_ctx *ctx,
 		existing = bpf_map_lookup_elem(&connection_map, &conn_key);
 		if (existing) {
 			existing->timestamp = get_timestamp();
+			*out_backend_index = existing->backend_index;
+
+			// Populate backend struct from the existing connection's backend
+			__u32 idx = existing->backend_index;
+			struct backend_entry *entry = bpf_map_lookup_elem(&backend_map, &idx);
+			if (!entry) {
+				return -1;
+			}
+			backend->ip = entry->ip;
+			backend->port = entry->port;
+
 			return 0;
 		}
 		return -1;
