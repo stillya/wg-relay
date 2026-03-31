@@ -86,6 +86,24 @@ func TestPaddingConfig_Validation(t *testing.T) {
 			wantErr: "",
 		},
 		{
+			name: "padding size one below link MTU is valid boundary",
+			padding: &PaddingConfig{
+				Enabled: true,
+				Size:    254,
+				LinkMTU: 255,
+			},
+			wantErr: "",
+		},
+		{
+			name: "padding size equal to link MTU boundary is invalid",
+			padding: &PaddingConfig{
+				Enabled: true,
+				Size:    255,
+				LinkMTU: 255,
+			},
+			wantErr: "padding size 255 must be less than link MTU 255",
+		},
+		{
 			name: "link MTU zero skips MTU validation",
 			padding: &PaddingConfig{
 				Enabled: true,

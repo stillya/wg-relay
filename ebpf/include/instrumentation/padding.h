@@ -18,12 +18,17 @@ static __always_inline __maybe_unused int padding_obfuscate_xdp(struct wg_ctx *c
 	}
 
 	__u8 cfg_padding_size = CONFIG(padding_size);
+	if (cfg_padding_size == 0) {
+		return INSTR_OK;
+	}
 
 	void *data = (void *)(long)ctx->xdp->data;
 	void *data_end = (void *)(long)ctx->xdp->data_end;
 	__u64 current_len = (data_end - data);
 	__u16 cfg_link_mtu = CONFIG(link_mtu);
-	if (cfg_link_mtu > 0 && current_len + cfg_padding_size > cfg_link_mtu) {
+	// current_len includes the L2 Ethernet header; subtract it before comparing to the IP-layer MTU.
+	if (cfg_link_mtu > 0 && current_len > ETH_HLEN &&
+	    (current_len - ETH_HLEN) + (__u64)cfg_padding_size > cfg_link_mtu) {
 		return INSTR_ERROR;
 	}
 
@@ -112,7 +117,10 @@ static __always_inline __maybe_unused int padding_obfuscate_tc(struct wg_ctx *ct
 
 	__u32 current_len = ctx->skb->len;
 	__u16 cfg_link_mtu = CONFIG(link_mtu);
-	if (cfg_link_mtu > 0 && current_len + cfg_padding_size > cfg_link_mtu) {
+	// current_len includes the L2 Ethernet header; subtract it before comparing to the IP-layer MTU.
+	// Cast to __u64 to prevent __u32 overflow before comparison.
+	if (cfg_link_mtu > 0 && current_len > ETH_HLEN &&
+	    ((__u64)current_len - ETH_HLEN) + cfg_padding_size > cfg_link_mtu) {
 		return INSTR_ERROR;
 	}
 

@@ -83,6 +83,13 @@ func TestDetectMinMTU(t *testing.T) {
 		}
 	})
 
+	t.Run("empty slice returns error", func(t *testing.T) {
+		_, err := DetectMinMTU([]string{})
+		if err == nil {
+			t.Error("expected error for empty slice, got nil")
+		}
+	})
+
 	t.Run("nonexistent interface returns error", func(t *testing.T) {
 		_, err := DetectMinMTU([]string{"nonexistent_iface_xyz"})
 		if err == nil {
@@ -108,7 +115,7 @@ func TestDetectMinMTU(t *testing.T) {
 		}
 	})
 
-	t.Run("minimum is selected across interfaces", func(t *testing.T) {
+	t.Run("duplicate interface returns consistent result", func(t *testing.T) {
 		// Use loopback twice - result should equal its own MTU
 		loName := "lo"
 		if _, err := net.InterfaceByName("lo"); err != nil {

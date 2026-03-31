@@ -574,7 +574,8 @@ func TestPaddingObfuscateMTUExceededDrop(t *testing.T) {
 		t.Fatalf("Failed to set wg_port: %v", err)
 	}
 	// Set MTU small enough that adding 64 bytes of padding would exceed it.
-	// A WG packet is 74 bytes; 74 + 64 = 138 > 100.
+	// A WG packet is 74 bytes total (14 Eth + 60 IP/UDP/payload).
+	// The MTU check compares IP-layer size: (74 - 14) + 64 = 110 > 100.
 	if err := spec.Variables["__cfg_link_mtu"].Set(uint16(100)); err != nil {
 		t.Fatalf("Failed to set link_mtu: %v", err)
 	}
