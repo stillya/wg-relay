@@ -7,13 +7,17 @@ import (
 	log "log/slog"
 
 	"github.com/stillya/wg-relay/pkg/maps/metricsmap"
-	"github.com/stillya/wg-relay/pkg/metrics"
 )
 
 // StatMonitorSource defines the interface for collecting metrics data.
 type StatMonitorSource interface {
 	Collect(ctx context.Context) ([]metricsmap.MetricData, error)
 	Name() string
+}
+
+// BackendDiscovery provides backend label resolution.
+type BackendDiscovery interface {
+	Backends() map[uint8]string
 }
 
 // StatMonitor periodically collects and displays traffic statistics.
@@ -34,7 +38,7 @@ type StatMonitorParams struct {
 }
 
 // NewStatMonitor creates a new StatMonitor with the given parameters.
-func NewStatMonitor(params StatMonitorParams, source StatMonitorSource, backends metrics.BackendDiscovery) *StatMonitor {
+func NewStatMonitor(params StatMonitorParams, source StatMonitorSource, backends BackendDiscovery) *StatMonitor {
 	return &StatMonitor{
 		StatMonitorParams: params,
 		source:            source,

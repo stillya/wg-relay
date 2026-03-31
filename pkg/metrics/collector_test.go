@@ -7,6 +7,7 @@ import (
 
 	"github.com/prometheus/client_golang/prometheus"
 	dto "github.com/prometheus/client_model/go"
+	"github.com/stillya/wg-relay/pkg/discovery"
 	"github.com/stillya/wg-relay/pkg/maps/metricsmap"
 )
 
@@ -48,7 +49,7 @@ func TestBpfCollector_Describe(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			source := &mockMetricSource{name: "test"}
-			collector := NewBpfCollector(source, tc.mode, NewStaticBackendDiscovery(map[uint8]string{0: "backend_0", 1: "backend_1"}))
+			collector := NewBpfCollector(source, tc.mode, discovery.NewStaticBackendDiscovery(map[uint8]string{0: "backend_0", 1: "backend_1"}))
 
 			ch := make(chan *prometheus.Desc, 10)
 			collector.Describe(ch)
@@ -213,7 +214,7 @@ func TestBpfCollector_Collect(t *testing.T) {
 				name: "test",
 				data: tc.metricsData,
 			}
-			collector := NewBpfCollector(source, tc.mode, NewStaticBackendDiscovery(tc.backendLabels))
+			collector := NewBpfCollector(source, tc.mode, discovery.NewStaticBackendDiscovery(tc.backendLabels))
 
 			ch := make(chan prometheus.Metric, 20)
 			collector.Collect(ch)
@@ -265,7 +266,7 @@ func TestBpfCollector_CollectWithError(t *testing.T) {
 		name: "test",
 		err:  context.DeadlineExceeded,
 	}
-	collector := NewBpfCollector(source, "forward", NewStaticBackendDiscovery(map[uint8]string{0: "backend_0"}))
+	collector := NewBpfCollector(source, "forward", discovery.NewStaticBackendDiscovery(map[uint8]string{0: "backend_0"}))
 
 	ch := make(chan prometheus.Metric, 10)
 	collector.Collect(ch)
@@ -300,7 +301,7 @@ func TestBpfCollector_BackendLabelFallback(t *testing.T) {
 		},
 	}
 
-	collector := NewBpfCollector(source, "forward", NewStaticBackendDiscovery(map[uint8]string{0: "backend_0", 1: "backend_1"}))
+	collector := NewBpfCollector(source, "forward", discovery.NewStaticBackendDiscovery(map[uint8]string{0: "backend_0", 1: "backend_1"}))
 
 	ch := make(chan prometheus.Metric, 10)
 	collector.Collect(ch)
@@ -348,7 +349,7 @@ func TestBpfCollector_MetricValues(t *testing.T) {
 		},
 	}
 
-	collector := NewBpfCollector(source, "forward", NewStaticBackendDiscovery(map[uint8]string{1: "backend_1"}))
+	collector := NewBpfCollector(source, "forward", discovery.NewStaticBackendDiscovery(map[uint8]string{1: "backend_1"}))
 
 	ch := make(chan prometheus.Metric, 10)
 	collector.Collect(ch)
@@ -386,9 +387,9 @@ func TestBpfCollector_MetricValues(t *testing.T) {
 
 func TestStaticBackendDiscovery_BackendLabels(t *testing.T) {
 	labels := map[uint8]string{0: "wg-server-1", 1: "wg-server-2"}
-	d := NewStaticBackendDiscovery(labels)
+	d := discovery.NewStaticBackendDiscovery(labels)
 
-	got := d.BackendLabels()
+	got := d.Backends()
 	if len(got) != 2 {
 		t.Fatalf("expected 2 labels, got %d", len(got))
 	}
@@ -401,8 +402,8 @@ func TestStaticBackendDiscovery_BackendLabels(t *testing.T) {
 }
 
 func TestNewStaticBackendDiscovery_NilMap(t *testing.T) {
-	d := NewStaticBackendDiscovery(nil)
-	got := d.BackendLabels()
+	d := discovery.NewStaticBackendDiscovery(nil)
+	got := d.Backends()
 	if got == nil {
 		t.Error("expected non-nil map, got nil")
 	}

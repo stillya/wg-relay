@@ -19,6 +19,7 @@ import (
 	"github.com/stillya/wg-relay/pkg/metrics"
 
 	"github.com/stillya/wg-relay/pkg/dataplane"
+	"github.com/stillya/wg-relay/pkg/discovery"
 	"github.com/stillya/wg-relay/pkg/maps/metricsmap"
 	"github.com/stillya/wg-relay/pkg/monitor"
 )
@@ -114,7 +115,7 @@ func main() {
 	var bpfCollector *metrics.BpfCollector
 	var statsMonitor *monitor.StatMonitor
 
-	backends := metrics.NewStaticBackendDiscovery(buildBackendLabels(cfg.Proxy))
+	backends := discovery.NewStaticBackendDiscovery(buildBackendLabels(&cfg.Proxy))
 
 	maps := dataplaneManager.Maps()
 	if maps != nil && maps.Metrics != nil {
@@ -177,7 +178,7 @@ func loadConfig(opts Opts) (*config.Config, error) {
 	return configData, nil
 }
 
-func buildBackendLabels(cfg config.ProxyConfig) map[uint8]string {
+func buildBackendLabels(cfg *config.ProxyConfig) map[uint8]string {
 	backends := cfg.GetBackends()
 	labels := make(map[uint8]string, len(backends))
 	for i, backend := range backends {

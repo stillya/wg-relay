@@ -10,25 +10,7 @@ import (
 
 // BackendDiscovery provides backend label resolution.
 type BackendDiscovery interface {
-	BackendLabels() map[uint8]string
-}
-
-// StaticBackendDiscovery implements BackendDiscovery with a fixed labels map.
-type StaticBackendDiscovery struct {
-	labels map[uint8]string
-}
-
-// NewStaticBackendDiscovery creates a new StaticBackendDiscovery.
-func NewStaticBackendDiscovery(labels map[uint8]string) *StaticBackendDiscovery {
-	if labels == nil {
-		labels = make(map[uint8]string)
-	}
-	return &StaticBackendDiscovery{labels: labels}
-}
-
-// BackendLabels returns the fixed backend labels map.
-func (s *StaticBackendDiscovery) BackendLabels() map[uint8]string {
-	return s.labels
+	Backends() map[uint8]string
 }
 
 // MetricCollectorSource defines the interface for collecting metrics from BPF maps.
@@ -64,9 +46,6 @@ type BpfCollector struct {
 
 // NewBpfCollector creates a new BpfCollector with the given source, mode, and backend discovery.
 func NewBpfCollector(source MetricCollectorSource, mode string, backends BackendDiscovery) *BpfCollector {
-	if backends == nil {
-		backends = NewStaticBackendDiscovery(nil)
-	}
 
 	return &BpfCollector{
 		source:   source,
@@ -205,7 +184,7 @@ func (c *BpfCollector) Collect(ch chan<- prometheus.Metric) {
 		return
 	}
 
-	backendLabels := c.backends.BackendLabels()
+	backendLabels := c.backends.Backends()
 
 	for _, metric := range metricsData {
 		var rxPacketsDesc, txPacketsDesc, rxBytesDesc, txBytesDesc *prometheus.Desc

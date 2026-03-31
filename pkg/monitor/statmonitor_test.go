@@ -8,8 +8,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/stillya/wg-relay/pkg/discovery"
 	"github.com/stillya/wg-relay/pkg/maps/metricsmap"
-	"github.com/stillya/wg-relay/pkg/metrics"
 )
 
 type mockSource struct {
@@ -47,7 +47,7 @@ func TestStatMonitor_PrintTrafficTable(t *testing.T) {
 	sm := NewStatMonitor(StatMonitorParams{
 		Mode:     "forward",
 		Interval: 10 * time.Second,
-	}, source, metrics.NewStaticBackendDiscovery(map[uint8]string{1: "test_backend"}))
+	}, source, discovery.NewStaticBackendDiscovery(map[uint8]string{1: "test_backend"}))
 
 	// Capture stdout
 	oldStdout := os.Stdout
@@ -135,7 +135,7 @@ func TestStatMonitor_MaxSources(t *testing.T) {
 		Mode:       "forward",
 		Interval:   10 * time.Second,
 		MaxSources: 2,
-	}, source, metrics.NewStaticBackendDiscovery(map[uint8]string{1: "backend_1", 2: "backend_2", 3: "backend_3"}))
+	}, source, discovery.NewStaticBackendDiscovery(map[uint8]string{1: "backend_1", 2: "backend_2", 3: "backend_3"}))
 
 	// Capture stdout
 	oldStdout := os.Stdout
@@ -185,7 +185,7 @@ func TestStatMonitor_ForwardModeWithBackendLabels(t *testing.T) {
 	sm := NewStatMonitor(StatMonitorParams{
 		Mode:     "forward",
 		Interval: 10 * time.Second,
-	}, source, metrics.NewStaticBackendDiscovery(map[uint8]string{1: "us-west", 2: "eu-central"}))
+	}, source, discovery.NewStaticBackendDiscovery(map[uint8]string{1: "us-west", 2: "eu-central"}))
 
 	oldStdout := os.Stdout
 	r, w, _ := os.Pipe()
@@ -287,7 +287,7 @@ func TestStatMonitor_DownstreamUpstreamSplit(t *testing.T) {
 	sm := NewStatMonitor(StatMonitorParams{
 		Mode:     "forward",
 		Interval: 10 * time.Second,
-	}, source, metrics.NewStaticBackendDiscovery(map[uint8]string{1: "test_backend"}))
+	}, source, discovery.NewStaticBackendDiscovery(map[uint8]string{1: "test_backend"}))
 
 	oldStdout := os.Stdout
 	r, w, _ := os.Pipe()
