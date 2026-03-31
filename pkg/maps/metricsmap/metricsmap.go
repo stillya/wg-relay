@@ -8,6 +8,7 @@ import (
 	"github.com/pkg/errors"
 )
 
+// Metrics constants.
 const (
 	MetricDownstream         uint8 = 0
 	MetricUpstream           uint8 = 1
