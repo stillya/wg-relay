@@ -8,28 +8,15 @@ import (
 	"github.com/pkg/errors"
 )
 
-// Metric direction constants.
 const (
-	MetricDownstream uint8 = 0
-	MetricUpstream   uint8 = 1
-)
-
-// Metric reason constants.
-const (
-	MetricReasonForwarded uint8 = 0
-	MetricReasonDropped   uint8 = 1
-)
-
-// Direction label constants.
-const (
-	DirectionLabelDownstream = "downstream"
-	DirectionLabelUpstream   = "upstream"
-)
-
-// Reason label constants.
-const (
-	ReasonLabelForwarded = "forwarded"
-	ReasonLabelDropped   = "dropped"
+	MetricDownstream         uint8 = 0
+	MetricUpstream           uint8 = 1
+	MetricReasonForwarded    uint8 = 0
+	MetricReasonDropped      uint8 = 1
+	DirectionLabelDownstream       = "downstream"
+	DirectionLabelUpstream         = "upstream"
+	ReasonLabelForwarded           = "forwarded"
+	ReasonLabelDropped             = "dropped"
 )
 
 // MetricsKey represents the key structure for the BPF metrics map.
