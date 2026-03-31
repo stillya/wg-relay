@@ -84,5 +84,5 @@ Detect the MTU of each configured interface in Go, and pass the minimum MTU acro
 
 ### Task 5: Update documentation
 
-- [ ] Update CLAUDE.md if any new internal patterns were introduced (e.g., runtime-computed config fields)
-- [ ] Move this plan to `docs/plans/completed/`
+- [x] Update CLAUDE.md if any new internal patterns were introduced (e.g., runtime-computed config fields)
+- [x] Move this plan to `docs/plans/completed/`
