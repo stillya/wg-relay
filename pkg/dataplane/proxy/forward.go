@@ -68,7 +68,7 @@ func (fp *ForwardLoader) loadEBPF() error {
 		if err := fp.cfg.Instrumentations.Padding.ValidateMTU(); err != nil {
 			return errors.Wrap(err, "padding MTU validation failed")
 		}
-		log.Info("Detected minimum MTU for padding", "mtu", mtu)
+		log.Info("Detected minimum MTU", "mtu", mtu)
 	}
 
 	if err := bpf.Configure(spec, &fp.cfg); err != nil {
