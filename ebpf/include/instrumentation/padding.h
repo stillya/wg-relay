@@ -41,7 +41,7 @@ static __always_inline __maybe_unused int padding_obfuscate_xdp(struct wg_ctx *c
 		return INSTR_ERROR;
 	}
 
-	__u32 mrk_offset = (__u32)(pkt_len - 1);
+	__u16 mrk_offset = (__u16)(pkt_len - 1);
 
 	if (data + mrk_offset + 1 > data_end) {
 		return INSTR_ERROR;
@@ -66,7 +66,7 @@ static __always_inline __maybe_unused int padding_deobfuscate_xdp(struct wg_ctx 
 		return INSTR_ERROR;
 	}
 
-	__u32 mrk_offset = (__u32)(pkt_len - 1);
+	__u16 mrk_offset = (__u16)(pkt_len - 1);
 
 	if (data + mrk_offset + 1 > data_end) {
 		return INSTR_ERROR;
@@ -122,7 +122,7 @@ static __always_inline __maybe_unused int padding_obfuscate_tc(struct wg_ctx *ct
 		return INSTR_ERROR;
 	}
 
-	__u32 mrk_offset = (__u32)(pkt_len - 1);
+	__u16 mrk_offset = (__u16)(pkt_len - 1);
 
 	if (data + mrk_offset + 1 > data_end) {
 		return INSTR_ERROR;
@@ -147,7 +147,7 @@ static __always_inline __maybe_unused int padding_deobfuscate_tc(struct wg_ctx *
 		return INSTR_ERROR;
 	}
 
-	__u32 mrk_offset = (__u32)(pkt_len - 1);
+	__u16 mrk_offset = (__u16)(pkt_len - 1);
 
 	if (data + mrk_offset + 1 > data_end) {
 		return INSTR_ERROR;
