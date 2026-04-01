@@ -14,7 +14,6 @@ import (
 	"github.com/stillya/wg-relay/pkg/bpf"
 	"github.com/stillya/wg-relay/pkg/dataplane/config"
 	"github.com/stillya/wg-relay/pkg/dataplane/maps"
-	"github.com/stillya/wg-relay/pkg/utils"
 )
 
 // ReverseLoader manages TC-based reverse proxy
@@ -54,7 +53,7 @@ func (rp *ReverseLoader) loadEBPF() error {
 	}
 
 	if rp.cfg.Instrumentations.Padding != nil && rp.cfg.Instrumentations.Padding.Enabled {
-		mtu, err := utils.DetectMinMTU(rp.cfg.Interfaces)
+		mtu, err := detectMinMTU(rp.cfg.Interfaces)
 		if err != nil {
 			return errors.Wrap(err, "failed to detect interface MTU")
 		}

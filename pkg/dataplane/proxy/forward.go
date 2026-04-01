@@ -60,7 +60,7 @@ func (fp *ForwardLoader) loadEBPF() error {
 	}
 
 	if fp.cfg.Instrumentations.Padding != nil && fp.cfg.Instrumentations.Padding.Enabled {
-		mtu, err := utils.DetectMinMTU(fp.cfg.Interfaces)
+		mtu, err := detectMinMTU(fp.cfg.Interfaces)
 		if err != nil {
 			return errors.Wrap(err, "failed to detect interface MTU")
 		}

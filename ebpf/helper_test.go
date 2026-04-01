@@ -374,6 +374,14 @@ func verifyPaddingObfuscation(t *testing.T, inputPacket, outputPacket []byte, pa
 	}
 }
 
+// setVar sets a named variable in an eBPF CollectionSpec, failing the test on error.
+func setVar(t *testing.T, spec *ebpf.CollectionSpec, name string, value any) {
+	t.Helper()
+	if err := spec.Variables[name].Set(value); err != nil {
+		t.Fatalf("Failed to set %s: %v", name, err)
+	}
+}
+
 // verifyPaddingDeobfuscation verifies that padding was removed correctly
 func verifyPaddingDeobfuscation(t *testing.T, paddedInput, output []byte, paddingSize uint8) {
 	t.Helper()

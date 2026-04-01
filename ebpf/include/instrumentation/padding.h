@@ -10,7 +10,7 @@
 
 DECLARE_CONFIG(bool, padding_enabled, "Enable padding obfuscation");
 DECLARE_CONFIG(__u8, padding_size, "Padding size in bytes");
-DECLARE_CONFIG(__u16, link_mtu, "Link MTU for padding size validation");
+DECLARE_CONFIG(__u16, link_mtu, "Link MTU size in bytes");
 
 static __always_inline __maybe_unused int padding_obfuscate_xdp(struct wg_ctx *ctx) {
 	if (!CONFIG(padding_enabled)) {
@@ -18,9 +18,6 @@ static __always_inline __maybe_unused int padding_obfuscate_xdp(struct wg_ctx *c
 	}
 
 	__u8 cfg_padding_size = CONFIG(padding_size);
-	if (cfg_padding_size == 0) {
-		return INSTR_OK;
-	}
 
 	void *data = (void *)(long)ctx->xdp->data;
 	void *data_end = (void *)(long)ctx->xdp->data_end;
@@ -44,7 +41,7 @@ static __always_inline __maybe_unused int padding_obfuscate_xdp(struct wg_ctx *c
 	}
 
 	__u64 pkt_len = (data_end - data);
-	if (pkt_len == 0 || pkt_len > 65535) {
+	if (pkt_len == 0 || pkt_len >= 65535) {
 		return INSTR_ERROR;
 	}
 
@@ -73,7 +70,7 @@ static __always_inline __maybe_unused int padding_deobfuscate_xdp(struct wg_ctx 
 	}
 
 	__u64 pkt_len = (data_end - data);
-	if (pkt_len == 0 || pkt_len > 65535) {
+	if (pkt_len == 0 || pkt_len >= 65535) {
 		return INSTR_ERROR;
 	}
 
@@ -107,9 +104,6 @@ static __always_inline __maybe_unused int padding_obfuscate_tc(struct wg_ctx *ct
 	}
 
 	__u8 cfg_padding_size = CONFIG(padding_size);
-	if (cfg_padding_size == 0) {
-		return INSTR_OK;
-	}
 
 	__u32 current_len = ctx->skb->len;
 	__u16 cfg_link_mtu = CONFIG(link_mtu);
@@ -136,7 +130,7 @@ static __always_inline __maybe_unused int padding_obfuscate_tc(struct wg_ctx *ct
 	}
 
 	__u64 pkt_len = (data_end - data);
-	if (pkt_len == 0 || pkt_len > 65535) {
+	if (pkt_len == 0 || pkt_len >= 65535) {
 		return INSTR_ERROR;
 	}
 
@@ -165,7 +159,7 @@ static __always_inline __maybe_unused int padding_deobfuscate_tc(struct wg_ctx *
 	}
 
 	__u64 pkt_len = (data_end - data);
-	if (pkt_len == 0 || pkt_len > 65535) {
+	if (pkt_len == 0 || pkt_len >= 65535) {
 		return INSTR_ERROR;
 	}
 
