@@ -1,10 +1,10 @@
 #ifndef __PACKET_H__
 #define __PACKET_H__
 
+#include "vmlinux.h"
 #include <bpf/bpf_endian.h>
 #include <bpf/bpf_helpers.h>
 #include "common.h"
-#include "vmlinux.h"
 
 #ifndef AF_INET
 #define AF_INET 2

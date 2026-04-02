@@ -1,9 +1,9 @@
 #ifndef __NAT_H__
 #define __NAT_H__
 
+#include "vmlinux.h"
 #include <bpf/bpf_helpers.h>
 #include "common.h"
-#include "vmlinux.h"
 
 // NAT port generation range (50000-65535)
 #define NAT_PORT_START 50000

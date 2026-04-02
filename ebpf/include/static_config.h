@@ -1,9 +1,9 @@
 #ifndef __STATIC_CONFIG_H__
 #define __STATIC_CONFIG_H__
 
+#include "vmlinux.h"
 #include <bpf/bpf_helpers.h>
 #include "common.h"
-#include "vmlinux.h"
 
 // Helper to stringify tokens
 #ifndef __stringify_1

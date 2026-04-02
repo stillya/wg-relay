@@ -1,9 +1,9 @@
 #ifndef __METRICS_H__
 #define __METRICS_H__
 
+#include "vmlinux.h"
 #include <bpf/bpf_helpers.h>
 #include "common.h"
-#include "vmlinux.h"
 
 #define METRICS_MAP_SIZE 65536
 

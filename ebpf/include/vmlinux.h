@@ -1,3 +1,4 @@
+// clang-format off
 #ifndef __VMLINUX_H__
 #define __VMLINUX_H__
 

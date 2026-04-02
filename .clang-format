@@ -24,14 +24,16 @@ SpacesInSquareBrackets: false
 # Includes
 IncludeBlocks: Merge
 IncludeCategories:
-  - Regex:           '^<linux/'
+  - Regex:           '^(<|")vmlinux\.h(>|")$'
     Priority:        1
-  - Regex:           '^<bpf/'
+  - Regex:           '^<linux/'
     Priority:        2
-  - Regex:           '^".*'
+  - Regex:           '^<bpf/'
     Priority:        3
-  - Regex:           '.*'
+  - Regex:           '^".*'
     Priority:        4
+  - Regex:           '.*'
+    Priority:        5
 SortIncludes: true
 
 # Alignment
