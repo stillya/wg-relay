@@ -36,7 +36,7 @@ const (
 type Opts struct {
 	ConfigFile string `short:"c" long:"config" description:"Path to configuration file" default:"config.yaml"`
 	Debug      bool   `short:"d" long:"debug" description:"Enable debug logging"`
-	Version    bool   `short:"v" long:"revision" description:"Show revision information"`
+	Version    bool   `short:"v" long:"version" description:"Show version information"`
 }
 
 var revision = "dev"
@@ -54,7 +54,7 @@ func main() {
 	}
 
 	if opts.Version {
-		fmt.Printf("wg-relay daemon revision %s\n", revision)
+		fmt.Printf("wg-relay daemon version %s\n", revision)
 		os.Exit(0)
 	}
 
@@ -68,7 +68,7 @@ func main() {
 	}))
 	log.SetDefault(logger)
 
-	log.Info("Starting wg-relay daemon", "revision", revision)
+	log.Info("Starting wg-relay daemon", "version", revision)
 
 	cfg, err := loadConfig(opts)
 	if err != nil {
