@@ -119,6 +119,14 @@ DEBUG_PRINTK("padding obfuscate tc: bpf_skb_change_tail failed (new_len=%u)", ne
 return INSTR_ERROR;
 }
 
+// bpf_skb_change_tail may put the new bytes in paged frags. Pull the entire
+// packet into the linear area so that bpf_skb_store_bytes can reliably write
+// the marker byte into the newly appended region.
+if (bpf_skb_pull_data(ctx->skb, new_len) < 0) {
+DEBUG_PRINTK("padding obfuscate tc: bpf_skb_pull_data failed (new_len=%u)", new_len);
+return INSTR_ERROR;
+}
+
 // Use bpf_skb_store_bytes so no direct variable-offset sk_buff pointer access is needed.
 __u8 marker = cfg_padding_size;
 if (bpf_skb_store_bytes(ctx->skb, new_len - 1, &marker, sizeof(marker), 0) != 0) {
