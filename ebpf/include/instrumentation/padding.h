@@ -48,6 +48,8 @@ DEBUG_PRINTK("padding obfuscate xdp: bpf_xdp_store_bytes failed (offset=%u)",
      mrk_offset);
 return INSTR_ERROR;
 }
+DEBUG_PRINTK("padding obfuscate xdp: wrote marker=%u at offset=%u (pkt_len=%llu)",
+     marker, mrk_offset, current_len + cfg_padding_size);
 
 return INSTR_PKT_INVD;
 }
@@ -126,6 +128,7 @@ if (bpf_skb_pull_data(ctx->skb, new_len) < 0) {
 DEBUG_PRINTK("padding obfuscate tc: bpf_skb_pull_data failed (new_len=%u)", new_len);
 return INSTR_ERROR;
 }
+DEBUG_PRINTK("padding obfuscate tc: pull_data ok (new_len=%u)", new_len);
 
 // Use bpf_skb_store_bytes so no direct variable-offset sk_buff pointer access is needed.
 __u8 marker = cfg_padding_size;
@@ -133,6 +136,7 @@ if (bpf_skb_store_bytes(ctx->skb, new_len - 1, &marker, sizeof(marker), 0) != 0)
 DEBUG_PRINTK("padding obfuscate tc: bpf_skb_store_bytes failed (offset=%u)", new_len - 1);
 return INSTR_ERROR;
 }
+DEBUG_PRINTK("padding obfuscate tc: wrote marker=%u at offset=%u", marker, new_len - 1);
 
 return INSTR_PKT_INVD;
 }
@@ -154,6 +158,8 @@ if (bpf_skb_load_bytes(ctx->skb, current_len - 1, &padding_size, sizeof(padding_
 DEBUG_PRINTK("padding deobfuscate tc: bpf_skb_load_bytes failed (offset=%u)", current_len - 1);
 return INSTR_ERROR;
 }
+DEBUG_PRINTK("padding deobfuscate tc: read byte=%u from offset=%u (current_len=%u)",
+     padding_size, current_len - 1, current_len);
 
 if (padding_size == 0) {
 return INSTR_OK;
