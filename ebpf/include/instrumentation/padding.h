@@ -1,12 +1,12 @@
 #ifndef __INSTRUMENTATION_PADDING_H__
 #define __INSTRUMENTATION_PADDING_H__
 
-#include "vmlinux.h"
 #include <bpf/bpf_helpers.h>
 #include "common.h"
 #include "context.h"
 #include "instrumentation.h"
 #include "static_config.h"
+#include "vmlinux.h"
 
 DECLARE_CONFIG(bool, padding_enabled, "Enable padding obfuscation");
 DECLARE_CONFIG(__u8, padding_size, "Padding size in bytes");

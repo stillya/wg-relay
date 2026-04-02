@@ -1,9 +1,9 @@
 #ifndef __BACKEND_H__
 #define __BACKEND_H__
 
-#include "vmlinux.h"
 #include <bpf/bpf_helpers.h>
 #include "common.h"
+#include "vmlinux.h"
 
 // Maximum number of backends
 #define MAX_BACKENDS 256

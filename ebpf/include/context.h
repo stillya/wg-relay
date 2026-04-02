@@ -1,9 +1,9 @@
 #ifndef __CONTEXT_H__
 #define __CONTEXT_H__
 
-#include "vmlinux.h"
 #include "common.h"
 #include "packet.h"
+#include "vmlinux.h"
 
 #define MAX_PAYLOAD_SIZE 1420
 
