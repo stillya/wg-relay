@@ -33,22 +33,17 @@ static __always_inline __maybe_unused int padding_obfuscate_xdp(struct wg_ctx *c
 		return INSTR_ERROR;
 	}
 
-	data = (void *)(long)ctx->xdp->data;
-	data_end = (void *)(long)ctx->xdp->data_end;
-
-	__u64 pkt_len = (data_end - data);
-	if (pkt_len == 0 || pkt_len >= 65535) {
+	// After adjust_tail, the new packet length is current_len + cfg_padding_size.
+	// Write the marker at the last byte using bpf_xdp_store_bytes to avoid direct
+	// variable-offset PTR_TO_PACKET access, which the BPF verifier rejects when
+	// the offset has a non-zero var_off.mask (i.e. any runtime-computed value)
+	// look at that: https://github.com/cilium/cilium/blob/main/bpf/include/bpf/ctx/xdp.h#L66
+	// here's a little description about var_off mask: https://github.com/google/security-research/security/advisories/GHSA-hfqc-63c7-rj9f
+	__u32 mrk_offset = (__u32)current_len + cfg_padding_size - 1;
+	__u8 marker = cfg_padding_size;
+	if (bpf_xdp_store_bytes(ctx->xdp, mrk_offset, &marker, sizeof(marker)) != 0) {
 		return INSTR_ERROR;
 	}
-
-	__u16 mrk_offset = (__u16)(pkt_len - 1);
-
-	if (data + mrk_offset + 1 > data_end) {
-		return INSTR_ERROR;
-	}
-
-	__u8 *mrk = (__u8 *)data + mrk_offset;
-	*mrk = cfg_padding_size;
 
 	return INSTR_PKT_INVD;
 }
@@ -61,19 +56,18 @@ static __always_inline __maybe_unused int padding_deobfuscate_xdp(struct wg_ctx 
 	void *data = (void *)(long)ctx->xdp->data;
 	void *data_end = (void *)(long)ctx->xdp->data_end;
 
-	__u64 pkt_len = (data_end - data);
+	__u32 pkt_len = (__u32)(data_end - data);
 	if (pkt_len == 0 || pkt_len >= 65535) {
 		return INSTR_ERROR;
 	}
 
-	__u16 mrk_offset = (__u16)(pkt_len - 1);
-
-	if (data + mrk_offset + 1 > data_end) {
+	// Read the marker from the last byte using bpf_xdp_load_bytes to avoid direct
+	// variable-offset PTR_TO_PACKET access, which the BPF verifier rejects when
+	// the offset has a non-zero var_off.mask (i.e. any runtime-computed value).
+	__u8 padding_size = 0;
+	if (bpf_xdp_load_bytes(ctx->xdp, pkt_len - 1, &padding_size, sizeof(padding_size)) != 0) {
 		return INSTR_ERROR;
 	}
-
-	__u8 *mrk = (__u8 *)data + mrk_offset;
-	__u8 padding_size = *mrk;
 
 	if (padding_size == 0) {
 		return INSTR_OK;
@@ -106,30 +100,16 @@ static __always_inline __maybe_unused int padding_obfuscate_tc(struct wg_ctx *ct
 		return INSTR_ERROR;
 	}
 
-	if (bpf_skb_change_tail(ctx->skb, current_len + cfg_padding_size, 0) != 0) {
+	__u32 new_len = current_len + cfg_padding_size;
+	if (bpf_skb_change_tail(ctx->skb, new_len, 0) != 0) {
 		return INSTR_ERROR;
 	}
 
-	if (bpf_skb_pull_data(ctx->skb, current_len + cfg_padding_size) < 0) {
+	// Use bpf_skb_store_bytes so no direct variable-offset sk_buff pointer access is needed.
+	__u8 marker = cfg_padding_size;
+	if (bpf_skb_store_bytes(ctx->skb, new_len - 1, &marker, sizeof(marker), 0) != 0) {
 		return INSTR_ERROR;
 	}
-
-	void *data = (void *)(long)ctx->skb->data;
-	void *data_end = (void *)(long)ctx->skb->data_end;
-
-	__u64 pkt_len = (data_end - data);
-	if (pkt_len == 0 || pkt_len >= 65535) {
-		return INSTR_ERROR;
-	}
-
-	__u16 mrk_offset = (__u16)(pkt_len - 1);
-
-	if (data + mrk_offset + 1 > data_end) {
-		return INSTR_ERROR;
-	}
-
-	__u8 *mrk = (__u8 *)data + mrk_offset;
-	*mrk = cfg_padding_size;
 
 	return INSTR_PKT_INVD;
 }
@@ -139,32 +119,25 @@ static __always_inline __maybe_unused int padding_deobfuscate_tc(struct wg_ctx *
 		return INSTR_OK;
 	}
 
-	void *data = (void *)(long)ctx->skb->data;
-	void *data_end = (void *)(long)ctx->skb->data_end;
-
-	__u64 pkt_len = (data_end - data);
-	if (pkt_len == 0 || pkt_len >= 65535) {
+	__u32 current_len = ctx->skb->len;
+	if (current_len == 0 || current_len >= 65535) {
 		return INSTR_ERROR;
 	}
 
-	__u16 mrk_offset = (__u16)(pkt_len - 1);
-
-	if (data + mrk_offset + 1 > data_end) {
+	// Use bpf_skb_load_bytes so no direct variable-offset sk_buff pointer access is needed.
+	__u8 padding_size = 0;
+	if (bpf_skb_load_bytes(ctx->skb, current_len - 1, &padding_size, sizeof(padding_size)) != 0) {
 		return INSTR_ERROR;
 	}
-
-	__u8 *mrk = (__u8 *)data + mrk_offset;
-	__u8 padding_size = *mrk;
 
 	if (padding_size == 0) {
 		return INSTR_OK;
 	}
 
-	if (pkt_len <= padding_size) {
+	if (current_len <= padding_size) {
 		return INSTR_ERROR;
 	}
 
-	__u32 current_len = ctx->skb->len;
 	if (bpf_skb_change_tail(ctx->skb, current_len - padding_size, 0) != 0) {
 		return INSTR_ERROR;
 	}
