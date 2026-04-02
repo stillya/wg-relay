@@ -1,0 +1,39 @@
+daemon:
+  listen: ":8080"                # Address and port for the daemon API
+
+monitoring:
+  statistics:
+    enabled: false               # Terminal stats table; disabled by default under systemd (use Prometheus instead)
+    interval: "5s"
+    max_sources: 10
+  prometheus:
+    enabled: true
+    listen: ":8081"              # Prometheus metrics endpoint
+
+proxy:
+  enabled: true
+  mode: "forward"                # "forward" (XDP, client-side) or "reverse" (TC, server-side)
+  wg_port: 51820
+
+  instrumentations:
+    xor:
+      enabled: true
+      # REQUIRED: 32-byte XOR obfuscation key. Must match on both client and server.
+      key: ""
+    padding:
+      enabled: true
+      size: 64
+      mode: "randomize"          # "direct" (fixed size) or "randomize" (random 1..size)
+
+  driver_mode: "driver"          # XDP attach mode: "driver", "generic", or "offload"
+
+  # REQUIRED: Network interfaces to attach to
+  interfaces:
+    - "eth0"
+
+  forward:                       # Only used in "forward" mode
+    backends:
+      # REQUIRED: Add at least one WireGuard backend
+      # - name: "wg-gateway-1"
+      #   ip: "192.0.2.1"
+      #   port: 51820

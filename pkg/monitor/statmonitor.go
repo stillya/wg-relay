@@ -9,6 +9,16 @@ import (
 	"github.com/stillya/wg-relay/pkg/maps/metricsmap"
 )
 
+// OutputMode controls how statistics are reported.
+type OutputMode int
+
+const (
+	// OutputModeTerminal prints an ANSI table to stdout (interactive use).
+	OutputModeTerminal OutputMode = iota
+	// OutputModeStructured emits a single structured slog entry per interval (systemd/journald use).
+	OutputModeStructured
+)
+
 // StatMonitorSource defines the interface for collecting metrics data.
 type StatMonitorSource interface {
 	Collect(ctx context.Context) ([]metricsmap.MetricData, error)
@@ -35,6 +45,7 @@ type StatMonitorParams struct {
 	Mode       string
 	Interval   time.Duration
 	MaxSources int
+	OutputMode OutputMode
 }
 
 // NewStatMonitor creates a new StatMonitor with the given parameters.
@@ -89,5 +100,42 @@ func (sm *StatMonitor) printStats(ctx context.Context) {
 	}
 
 	elapsed := time.Since(sm.startTime)
+
+	if sm.OutputMode == OutputModeStructured {
+		sm.logStructured(metricsData, elapsed)
+		return
+	}
+
 	sm.printer.PrintTrafficTable(sm.Mode, metricsData, elapsed)
+}
+
+func (sm *StatMonitor) logStructured(metricsData []metricsmap.MetricData, elapsed time.Duration) {
+	var downstreamRx, downstreamTx, upstreamRx, upstreamTx uint64
+	for _, m := range metricsData {
+		switch m.Key.Direction {
+		case metricsmap.MetricDownstream:
+			downstreamRx += m.Value.RxBytes
+			downstreamTx += m.Value.TxBytes
+		case metricsmap.MetricUpstream:
+			upstreamRx += m.Value.RxBytes
+			upstreamTx += m.Value.TxBytes
+		}
+	}
+
+	total := downstreamRx + downstreamTx + upstreamRx + upstreamTx
+	var avgRateBps float64
+	if elapsed.Seconds() > 0 {
+		avgRateBps = float64(total) / elapsed.Seconds()
+	}
+
+	log.Info("traffic stats",
+		"mode", sm.Mode,
+		"downstream_rx_bytes", downstreamRx,
+		"downstream_tx_bytes", downstreamTx,
+		"upstream_rx_bytes", upstreamRx,
+		"upstream_tx_bytes", upstreamTx,
+		"total_bytes", total,
+		"avg_rate_bps", uint64(avgRateBps),
+		"elapsed", elapsed.String(),
+	)
 }

@@ -1,0 +1,22 @@
+[Unit]
+Description=WireGuard Traffic Obfuscator Relay Daemon
+Documentation=https://github.com/stillya/wg-relay
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+ExecStart=/usr/bin/wg-relay-daemon -c /etc/wg-relay/config.yaml
+Restart=on-failure
+RestartSec=5s
+SyslogIdentifier=wg-relay
+StandardOutput=journal
+StandardError=journal
+AmbientCapabilities=CAP_NET_ADMIN CAP_SYS_ADMIN CAP_BPF CAP_NET_RAW
+CapabilityBoundingSet=CAP_NET_ADMIN CAP_SYS_ADMIN CAP_BPF CAP_NET_RAW
+ProtectSystem=strict
+ReadWritePaths=/sys/fs/bpf /sys/kernel/debug
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target

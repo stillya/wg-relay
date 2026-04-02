@@ -36,10 +36,10 @@ const (
 type Opts struct {
 	ConfigFile string `short:"c" long:"config" description:"Path to configuration file" default:"config.yaml"`
 	Debug      bool   `short:"d" long:"debug" description:"Enable debug logging"`
-	Version    bool   `short:"v" long:"version" description:"Show version information"`
+	Version    bool   `short:"v" long:"revision" description:"Show revision information"`
 }
 
-const version = "0.1.0"
+var revision = "dev"
 
 func main() {
 	var opts Opts
@@ -54,7 +54,7 @@ func main() {
 	}
 
 	if opts.Version {
-		fmt.Printf("wg-relay daemon version %s\n", version)
+		fmt.Printf("wg-relay daemon revision %s\n", revision)
 		os.Exit(0)
 	}
 
@@ -68,7 +68,7 @@ func main() {
 	}))
 	log.SetDefault(logger)
 
-	log.Info("Starting wg-relay daemon", "version", version)
+	log.Info("Starting wg-relay daemon", "revision", revision)
 
 	cfg, err := loadConfig(opts)
 	if err != nil {
@@ -144,10 +144,15 @@ func main() {
 		}
 
 		if cfg.Monitoring.Statistics.Enabled {
+			outputMode := monitor.OutputModeTerminal
+			if os.Getenv("INVOCATION_ID") != "" {
+				outputMode = monitor.OutputModeStructured
+			}
 			statsMonitor = monitor.NewStatMonitor(monitor.StatMonitorParams{
 				Interval:   cfg.Monitoring.Statistics.Interval,
 				Mode:       cfg.Proxy.Mode,
 				MaxSources: cfg.Monitoring.Statistics.MaxSources,
+				OutputMode: outputMode,
 			}, metricsSource, backends)
 			go statsMonitor.Start(ctx)
 			defer statsMonitor.Stop()

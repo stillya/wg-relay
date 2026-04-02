@@ -1,0 +1,61 @@
+version: 2
+project_name: wg-relay
+
+builds:
+  - id: wg-relay-daemon
+    main: ./cmd/daemon
+    binary: wg-relay-daemon
+    env:
+      - CGO_ENABLED=0
+    goos:
+      - linux
+    goarch:
+      - amd64
+      - arm64
+    ldflags:
+      - -s -w -X main.revision={{.Version}}
+    flags:
+      - -buildvcs=false
+
+archives:
+  - name_template: "{{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
+    files:
+      - LICENSE
+      - src: packaging/config/config.yaml
+        dst: config.yaml.example
+
+checksum:
+  name_template: "checksums.txt"
+  algorithm: sha256
+
+nfpms:
+  - package_name: wg-relay
+    vendor: stillya
+    homepage: https://github.com/stillya/wg-relay
+    maintainer: stillya <maintainer@example.com>
+    description: eBPF-based WireGuard traffic obfuscator that bypasses DPI
+    license: MIT
+    formats:
+      - deb
+      - rpm
+    bindir: /usr/bin
+    contents:
+      - src: packaging/systemd/wg-relay.service
+        dst: /lib/systemd/system/wg-relay.service
+      - src: packaging/config/config.yaml
+        dst: /etc/wg-relay/config.yaml
+        type: config|noreplace
+    scripts:
+      postinstall: packaging/scripts/postinstall.sh
+      preremove: packaging/scripts/preremove.sh
+
+release:
+  prerelease: auto
+
+changelog:
+  sort: asc
+  filters:
+    exclude:
+      - "^docs:"
+      - "^test:"
+      - "^ci:"

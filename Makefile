@@ -29,7 +29,7 @@ all: $(SUBDIRS)
 build: all
 	@echo "Building $(DAEMON_BINARY)..."
 	$(QUIET)mkdir -p $(BUILD_DIR)
-	$(QUIET)$(GO_BUILD) -ldflags "-X main.version=$(REV) -s -w" -o $(BUILD_DIR)/$(DAEMON_BINARY) ./cmd/daemon
+	$(QUIET)$(GO_BUILD) -ldflags "-X main.revision=$(REV) -s -w" -o $(BUILD_DIR)/$(DAEMON_BINARY) ./cmd/daemon
 	@echo "Build completed: $(BUILD_DIR)/$(DAEMON_BINARY)"
 
 clean:
@@ -88,3 +88,6 @@ test-ebpf: all
 test: all
 	@echo "Running tests with coverage..."
 	$(QUIET)sudo -E $(GO) test -v -coverprofile=covprofile ./...
+
+snapshot:
+	goreleaser release --snapshot --clean

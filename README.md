@@ -30,6 +30,61 @@ Client                 Obfuscator Proxy           WireGuard Server
   |<-------------------------|                          |
 ```
 
+## Installation
+
+### Debian / Ubuntu
+
+Download the `.deb` package from the [latest release](https://github.com/stillya/wg-relay/releases/latest):
+
+```bash
+wget https://github.com/stillya/wg-relay/releases/latest/download/wg-relay_<version>_linux_amd64.deb
+sudo dpkg -i wg-relay_<version>_linux_amd64.deb
+```
+
+Edit the config before starting:
+
+```bash
+sudo nano /etc/wg-relay/config.yaml
+sudo systemctl start wg-relay
+```
+
+View logs:
+
+```bash
+journalctl -u wg-relay -f
+```
+
+Override service settings without editing the unit file (e.g. to use a different config path):
+
+```bash
+sudo systemctl edit wg-relay
+# adds a drop-in at /etc/systemd/system/wg-relay.service.d/override.conf
+```
+
+On upgrade, dpkg will **not** overwrite your `/etc/wg-relay/config.yaml` if you have modified it.
+
+### RPM (RHEL / Fedora)
+
+```bash
+sudo rpm -i wg-relay_<version>_linux_amd64.rpm
+sudo nano /etc/wg-relay/config.yaml
+sudo systemctl start wg-relay
+```
+
+### Binary tarball
+
+```bash
+tar -xzf wg-relay_<version>_linux_amd64.tar.gz
+sudo install -m 755 wg-relay-daemon /usr/local/bin/
+sudo wg-relay-daemon -c config.yaml
+```
+
+Verify the download with the provided `checksums.txt`:
+
+```bash
+sha256sum -c checksums.txt --ignore-missing
+```
+
 ## Requirements
 
 - Linux kernel 6.6+ with eBPF support

@@ -1,0 +1,51 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v[0-9]*'
+
+jobs:
+  build-ebpf:
+    name: Compile eBPF objects
+    runs-on: ubuntu-22.04
+    container:
+      image: stillya101/ebpf-devcontainer-go:0.1.2
+      options: --privileged
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Compile eBPF objects
+        run: make -C ebpf
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ebpf-objects
+          path: ebpf/*.o
+
+  release:
+    name: GoReleaser
+    needs: build-ebpf
+    runs-on: ubuntu-22.04
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: ebpf-objects
+          path: ebpf/
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+
+      - uses: goreleaser/goreleaser-action@v6
+        with:
+          version: latest
+          args: release --clean
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
