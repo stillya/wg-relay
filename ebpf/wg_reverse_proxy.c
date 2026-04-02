@@ -20,6 +20,15 @@
 // Reverse proxy static configuration
 DECLARE_CONFIG(__u16, wg_port, "WireGuard port to intercept");
 
+static __always_inline void finalize_tc_packet(struct wg_ctx *ctx) {
+	__u16 new_tot_len = (__u16)ctx->skb->len - ETH_HLEN;
+	ctx->ip->tot_len  = bpf_htons(new_tot_len);
+	ctx->udp->len     = bpf_htons(new_tot_len - (ctx->ip->ihl * 4));
+	ctx->ip->frag_off |= bpf_htons(IP_DF);
+	ctx->ip->check    = iph_csum(ctx->ip);
+	ctx->udp->check   = 0;
+}
+
 // Apply obfuscation in TC mode (manual ordering)
 // NOTE: Order matters! XOR first, then padding (so size marker is at end)
 static __always_inline int instr_obfuscate_tc(struct wg_ctx *ctx) {
@@ -101,6 +110,7 @@ int wg_reverse_proxy(struct __sk_buff *skb) {
 			return TC_ACT_SHOT;
 		}
 
+		finalize_tc_packet(&ctx);
 		update_metrics(0, METRIC_DOWNSTREAM, skb->len, 0, METRIC_REASON_FORWARDED);
 	}
 
@@ -114,6 +124,7 @@ int wg_reverse_proxy(struct __sk_buff *skb) {
 			return TC_ACT_SHOT;
 		}
 
+		finalize_tc_packet(&ctx);
 		update_metrics(0, METRIC_UPSTREAM, skb->len, 0, METRIC_REASON_FORWARDED);
 	}
 

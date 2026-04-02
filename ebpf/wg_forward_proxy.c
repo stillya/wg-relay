@@ -156,6 +156,10 @@ static __always_inline int forward_packet(struct wg_ctx *ctx, __u32 new_saddr, _
 		memcpy(ctx->eth->h_dest, params.dmac, ETH_ALEN);
 	}
 
+	__u16 new_tot_len = (__u16)((void *)(long)ctx->xdp->data_end - (void *)(long)ctx->xdp->data) - ETH_HLEN;
+	ctx->ip->tot_len = bpf_htons(new_tot_len);
+	ctx->udp->len    = bpf_htons(new_tot_len - (ctx->ip->ihl * 4));
+
 	// TODO: Disabled fragmentation for now, fix it later(or not)
 	ctx->ip->frag_off |= bpf_htons(IP_DF);
 
