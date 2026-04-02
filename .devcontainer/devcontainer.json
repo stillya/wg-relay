@@ -18,7 +18,6 @@
   // "features": {},
 
   "forwardPorts": [
-
     3000
   ],
   "portsAttributes": {
