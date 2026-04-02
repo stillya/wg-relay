@@ -1,13 +1,7 @@
 #ifndef __PACKET_H__
 #define __PACKET_H__
 
-#include <linux/bpf.h>
-#include <linux/if_ether.h>
-#include <linux/in.h>
-#include <linux/ip.h>
-#include <linux/pkt_cls.h>
-#include <linux/types.h>
-#include <linux/udp.h>
+#include "vmlinux.h"
 #include <bpf/bpf_endian.h>
 #include <bpf/bpf_helpers.h>
 #include "common.h"
