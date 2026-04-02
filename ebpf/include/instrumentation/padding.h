@@ -7,6 +7,7 @@
 #include "context.h"
 #include "instrumentation.h"
 #include "static_config.h"
+#include "csum.h"
 
 DECLARE_CONFIG(bool, padding_enabled, "Enable padding obfuscation");
 DECLARE_CONFIG(__u8, padding_size, "Padding size in bytes");
@@ -30,6 +31,12 @@ DEBUG_PRINTK("padding obfuscate xdp: MTU exceeded (pkt_len=%llu padding=%u mtu=%
      current_len, cfg_padding_size, cfg_link_mtu);
 return INSTR_ERROR;
 }
+
+// Update IP/UDP length fields before adjust_tail – ctx pointers are valid here.
+// The kernel trims received SKBs to IP tot_len, so if we don't update it the
+// padding bytes are silently discarded before the remote side ever sees them.
+ctx->ip->tot_len = bpf_htons(bpf_ntohs(ctx->ip->tot_len) + cfg_padding_size);
+ctx->udp->len    = bpf_htons(bpf_ntohs(ctx->udp->len)    + cfg_padding_size);
 
 if (bpf_xdp_adjust_tail(ctx->xdp, cfg_padding_size) != 0) {
 DEBUG_PRINTK("padding obfuscate xdp: bpf_xdp_adjust_tail failed (padding=%u)",
@@ -88,6 +95,10 @@ DEBUG_PRINTK("padding deobfuscate xdp: pkt_len=%u <= padding_size=%u, dropping",
 return INSTR_ERROR;
 }
 
+// Update IP/UDP length fields before shrinking the packet.
+ctx->ip->tot_len = bpf_htons(bpf_ntohs(ctx->ip->tot_len) - padding_size);
+ctx->udp->len    = bpf_htons(bpf_ntohs(ctx->udp->len)    - padding_size);
+
 if (bpf_xdp_adjust_tail(ctx->xdp, -((int)padding_size)) != 0) {
 DEBUG_PRINTK("padding deobfuscate xdp: bpf_xdp_adjust_tail failed (padding=%u)",
      padding_size);
@@ -116,6 +127,12 @@ return INSTR_ERROR;
 }
 
 __u32 new_len = current_len + cfg_padding_size;
+
+// Update IP/UDP length fields before change_tail – ctx pointers valid here.
+ctx->ip->tot_len = bpf_htons(bpf_ntohs(ctx->ip->tot_len) + cfg_padding_size);
+ctx->udp->len    = bpf_htons(bpf_ntohs(ctx->udp->len)    + cfg_padding_size);
+ctx->ip->check   = iph_csum(ctx->ip);
+
 if (bpf_skb_change_tail(ctx->skb, new_len, 0) != 0) {
 DEBUG_PRINTK("padding obfuscate tc: bpf_skb_change_tail failed (new_len=%u)", new_len);
 return INSTR_ERROR;
@@ -170,6 +187,11 @@ DEBUG_PRINTK("padding deobfuscate tc: current_len=%u <= padding_size=%u, droppin
      current_len, padding_size);
 return INSTR_ERROR;
 }
+
+// Update IP/UDP length fields before shrinking the packet.
+ctx->ip->tot_len = bpf_htons(bpf_ntohs(ctx->ip->tot_len) - padding_size);
+ctx->udp->len    = bpf_htons(bpf_ntohs(ctx->udp->len)    - padding_size);
+ctx->ip->check   = iph_csum(ctx->ip);
 
 if (bpf_skb_change_tail(ctx->skb, current_len - padding_size, 0) != 0) {
 DEBUG_PRINTK("padding deobfuscate tc: bpf_skb_change_tail failed (new_len=%u)",
