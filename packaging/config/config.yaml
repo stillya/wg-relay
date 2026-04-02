@@ -23,7 +23,7 @@ proxy:
     padding:
       enabled: true
       size: 64
-      mode: "randomize"          # "direct" (fixed size) or "randomize" (random 1..size)
+      mode: "direct"             # "direct" (fixed size) or "randomize" (random 1..size)
 
   driver_mode: "driver"          # XDP attach mode: "driver", "generic", or "offload"
 
