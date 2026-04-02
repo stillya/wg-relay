@@ -127,12 +127,13 @@ type WgForwardProxyMapSpecs struct {
 //
 // It can be passed ebpf.CollectionSpec.Assign.
 type WgForwardProxyVariableSpecs struct {
-	CfgLinkMtu        *ebpf.VariableSpec `ebpf:"__cfg_link_mtu"`
-	CfgPaddingEnabled *ebpf.VariableSpec `ebpf:"__cfg_padding_enabled"`
-	CfgPaddingSize    *ebpf.VariableSpec `ebpf:"__cfg_padding_size"`
-	CfgWgPort         *ebpf.VariableSpec `ebpf:"__cfg_wg_port"`
-	CfgXorEnabled     *ebpf.VariableSpec `ebpf:"__cfg_xor_enabled"`
-	CfgXorKey         *ebpf.VariableSpec `ebpf:"__cfg_xor_key"`
+	CfgLinkMtu          *ebpf.VariableSpec `ebpf:"__cfg_link_mtu"`
+	CfgPaddingEnabled   *ebpf.VariableSpec `ebpf:"__cfg_padding_enabled"`
+	CfgPaddingRandomize *ebpf.VariableSpec `ebpf:"__cfg_padding_randomize"`
+	CfgPaddingSize      *ebpf.VariableSpec `ebpf:"__cfg_padding_size"`
+	CfgWgPort           *ebpf.VariableSpec `ebpf:"__cfg_wg_port"`
+	CfgXorEnabled       *ebpf.VariableSpec `ebpf:"__cfg_xor_enabled"`
+	CfgXorKey           *ebpf.VariableSpec `ebpf:"__cfg_xor_key"`
 }
 
 // WgForwardProxyObjects contains all objects after they have been loaded into the kernel.
@@ -178,12 +179,13 @@ func (m *WgForwardProxyMaps) Close() error {
 //
 // It can be passed to LoadWgForwardProxyObjects or ebpf.CollectionSpec.LoadAndAssign.
 type WgForwardProxyVariables struct {
-	CfgLinkMtu        *ebpf.Variable `ebpf:"__cfg_link_mtu"`
-	CfgPaddingEnabled *ebpf.Variable `ebpf:"__cfg_padding_enabled"`
-	CfgPaddingSize    *ebpf.Variable `ebpf:"__cfg_padding_size"`
-	CfgWgPort         *ebpf.Variable `ebpf:"__cfg_wg_port"`
-	CfgXorEnabled     *ebpf.Variable `ebpf:"__cfg_xor_enabled"`
-	CfgXorKey         *ebpf.Variable `ebpf:"__cfg_xor_key"`
+	CfgLinkMtu          *ebpf.Variable `ebpf:"__cfg_link_mtu"`
+	CfgPaddingEnabled   *ebpf.Variable `ebpf:"__cfg_padding_enabled"`
+	CfgPaddingRandomize *ebpf.Variable `ebpf:"__cfg_padding_randomize"`
+	CfgPaddingSize      *ebpf.Variable `ebpf:"__cfg_padding_size"`
+	CfgWgPort           *ebpf.Variable `ebpf:"__cfg_wg_port"`
+	CfgXorEnabled       *ebpf.Variable `ebpf:"__cfg_xor_enabled"`
+	CfgXorKey           *ebpf.Variable `ebpf:"__cfg_xor_key"`
 }
 
 // WgForwardProxyPrograms contains all programs after they have been loaded into the kernel.

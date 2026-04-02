@@ -83,6 +83,7 @@ proxy:
     padding:                     # Padding obfuscation
       enabled: true
       size: 32
+      mode: "direct"             # "direct" (fixed size) or "randomize" (random 1..size)
 
   driver_mode: "driver"          # "driver", "generic" or "offload" for XDP mode
   interfaces:                    # Network interfaces to attach to
@@ -120,7 +121,7 @@ sudo make run-reverse-proxy    # wg-server namespace
 ### Obfuscation Methods
 
 - **XOR**: Simple XOR-based obfuscation with a configurable key
-- **Padding**: Adds padding to packets to alter traffic patterns
+- **Padding**: Adds padding to packets to alter traffic patterns. Supports `direct` mode (fixed size) and `randomize` mode (random size between 1 and `size` per packet)
 - **None**: Pass-through mode for testing
 
 ### XDP Driver Modes
