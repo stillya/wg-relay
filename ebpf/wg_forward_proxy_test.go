@@ -442,6 +442,67 @@ func TestDownstreamUpstreamMetrics(t *testing.T) {
 	verifyMetrics(t, oldMetrics, currentMetrics, expectedMetrics)
 }
 
+func TestPaddingDeobfuscation(t *testing.T) {
+	tests := []struct {
+		name        string
+		paddingSize uint8
+	}{
+		{name: "padding_size_64", paddingSize: 64},
+		{name: "padding_size_32", paddingSize: 32},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			spec, err := LoadWgForwardProxy()
+			if err != nil {
+				t.Fatalf("Failed to load spec: %v", err)
+			}
+
+			setVar(t, spec, "__cfg_xor_enabled", false)
+			setVar(t, spec, "__cfg_padding_enabled", true)
+			setVar(t, spec, "__cfg_padding_size", tt.paddingSize)
+			setVar(t, spec, "__cfg_wg_port", uint16(wgPort))
+
+			objs := &WgForwardProxyObjects{}
+			if err := spec.LoadAndAssign(objs, nil); err != nil {
+				t.Fatalf("Failed to load objects: %v", err)
+			}
+			defer objs.Close()
+
+			if err := configureBackends(objs, []config.BackendServer{
+				{IP: "10.0.0.1", Port: 51820},
+			}); err != nil {
+				t.Fatalf("Failed to configure backends: %v", err)
+			}
+
+			// Send a TO_WG packet first to establish NAT state.
+			toWgPacket := createWGPacket("192.168.1.1", "192.168.1.2", 12345, wgPort)
+			_, toWgOutput, err := objs.WgForwardProxy.Test(toWgPacket)
+			if err != nil {
+				t.Fatalf("Failed to run TO_WG packet: %v", err)
+			}
+			natInfo, err := parseUDPPacket(toWgOutput)
+			if err != nil || natInfo == nil {
+				t.Fatalf("Failed to parse TO_WG output: %v", err)
+			}
+
+			// Simulate the reverse proxy sending back a padded response.
+			paddedResponse := createPaddedWGPacket("10.0.0.1", "192.168.1.2", 51820, natInfo.srcPort, tt.paddingSize)
+
+			_, fromWgOutput, err := objs.WgForwardProxy.Test(paddedResponse)
+			if err != nil {
+				t.Fatalf("Failed to run FROM_WG padded packet: %v", err)
+			}
+
+			// Read the padding size from the marker in the last byte and verify it was stripped.
+			markerSize := paddedResponse[len(paddedResponse)-1]
+			verifyPaddingDeobfuscation(t, paddedResponse, fromWgOutput, markerSize)
+			// Verify the deobfuscated packet was forwarded back to the original client.
+			verifyPacket(t, fromWgOutput, "192.168.1.1", 12345)
+		})
+	}
+}
+
 // TestPaddingDeobfuscateMalformedDrop verifies that malformed padded packets are dropped.
 func TestPaddingDeobfuscateMalformedDrop(t *testing.T) {
 	spec, err := LoadWgForwardProxy()

@@ -283,7 +283,8 @@ func TestReverseProxyPaddingObfuscation(t *testing.T) {
 			} else {
 				// TO_WG: verify padding was removed
 				if tt.paddingEnabled {
-					verifyPaddingDeobfuscation(t, inputPacket, outputPacket, tt.paddingSize)
+					markerSize := inputPacket[len(inputPacket)-1]
+					verifyPaddingDeobfuscation(t, inputPacket, outputPacket, markerSize)
 				} else {
 					if len(outputPacket) != len(inputPacket) {
 						t.Errorf("Packet length changed when padding disabled: input %d, output %d",
