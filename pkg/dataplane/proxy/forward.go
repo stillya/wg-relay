@@ -59,6 +59,18 @@ func (fp *ForwardLoader) loadEBPF() error {
 		return errors.Wrap(err, "failed to load forward proxy spec")
 	}
 
+	if fp.cfg.Instrumentations.Padding != nil && fp.cfg.Instrumentations.Padding.Enabled {
+		mtu, err := detectMinMTU(fp.cfg.Interfaces)
+		if err != nil {
+			return errors.Wrap(err, "failed to detect interface MTU")
+		}
+		fp.cfg.Instrumentations.Padding.LinkMTU = mtu
+		if err := fp.cfg.Instrumentations.Padding.ValidateMTU(); err != nil {
+			return errors.Wrap(err, "padding MTU validation failed")
+		}
+		log.Info("Detected minimum MTU", "mtu", mtu)
+	}
+
 	if err := bpf.Configure(spec, &fp.cfg); err != nil {
 		return errors.Wrap(err, "failed to configure static variables")
 	}

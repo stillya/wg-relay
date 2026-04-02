@@ -94,6 +94,62 @@ func TestPaddingConfig_Validation(t *testing.T) {
 	}
 }
 
+func TestPaddingConfig_ValidateMTU(t *testing.T) {
+	tests := []struct {
+		name    string
+		padding PaddingConfig
+		wantErr string
+	}{
+		{
+			name:    "link MTU zero skips MTU validation",
+			padding: PaddingConfig{Size: 200, LinkMTU: 0},
+			wantErr: "",
+		},
+		{
+			name:    "padding size less than link MTU is valid",
+			padding: PaddingConfig{Size: 100, LinkMTU: 1500},
+			wantErr: "",
+		},
+		{
+			name:    "padding size one below link MTU is valid boundary",
+			padding: PaddingConfig{Size: 254, LinkMTU: 255},
+			wantErr: "",
+		},
+		{
+			name:    "padding size equals link MTU is invalid",
+			padding: PaddingConfig{Size: 100, LinkMTU: 100},
+			wantErr: "padding size 100 must be less than link MTU 100",
+		},
+		{
+			name:    "padding size exceeds link MTU is invalid",
+			padding: PaddingConfig{Size: 200, LinkMTU: 100},
+			wantErr: "padding size 200 must be less than link MTU 100",
+		},
+		{
+			name:    "padding size equal to link MTU boundary is invalid",
+			padding: PaddingConfig{Size: 255, LinkMTU: 255},
+			wantErr: "padding size 255 must be less than link MTU 255",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := tt.padding.ValidateMTU()
+			if tt.wantErr == "" {
+				if err != nil {
+					t.Errorf("unexpected error: %v", err)
+				}
+			} else {
+				if err == nil {
+					t.Error("expected error, got nil")
+				} else if !strings.Contains(err.Error(), tt.wantErr) {
+					t.Errorf("error %q should contain %q", err.Error(), tt.wantErr)
+				}
+			}
+		})
+	}
+}
+
 func TestInstrumentationConfig_Combined(t *testing.T) {
 	tests := []struct {
 		name    string

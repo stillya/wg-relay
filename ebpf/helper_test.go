@@ -155,6 +155,21 @@ func createPaddedWGPacket(srcIP, dstIP string, srcPort, dstPort uint16, paddingS
 	return packet
 }
 
+// createMalformedPaddedWGPacket creates a WireGuard packet where the padding_size
+// marker byte claims a size larger than the actual appended padding, making it malformed.
+// This is used to test that the deobfuscate path drops such packets (INSTR_ERROR).
+func createMalformedPaddedWGPacket(srcIP, dstIP string, srcPort, dstPort uint16, claimedPaddingSize uint8) []byte {
+	packet := createWGPacket(srcIP, dstIP, srcPort, dstPort)
+
+	// Append only 1 byte of padding but set the marker to claim a larger size.
+	// This makes pkt_len <= padding_size true, which should be dropped.
+	padding := make([]byte, 1)
+	padding[0] = claimedPaddingSize
+	packet = append(packet, padding...)
+
+	return packet
+}
+
 // parseUDPPacket extracts packet information from a raw packet
 func parseUDPPacket(packet []byte) (*packetInfo, error) {
 	if len(packet) < 42 {
@@ -356,6 +371,14 @@ func verifyPaddingObfuscation(t *testing.T, inputPacket, outputPacket []byte, pa
 	sizeMarker := outputPacket[len(outputPacket)-1]
 	if sizeMarker != paddingSize {
 		t.Errorf("Expected size marker %d at position %d, got %d", paddingSize, len(outputPacket)-1, sizeMarker)
+	}
+}
+
+// setVar sets a named variable in an eBPF CollectionSpec, failing the test on error.
+func setVar(t *testing.T, spec *ebpf.CollectionSpec, name string, value any) {
+	t.Helper()
+	if err := spec.Variables[name].Set(value); err != nil {
+		t.Fatalf("Failed to set %s: %v", name, err)
 	}
 }
 

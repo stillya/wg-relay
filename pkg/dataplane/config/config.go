@@ -52,8 +52,9 @@ type XORConfig struct {
 
 // PaddingConfig represents padding obfuscation configuration
 type PaddingConfig struct {
-	Enabled bool  `yaml:"enabled" ebpf:"padding_enabled"`
-	Size    uint8 `yaml:"size" ebpf:"padding_size"`
+	Enabled bool   `yaml:"enabled" ebpf:"padding_enabled"`
+	Size    uint8  `yaml:"size" ebpf:"padding_size"`
+	LinkMTU uint16 `yaml:"-" ebpf:"link_mtu"` // computed at runtime, not yaml-exposed
 }
 
 // BackendServer represents a single backend server
@@ -160,6 +161,14 @@ func (cfg *Config) validate() error {
 	return cfg.Proxy.validate(cfg.Proxy.Mode)
 }
 
+// ValidateMTU validates padding size against the link MTU. Must be called after LinkMTU is populated.
+func (p *PaddingConfig) ValidateMTU() error {
+	if p.LinkMTU > 0 && uint16(p.Size) >= p.LinkMTU {
+		return errors.Errorf("padding size %d must be less than link MTU %d", p.Size, p.LinkMTU)
+	}
+	return nil
+}
+
 // validate validates the proxy configuration
 func (cfg *ProxyConfig) validate(mode string) error {
 	// Validate interfaces
@@ -187,6 +196,7 @@ func (cfg *ProxyConfig) validate(mode string) error {
 		if cfg.Instrumentations.Padding.Size < 1 {
 			return errors.New("padding size must be at least 1")
 		}
+		// LinkMTU is 0 here (populated later at loadEBPF time), so MTU check is deferred.
 	}
 
 	// Forward mode specific validations

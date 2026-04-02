@@ -68,6 +68,7 @@ Client → Obfuscator Proxy → WireGuard Server
 
 - **Dependency Injection**: Prefer constructor injection for better testability
 - **Error Wrapping**: Always wrap errors with context using pkg/errors
+- **Runtime-Computed Config Fields**: Some config struct fields are computed at runtime (not loaded from YAML). Mark them with `yaml:"-"` to exclude from YAML parsing while still using `ebpf:"..."` tags for eBPF propagation via `bpf.Configure`. Example: `LinkMTU uint16 \`yaml:"-" ebpf:"link_mtu"\`` in `PaddingConfig` is detected from the network interface at loader startup and passed to eBPF rodata.
 
 ### Metrics Architecture
 

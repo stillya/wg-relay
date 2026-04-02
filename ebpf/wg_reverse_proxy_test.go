@@ -283,7 +283,8 @@ func TestReverseProxyPaddingObfuscation(t *testing.T) {
 			} else {
 				// TO_WG: verify padding was removed
 				if tt.paddingEnabled {
-					verifyPaddingDeobfuscation(t, inputPacket, outputPacket, tt.paddingSize)
+					markerSize := inputPacket[len(inputPacket)-1]
+					verifyPaddingDeobfuscation(t, inputPacket, outputPacket, markerSize)
 				} else {
 					if len(outputPacket) != len(inputPacket) {
 						t.Errorf("Packet length changed when padding disabled: input %d, output %d",
@@ -381,7 +382,50 @@ func TestReverseProxyCombinedObfuscation(t *testing.T) {
 	}
 }
 
-// createObfuscatedAndPaddedWGPacket creates a WireGuard packet with XOR and padding applied
+// TestReverseProxyMalformedPaddingDrop verifies that malformed padded packets are dropped
+// (INSTR_ERROR path: pkt_len <= padding_size) instead of being passed through.
+func TestReverseProxyMalformedPaddingDrop(t *testing.T) {
+	spec, err := LoadWgReverseProxy()
+	if err != nil {
+		t.Fatalf("Failed to load spec: %v", err)
+	}
+
+	if err := spec.Variables["__cfg_xor_enabled"].Set(false); err != nil {
+		t.Fatalf("Failed to set xor_enabled: %v", err)
+	}
+	if err := spec.Variables["__cfg_padding_enabled"].Set(true); err != nil {
+		t.Fatalf("Failed to set padding_enabled: %v", err)
+	}
+	// padding_size config controls obfuscation, not deobfuscation. The deobfuscate path
+	// reads the padding marker byte from the packet itself (set by createMalformedPaddedWGPacket).
+	if err := spec.Variables["__cfg_padding_size"].Set(uint8(8)); err != nil {
+		t.Fatalf("Failed to set padding_size: %v", err)
+	}
+	if err := spec.Variables["__cfg_wg_port"].Set(uint16(wgPort)); err != nil {
+		t.Fatalf("Failed to set wg_port: %v", err)
+	}
+
+	objs := &WgReverseProxyObjects{}
+	if err := spec.LoadAndAssign(objs, nil); err != nil {
+		t.Fatalf("Failed to load objects: %v", err)
+	}
+	defer objs.Close()
+
+	// TO_WG direction: client sends a malformed padded packet to the WG server.
+	// The last byte marker claims padding_size=200 but the packet only has 1 extra byte,
+	// so pkt_len <= padding_size triggers INSTR_ERROR → TC_ACT_SHOT (drop).
+	inputPacket := createMalformedPaddedWGPacket("192.168.1.1", "192.168.1.2", 12345, wgPort, 200)
+
+	result, _, err := objs.WgReverseProxy.Test(inputPacket)
+	if err != nil {
+		t.Fatalf("Failed to run program: %v", err)
+	}
+
+	if int(result) != tcActShot {
+		t.Errorf("Expected malformed padded packet to be dropped (TC_ACT_SHOT=%d), got %d", tcActShot, result)
+	}
+}
+
 // This simulates what a forward proxy would send that needs to be deobfuscated
 func createObfuscatedAndPaddedWGPacket(srcIP, dstIP string, srcPort, dstPort uint16, xorKey []byte, paddingSize uint8) []byte {
 	// Start with a base packet, XOR it, then add padding
@@ -405,4 +449,54 @@ func createObfuscatedAndPaddedWGPacket(srcIP, dstIP string, srcPort, dstPort uin
 	packet = append(packet, padding...)
 
 	return packet
+}
+
+// TestReverseProxyPaddingObfuscateMTUExceededDrop verifies that a FROM_WG packet is dropped
+// when adding padding would cause it to exceed the configured link MTU.
+func TestReverseProxyPaddingObfuscateMTUExceededDrop(t *testing.T) {
+	spec, err := LoadWgReverseProxy()
+	if err != nil {
+		t.Fatalf("Failed to load spec: %v", err)
+	}
+
+	if spec.Variables["__cfg_link_mtu"] == nil {
+		t.Skip("__cfg_link_mtu variable not present in compiled eBPF object; recompile after updating padding.h")
+	}
+
+	if err := spec.Variables["__cfg_xor_enabled"].Set(false); err != nil {
+		t.Fatalf("Failed to set xor_enabled: %v", err)
+	}
+	if err := spec.Variables["__cfg_padding_enabled"].Set(true); err != nil {
+		t.Fatalf("Failed to set padding_enabled: %v", err)
+	}
+	if err := spec.Variables["__cfg_padding_size"].Set(uint8(64)); err != nil {
+		t.Fatalf("Failed to set padding_size: %v", err)
+	}
+	if err := spec.Variables["__cfg_wg_port"].Set(uint16(wgPort)); err != nil {
+		t.Fatalf("Failed to set wg_port: %v", err)
+	}
+	// Set MTU small enough that adding 64 bytes of padding would exceed it.
+	// A WG packet is 74 bytes total (14 Eth + 60 IP/UDP/payload).
+	// The MTU check compares IP-layer size: (74 - 14) + 64 = 110 > 100.
+	if err := spec.Variables["__cfg_link_mtu"].Set(uint16(100)); err != nil {
+		t.Fatalf("Failed to set link_mtu: %v", err)
+	}
+
+	objs := &WgReverseProxyObjects{}
+	if err := spec.LoadAndAssign(objs, nil); err != nil {
+		t.Fatalf("Failed to load objects: %v", err)
+	}
+	defer objs.Close()
+
+	// FROM_WG direction: WG server sends packet to client, reverse proxy would add padding.
+	inputPacket := createWGPacket("192.168.1.2", "192.168.1.1", wgPort, 12345)
+
+	result, _, err := objs.WgReverseProxy.Test(inputPacket)
+	if err != nil {
+		t.Fatalf("Failed to run program: %v", err)
+	}
+
+	if int(result) != tcActShot {
+		t.Errorf("Expected packet to be dropped (TC_ACT_SHOT=%d) when padding exceeds MTU, got %d", tcActShot, result)
+	}
 }

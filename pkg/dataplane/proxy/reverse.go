@@ -52,6 +52,18 @@ func (rp *ReverseLoader) loadEBPF() error {
 		return errors.Wrap(err, "failed to load reverse proxy spec")
 	}
 
+	if rp.cfg.Instrumentations.Padding != nil && rp.cfg.Instrumentations.Padding.Enabled {
+		mtu, err := detectMinMTU(rp.cfg.Interfaces)
+		if err != nil {
+			return errors.Wrap(err, "failed to detect interface MTU")
+		}
+		rp.cfg.Instrumentations.Padding.LinkMTU = mtu
+		if err := rp.cfg.Instrumentations.Padding.ValidateMTU(); err != nil {
+			return errors.Wrap(err, "padding MTU validation failed")
+		}
+		log.Info("Detected minimum MTU", "mtu", mtu)
+	}
+
 	if err := bpf.Configure(spec, &rp.cfg); err != nil {
 		return errors.Wrap(err, "failed to configure static variables")
 	}

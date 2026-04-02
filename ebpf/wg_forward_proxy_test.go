@@ -18,12 +18,8 @@ func TestBasicForwarding(t *testing.T) {
 		t.Fatalf("Failed to load spec: %v", err)
 	}
 
-	if err := spec.Variables["__cfg_xor_enabled"].Set(false); err != nil {
-		t.Fatalf("Failed to set xor_enabled: %v", err)
-	}
-	if err := spec.Variables["__cfg_wg_port"].Set(uint16(wgPort)); err != nil {
-		t.Fatalf("Failed to set wg_port: %v", err)
-	}
+	setVar(t, spec, "__cfg_xor_enabled", false)
+	setVar(t, spec, "__cfg_wg_port", uint16(wgPort))
 
 	objs := &WgForwardProxyObjects{}
 	if err := spec.LoadAndAssign(objs, nil); err != nil {
@@ -131,15 +127,9 @@ func TestXORObfuscation(t *testing.T) {
 			var keyArray [32]byte
 			copy(keyArray[:], keyBytes)
 
-			if err := spec.Variables["__cfg_xor_enabled"].Set(tt.xorEnabled); err != nil {
-				t.Fatalf("Failed to set xor_enabled: %v", err)
-			}
-			if err := spec.Variables["__cfg_xor_key"].Set(keyArray); err != nil {
-				t.Fatalf("Failed to set xor_key: %v", err)
-			}
-			if err := spec.Variables["__cfg_wg_port"].Set(uint16(wgPort)); err != nil {
-				t.Fatalf("Failed to set wg_port: %v", err)
-			}
+			setVar(t, spec, "__cfg_xor_enabled", tt.xorEnabled)
+			setVar(t, spec, "__cfg_xor_key", keyArray)
+			setVar(t, spec, "__cfg_wg_port", uint16(wgPort))
 
 			objs := &WgForwardProxyObjects{}
 			if err := spec.LoadAndAssign(objs, nil); err != nil {
@@ -173,19 +163,14 @@ func TestXORObfuscation(t *testing.T) {
 func TestPaddingObfuscation(t *testing.T) {
 	tests := []struct {
 		name           string
+		direction      string
 		paddingEnabled bool
 		paddingSize    uint8
 	}{
-		{
-			name:           "padding_enabled",
-			paddingEnabled: true,
-			paddingSize:    64,
-		},
-		{
-			name:           "padding_disabled",
-			paddingEnabled: false,
-			paddingSize:    32,
-		},
+		{"obfuscate_enabled", "to_backend", true, 64},
+		{"obfuscate_disabled", "to_backend", false, 32},
+		{"deobfuscate_size_64", "from_backend", true, 64},
+		{"deobfuscate_size_32", "from_backend", true, 32},
 	}
 
 	for _, tt := range tests {
@@ -195,18 +180,10 @@ func TestPaddingObfuscation(t *testing.T) {
 				t.Fatalf("Failed to load spec: %v", err)
 			}
 
-			if err := spec.Variables["__cfg_xor_enabled"].Set(false); err != nil {
-				t.Fatalf("Failed to set xor_enabled: %v", err)
-			}
-			if err := spec.Variables["__cfg_padding_enabled"].Set(tt.paddingEnabled); err != nil {
-				t.Fatalf("Failed to set padding_enabled: %v", err)
-			}
-			if err := spec.Variables["__cfg_padding_size"].Set(tt.paddingSize); err != nil {
-				t.Fatalf("Failed to set padding_size: %v", err)
-			}
-			if err := spec.Variables["__cfg_wg_port"].Set(uint16(wgPort)); err != nil {
-				t.Fatalf("Failed to set wg_port: %v", err)
-			}
+			setVar(t, spec, "__cfg_xor_enabled", false)
+			setVar(t, spec, "__cfg_padding_enabled", tt.paddingEnabled)
+			setVar(t, spec, "__cfg_padding_size", tt.paddingSize)
+			setVar(t, spec, "__cfg_wg_port", uint16(wgPort))
 
 			objs := &WgForwardProxyObjects{}
 			if err := spec.LoadAndAssign(objs, nil); err != nil {
@@ -220,21 +197,39 @@ func TestPaddingObfuscation(t *testing.T) {
 				t.Fatalf("Failed to configure backends: %v", err)
 			}
 
-			inputPacket := createWGPacket("192.168.1.1", "192.168.1.2", 12345, wgPort)
-			_, outputPacket, err := objs.WgForwardProxy.Test(inputPacket)
-			if err != nil {
-				t.Fatalf("Failed to run program: %v", err)
-			}
-
-			verifyPacket(t, outputPacket, "10.0.0.1", 51820)
-
-			if tt.paddingEnabled {
-				verifyPaddingObfuscation(t, inputPacket, outputPacket, tt.paddingSize)
-			} else {
-				if len(outputPacket) != len(inputPacket) {
+			if tt.direction == "to_backend" {
+				inputPacket := createWGPacket("192.168.1.1", "192.168.1.2", 12345, wgPort)
+				_, outputPacket, err := objs.WgForwardProxy.Test(inputPacket)
+				if err != nil {
+					t.Fatalf("Failed to run program: %v", err)
+				}
+				verifyPacket(t, outputPacket, "10.0.0.1", 51820)
+				if tt.paddingEnabled {
+					verifyPaddingObfuscation(t, inputPacket, outputPacket, tt.paddingSize)
+				} else if len(outputPacket) != len(inputPacket) {
 					t.Errorf("Packet length changed when padding disabled: input %d, output %d",
 						len(inputPacket), len(outputPacket))
 				}
+			} else {
+				toWgPacket := createWGPacket("192.168.1.1", "192.168.1.2", 12345, wgPort)
+				_, toWgOutput, err := objs.WgForwardProxy.Test(toWgPacket)
+				if err != nil {
+					t.Fatalf("Failed to run TO_WG packet: %v", err)
+				}
+				natInfo, err := parseUDPPacket(toWgOutput)
+				if err != nil || natInfo == nil {
+					t.Fatalf("Failed to parse TO_WG output: %v", err)
+				}
+
+				paddedResponse := createPaddedWGPacket("10.0.0.1", "192.168.1.2", 51820, natInfo.srcPort, tt.paddingSize)
+				_, fromWgOutput, err := objs.WgForwardProxy.Test(paddedResponse)
+				if err != nil {
+					t.Fatalf("Failed to run FROM_WG padded packet: %v", err)
+				}
+
+				markerSize := paddedResponse[len(paddedResponse)-1]
+				verifyPaddingDeobfuscation(t, paddedResponse, fromWgOutput, markerSize)
+				verifyPacket(t, fromWgOutput, "192.168.1.1", 12345)
 			}
 		})
 	}
@@ -253,21 +248,11 @@ func TestPaddingWithXOR(t *testing.T) {
 
 	paddingSize := uint8(32)
 
-	if err := spec.Variables["__cfg_xor_enabled"].Set(true); err != nil {
-		t.Fatalf("Failed to set xor_enabled: %v", err)
-	}
-	if err := spec.Variables["__cfg_xor_key"].Set(keyArray); err != nil {
-		t.Fatalf("Failed to set xor_key: %v", err)
-	}
-	if err := spec.Variables["__cfg_padding_enabled"].Set(true); err != nil {
-		t.Fatalf("Failed to set padding_enabled: %v", err)
-	}
-	if err := spec.Variables["__cfg_padding_size"].Set(paddingSize); err != nil {
-		t.Fatalf("Failed to set padding_size: %v", err)
-	}
-	if err := spec.Variables["__cfg_wg_port"].Set(uint16(wgPort)); err != nil {
-		t.Fatalf("Failed to set wg_port: %v", err)
-	}
+	setVar(t, spec, "__cfg_xor_enabled", true)
+	setVar(t, spec, "__cfg_xor_key", keyArray)
+	setVar(t, spec, "__cfg_padding_enabled", true)
+	setVar(t, spec, "__cfg_padding_size", paddingSize)
+	setVar(t, spec, "__cfg_wg_port", uint16(wgPort))
 
 	objs := &WgForwardProxyObjects{}
 	if err := spec.LoadAndAssign(objs, nil); err != nil {
@@ -299,12 +284,8 @@ func TestMultipleBackends(t *testing.T) {
 		t.Fatalf("Failed to load spec: %v", err)
 	}
 
-	if err := spec.Variables["__cfg_xor_enabled"].Set(false); err != nil {
-		t.Fatalf("Failed to set xor_enabled: %v", err)
-	}
-	if err := spec.Variables["__cfg_wg_port"].Set(uint16(wgPort)); err != nil {
-		t.Fatalf("Failed to set wg_port: %v", err)
-	}
+	setVar(t, spec, "__cfg_xor_enabled", false)
+	setVar(t, spec, "__cfg_wg_port", uint16(wgPort))
 
 	objs := &WgForwardProxyObjects{}
 	if err := spec.LoadAndAssign(objs, nil); err != nil {
@@ -385,12 +366,8 @@ func TestWgPortConfig(t *testing.T) {
 				t.Fatalf("Failed to load spec: %v", err)
 			}
 
-			if err := spec.Variables["__cfg_xor_enabled"].Set(false); err != nil {
-				t.Fatalf("Failed to set xor_enabled: %v", err)
-			}
-			if err := spec.Variables["__cfg_wg_port"].Set(tt.wgPort); err != nil {
-				t.Fatalf("Failed to set wg_port: %v", err)
-			}
+			setVar(t, spec, "__cfg_xor_enabled", false)
+			setVar(t, spec, "__cfg_wg_port", tt.wgPort)
 
 			objs := &WgForwardProxyObjects{}
 			if err := spec.LoadAndAssign(objs, nil); err != nil {
@@ -430,12 +407,8 @@ func TestDownstreamUpstreamMetrics(t *testing.T) {
 		t.Fatalf("Failed to load spec: %v", err)
 	}
 
-	if err := spec.Variables["__cfg_xor_enabled"].Set(false); err != nil {
-		t.Fatalf("Failed to set xor_enabled: %v", err)
-	}
-	if err := spec.Variables["__cfg_wg_port"].Set(uint16(wgPort)); err != nil {
-		t.Fatalf("Failed to set wg_port: %v", err)
-	}
+	setVar(t, spec, "__cfg_xor_enabled", false)
+	setVar(t, spec, "__cfg_wg_port", uint16(wgPort))
 
 	objs := &WgForwardProxyObjects{}
 	if err := spec.LoadAndAssign(objs, nil); err != nil {
@@ -482,10 +455,98 @@ func TestDownstreamUpstreamMetrics(t *testing.T) {
 	verifyMetrics(t, oldMetrics, currentMetrics, expectedMetrics)
 }
 
-// verifyPacket is a forward-proxy specific wrapper that uses the shared verifyPacketDestination
+// TestPaddingDeobfuscateMalformedDrop verifies that malformed padded packets are dropped.
+func TestPaddingDeobfuscateMalformedDrop(t *testing.T) {
+	spec, err := LoadWgForwardProxy()
+	if err != nil {
+		t.Fatalf("Failed to load spec: %v", err)
+	}
+
+	setVar(t, spec, "__cfg_xor_enabled", false)
+	setVar(t, spec, "__cfg_padding_enabled", true)
+	setVar(t, spec, "__cfg_padding_size", uint8(32))
+	setVar(t, spec, "__cfg_wg_port", uint16(wgPort))
+
+	objs := &WgForwardProxyObjects{}
+	if err := spec.LoadAndAssign(objs, nil); err != nil {
+		t.Fatalf("Failed to load objects: %v", err)
+	}
+	defer objs.Close()
+
+	if err := configureBackends(objs, []config.BackendServer{
+		{IP: "10.0.0.1", Port: 51820},
+	}); err != nil {
+		t.Fatalf("Failed to configure backends: %v", err)
+	}
+
+	toWgPacket := createWGPacket("192.168.1.1", "192.168.1.2", 12345, wgPort)
+	_, outputPacket, err := objs.WgForwardProxy.Test(toWgPacket)
+	if err != nil {
+		t.Fatalf("Failed to run TO_WG packet: %v", err)
+	}
+
+	natInfo, err := parseUDPPacket(outputPacket)
+	if err != nil || natInfo == nil {
+		t.Fatalf("Failed to parse TO_WG output: %v", err)
+	}
+
+	malformedPacket := createMalformedPaddedWGPacket("10.0.0.1", "192.168.1.2", 51820, natInfo.srcPort, 200)
+
+	result, _, err := objs.WgForwardProxy.Test(malformedPacket)
+	if err != nil {
+		t.Fatalf("Failed to run FROM_WG malformed packet: %v", err)
+	}
+
+	const xdpDrop = 1
+	if int(result) != xdpDrop {
+		t.Errorf("Expected malformed padded packet to be dropped (XDP_DROP=%d), got %d", xdpDrop, result)
+	}
+}
+
 func verifyPacket(t *testing.T, outputPacket []byte, expectedIP string, expectedPort int) {
 	t.Helper()
 	verifyPacketDestination(t, outputPacket, expectedIP, uint16(expectedPort)) //nolint:gosec // G115: it's fine
+}
+
+func TestPaddingObfuscateMTUExceededDrop(t *testing.T) {
+	spec, err := LoadWgForwardProxy()
+	if err != nil {
+		t.Fatalf("Failed to load spec: %v", err)
+	}
+
+	if spec.Variables["__cfg_link_mtu"] == nil {
+		t.Skip("__cfg_link_mtu variable not present in compiled eBPF object; recompile after updating padding.h")
+	}
+
+	setVar(t, spec, "__cfg_xor_enabled", false)
+	setVar(t, spec, "__cfg_padding_enabled", true)
+	setVar(t, spec, "__cfg_padding_size", uint8(64))
+	setVar(t, spec, "__cfg_wg_port", uint16(wgPort))
+	setVar(t, spec, "__cfg_link_mtu", uint16(100))
+
+	objs := &WgForwardProxyObjects{}
+	if err := spec.LoadAndAssign(objs, nil); err != nil {
+		t.Fatalf("Failed to load objects: %v", err)
+	}
+	defer objs.Close()
+
+	if err := configureBackends(objs, []config.BackendServer{
+		{IP: "10.0.0.1", Port: 51820},
+	}); err != nil {
+		t.Fatalf("Failed to configure backends: %v", err)
+	}
+
+	inputPacket := createWGPacket("192.168.1.1", "192.168.1.2", 12345, wgPort)
+
+	result, _, err := objs.WgForwardProxy.Test(inputPacket)
+	if err != nil {
+		t.Fatalf("Failed to run program: %v", err)
+	}
+
+	const xdpDrop = 1
+	if int(result) != xdpDrop {
+		t.Errorf("Expected packet to be dropped (XDP_DROP=%d) when padding exceeds MTU, got %d", xdpDrop, result)
+	}
 }
 
 // configureBackends configures backend servers for the forward proxy
