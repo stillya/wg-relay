@@ -1,9 +1,7 @@
 #ifndef __NAT_H__
 #define __NAT_H__
 
-#include <linux/bpf.h>
-#include <linux/if_ether.h>
-#include <linux/types.h>
+#include "vmlinux.h"
 #include <bpf/bpf_helpers.h>
 #include "common.h"
 

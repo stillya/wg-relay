@@ -1,12 +1,14 @@
 // clang-format off
 //go:build ignore
 //  clang-format on
-#include <linux/bpf.h>
-#include <linux/if_ether.h>
-#include <linux/in.h>
-#include <linux/ip.h>
-#include <linux/pkt_cls.h>
-#include <linux/udp.h>
+
+// NOTE: Disable preserve_access_index on BPF context types (xdp_md, __sk_buff, etc.)
+// to prevent CO-RE relocations on context pointers, which cause the BPF verifier
+// to reject programs with "dereference of modified ctx ptr" errors.
+// But we should move to direct BPF_CORE_READ if there will be direct access to kernel structs.
+#define BPF_NO_PRESERVE_ACCESS_INDEX
+#include "vmlinux.h"
+#include <bpf/bpf_core_read.h>
 #include <bpf/bpf_endian.h>
 #include <bpf/bpf_helpers.h>
 #include "csum.h"

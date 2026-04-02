@@ -12,13 +12,24 @@ RUN asm_arch=$(if [ "${TARGETARCH}" = "arm64" ]; then echo "aarch64-linux-gnu"; 
     echo "wireshark-common wireshark-common/install-setuid boolean true" | debconf-set-selections && \
     apt-get update && \
     DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
+    wget \
+    gnupg \
+    lsb-release \
+    ca-certificates \
+    software-properties-common && \
+    wget https://apt.llvm.org/llvm.sh && \
+    chmod +x llvm.sh && \
+    ./llvm.sh 18 && \
+    rm -f llvm.sh && \
+    apt-get update && \
+    DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
     build-essential \
     pkg-config \
-    clang \
-    clangd \
-    clang-format \
-    llvm \
-    lld \
+    clang-18 \
+    clangd-18 \
+    clang-format-18 \
+    llvm-18 \
+    lld-18 \
     m4 \
     git \
     libelf-dev \
@@ -34,8 +45,13 @@ RUN asm_arch=$(if [ "${TARGETARCH}" = "arm64" ]; then echo "aarch64-linux-gnu"; 
     libcap-dev \
     xdp-tools \
     tshark \
-    ca-certificates \
     bear && \
+    ln -sf /usr/bin/clang-18 /usr/bin/clang && \
+    ln -sf /usr/bin/clangd-18 /usr/bin/clangd && \
+    ln -sf /usr/bin/clang-format-18 /usr/bin/clang-format && \
+    ln -sf /usr/bin/ld.lld-18 /usr/bin/ld.lld && \
+    ln -sf /usr/bin/llvm-strip-18 /usr/bin/llvm-strip && \
+    ln -sf /usr/bin/llc-18 /usr/bin/llc && \
     ln -sf /usr/include/${asm_arch}/asm/ /usr/include/asm && \
     ln -sf /usr/local/go/bin/go /bin/go && \
     git clone --recurse-submodules --depth 1 https://github.com/libbpf/bpftool.git /tmp/bpftool && \

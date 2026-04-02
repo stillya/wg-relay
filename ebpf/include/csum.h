@@ -1,8 +1,7 @@
 #ifndef __CSUM_H__
 #define __CSUM_H__
 
-#include <linux/ip.h>
-#include <linux/types.h>
+#include "vmlinux.h"
 #include <bpf/bpf_helpers.h>
 #include "common.h"
 

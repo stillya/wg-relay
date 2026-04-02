@@ -1,12 +1,7 @@
 #ifndef __CONTEXT_H__
 #define __CONTEXT_H__
 
-#include <linux/bpf.h>
-#include <linux/if_ether.h>
-#include <linux/ip.h>
-#include <linux/pkt_cls.h>
-#include <linux/types.h>
-#include <linux/udp.h>
+#include "vmlinux.h"
 #include "common.h"
 #include "packet.h"
 
