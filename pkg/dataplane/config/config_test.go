@@ -58,6 +58,42 @@ func TestPaddingConfig_Validation(t *testing.T) {
 			},
 			wantErr: "padding size must be at least 1",
 		},
+		{
+			name: "valid padding mode direct",
+			padding: &PaddingConfig{
+				Enabled: true,
+				Size:    32,
+				Mode:    "direct",
+			},
+			wantErr: "",
+		},
+		{
+			name: "valid padding mode randomize",
+			padding: &PaddingConfig{
+				Enabled: true,
+				Size:    32,
+				Mode:    "randomize",
+			},
+			wantErr: "",
+		},
+		{
+			name: "valid padding mode empty defaults to direct",
+			padding: &PaddingConfig{
+				Enabled: true,
+				Size:    32,
+				Mode:    "",
+			},
+			wantErr: "",
+		},
+		{
+			name: "invalid padding mode",
+			padding: &PaddingConfig{
+				Enabled: true,
+				Size:    32,
+				Mode:    "fixed",
+			},
+			wantErr: "padding mode must be 'direct' or 'randomize'",
+		},
 	}
 
 	for _, tt := range tests {

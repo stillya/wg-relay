@@ -58,6 +58,7 @@ func (rp *ReverseLoader) loadEBPF() error {
 			return errors.Wrap(err, "failed to detect interface MTU")
 		}
 		rp.cfg.Instrumentations.Padding.LinkMTU = mtu
+		rp.cfg.Instrumentations.Padding.Randomize = rp.cfg.Instrumentations.Padding.Mode == "randomize"
 		if err := rp.cfg.Instrumentations.Padding.ValidateMTU(); err != nil {
 			return errors.Wrap(err, "padding MTU validation failed")
 		}

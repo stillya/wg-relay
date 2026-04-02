@@ -52,9 +52,11 @@ type XORConfig struct {
 
 // PaddingConfig represents padding obfuscation configuration
 type PaddingConfig struct {
-	Enabled bool   `yaml:"enabled" ebpf:"padding_enabled"`
-	Size    uint8  `yaml:"size" ebpf:"padding_size"`
-	LinkMTU uint16 `yaml:"-" ebpf:"link_mtu"` // computed at runtime, not yaml-exposed
+	Enabled   bool   `yaml:"enabled" ebpf:"padding_enabled"`
+	Size      uint8  `yaml:"size" ebpf:"padding_size"`
+	Mode      string `yaml:"mode"`                       // "direct" or "randomize" (default: "direct")
+	Randomize bool   `yaml:"-" ebpf:"padding_randomize"` // computed at runtime from Mode, not yaml-exposed
+	LinkMTU   uint16 `yaml:"-" ebpf:"link_mtu"`          // computed at runtime, not yaml-exposed
 }
 
 // BackendServer represents a single backend server
@@ -196,7 +198,10 @@ func (cfg *ProxyConfig) validate(mode string) error {
 		if cfg.Instrumentations.Padding.Size < 1 {
 			return errors.New("padding size must be at least 1")
 		}
-		// LinkMTU is 0 here (populated later at loadEBPF time), so MTU check is deferred.
+		mode := cfg.Instrumentations.Padding.Mode
+		if mode != "" && mode != "direct" && mode != "randomize" {
+			return errors.New("padding mode must be 'direct' or 'randomize'")
+		}
 	}
 
 	// Forward mode specific validations

@@ -10,6 +10,7 @@
 
 DECLARE_CONFIG(bool, padding_enabled, "Enable padding obfuscation");
 DECLARE_CONFIG(__u8, padding_size, "Padding size in bytes");
+DECLARE_CONFIG(bool, padding_randomize, "Randomize padding size between 1 and padding_size");
 DECLARE_CONFIG(__u16, link_mtu, "Link MTU size in bytes");
 
 static __always_inline __maybe_unused int padding_obfuscate_xdp(struct wg_ctx *ctx) {
@@ -18,17 +19,19 @@ static __always_inline __maybe_unused int padding_obfuscate_xdp(struct wg_ctx *c
 	}
 
 	__u8 cfg_padding_size = CONFIG(padding_size);
+	__u8 actual_size =
+		CONFIG(padding_randomize) ? ((__u8)(bpf_get_prandom_u32() % cfg_padding_size) + 1) : cfg_padding_size;
 
 	void *data = (void *)(long)ctx->xdp->data;
 	void *data_end = (void *)(long)ctx->xdp->data_end;
 	__u64 current_len = (data_end - data);
 	__u16 cfg_link_mtu = CONFIG(link_mtu);
 	if (cfg_link_mtu > 0 && current_len > ETH_HLEN &&
-	    (current_len - ETH_HLEN) + (__u64)cfg_padding_size > cfg_link_mtu) {
+	    (current_len - ETH_HLEN) + (__u64)actual_size > cfg_link_mtu) {
 		return INSTR_ERROR;
 	}
 
-	if (bpf_xdp_adjust_tail(ctx->xdp, cfg_padding_size) != 0) {
+	if (bpf_xdp_adjust_tail(ctx->xdp, actual_size) != 0) {
 		return INSTR_ERROR;
 	}
 
@@ -37,8 +40,8 @@ static __always_inline __maybe_unused int padding_obfuscate_xdp(struct wg_ctx *c
 	// the offset has a non-zero var_off.mask (i.e. any runtime-computed value).
 	// Example: https://github.com/cilium/cilium/blob/main/bpf/include/bpf/ctx/xdp.h#L66
 	// Little about var_off: https://github.com/google/security-research/security/advisories/GHSA-hfqc-63c7-rj9f
-	__u32 mrk_offset = (__u32)current_len + cfg_padding_size - 1;
-	__u8 marker = cfg_padding_size;
+	__u32 mrk_offset = (__u32)current_len + actual_size - 1;
+	__u8 marker = actual_size;
 	if (bpf_xdp_store_bytes(ctx->xdp, mrk_offset, &marker, sizeof(marker)) != 0) {
 		return INSTR_ERROR;
 	}
@@ -90,20 +93,22 @@ static __always_inline __maybe_unused int padding_obfuscate_tc(struct wg_ctx *ct
 	}
 
 	__u8 cfg_padding_size = CONFIG(padding_size);
+	__u8 actual_size =
+		CONFIG(padding_randomize) ? ((__u8)(bpf_get_prandom_u32() % cfg_padding_size) + 1) : cfg_padding_size;
 
 	__u32 current_len = ctx->skb->len;
 	__u16 cfg_link_mtu = CONFIG(link_mtu);
 	if (cfg_link_mtu > 0 && current_len > ETH_HLEN &&
-	    ((__u64)current_len - ETH_HLEN) + cfg_padding_size > cfg_link_mtu) {
+	    ((__u64)current_len - ETH_HLEN) + actual_size > cfg_link_mtu) {
 		return INSTR_ERROR;
 	}
 
-	__u32 new_len = current_len + cfg_padding_size;
+	__u32 new_len = current_len + actual_size;
 	if (bpf_skb_change_tail(ctx->skb, new_len, 0) != 0) {
 		return INSTR_ERROR;
 	}
 
-	__u8 marker = cfg_padding_size;
+	__u8 marker = actual_size;
 	if (bpf_skb_store_bytes(ctx->skb, new_len - 1, &marker, sizeof(marker), 0) != 0) {
 		return INSTR_ERROR;
 	}
