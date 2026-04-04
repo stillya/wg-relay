@@ -1,7 +1,7 @@
 include ../Makefile.defs
 
 BPF := wg_forward_proxy.o wg_reverse_proxy.o
-LIB := $(wildcard include/*.h) include/vmlinux.h
+LIB := $(wildcard include/*.h)
 
 CLANG ?= clang
 LLC ?= llc
@@ -24,13 +24,9 @@ LLC_FLAGS := -march=bpf -mcpu=v3 -filetype=obj
 # Disable built-in implicit rules
 .SUFFIXES:
 
-.PHONY: all generate clean gen_compile_commands format check-format
+.PHONY: all generate clean gen_compile_commands format check-format vmlinux
 
 all: generate
-
-include/vmlinux.h:
-	@echo "Generating vmlinux.h from kernel BTF..."
-	$(QUIET)$(BPFTOOL) btf dump file /sys/kernel/btf/vmlinux format c > include/vmlinux.h
 
 generate: $(BPF)
 	@$(ECHO_GEN)
@@ -52,7 +48,10 @@ clean:
 	@$(ECHO_CLEAN)
 	$(QUIET)rm -f *.o *.ll
 	$(QUIET)rm -f *_bpfel.o *_bpfeb.o
-	$(QUIET)rm -f include/vmlinux.h
+
+vmlinux:
+	@echo "Generating vmlinux.h from kernel BTF..."
+	$(QUIET)$(BPFTOOL) btf dump file /sys/kernel/btf/vmlinux format c > include/vmlinux.h
 
 gen_compile_commands:
 	@echo "Generating compile_commands.json..."

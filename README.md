@@ -32,6 +32,15 @@ Client                 Obfuscator Proxy           WireGuard Server
 
 ## Installation
 
+### Deployment Overview
+
+A full deployment requires **two instances** of wg-relay:
+
+- **Forward instance** - runs on the relay-machine. Set `mode: "forward"` and configure `backends` to point to the reverse instance(s).
+- **Reverse instance** - runs on the same machine as the WireGuard server. Set `mode: "reverse"`. It deobfuscates incoming traffic and forwards it to the local WireGuard daemon.
+
+Both instances must use identical obfuscation settings (same XOR key, same padding configuration).
+
 ### Debian / Ubuntu
 
 Download the `.deb` package from the [latest release](https://github.com/stillya/wg-relay/releases/latest):
@@ -60,8 +69,6 @@ Override service settings without editing the unit file (e.g. to use a different
 sudo systemctl edit wg-relay
 # adds a drop-in at /etc/systemd/system/wg-relay.service.d/override.conf
 ```
-
-On upgrade, dpkg will **not** overwrite your `/etc/wg-relay/config.yaml` if you have modified it.
 
 ### RPM (RHEL / Fedora)
 
@@ -155,7 +162,7 @@ proxy:
 
 Backend names: The optional name field allows you to assign human-readable labels to backends for Prometheus metrics and console statistics. If omitted, backends are labeled as backend_0, backend_1, etc. Named backends help with metric clarity and dashboard creation.
 
-### 3. Run
+### 3. Run locally
 
 ```bash
 # Run daemon
