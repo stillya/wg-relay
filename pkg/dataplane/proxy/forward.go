@@ -124,6 +124,22 @@ func (fp *ForwardLoader) configureBackendMap() error {
 		return errors.Wrap(err, "failed to set backend count")
 	}
 
+	portSet := make(map[uint16]struct{})
+	for _, backend := range backends {
+		port := backend.Port
+		if port == 0 {
+			port = fp.cfg.WGPort
+		}
+		portSet[port] = struct{}{}
+	}
+	dummy := uint8(1)
+	for port := range portSet {
+		p := port
+		if err := fp.objs.BackendPortSet.Put(&p, &dummy); err != nil {
+			return errors.Wrap(err, "failed to populate backend port set")
+		}
+	}
+
 	backendAddrs := make([]string, len(backends))
 	for i, b := range fp.cfg.Forward.Backends {
 		if b.Port > 0 {

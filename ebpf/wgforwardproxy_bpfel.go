@@ -117,6 +117,7 @@ type WgForwardProxyProgramSpecs struct {
 type WgForwardProxyMapSpecs struct {
 	BackendCount   *ebpf.MapSpec `ebpf:"backend_count"`
 	BackendMap     *ebpf.MapSpec `ebpf:"backend_map"`
+	BackendPortSet *ebpf.MapSpec `ebpf:"backend_port_set"`
 	ConnectionMap  *ebpf.MapSpec `ebpf:"connection_map"`
 	MetricsMap     *ebpf.MapSpec `ebpf:"metrics_map"`
 	NatPortCounter *ebpf.MapSpec `ebpf:"nat_port_counter"`
@@ -158,6 +159,7 @@ func (o *WgForwardProxyObjects) Close() error {
 type WgForwardProxyMaps struct {
 	BackendCount   *ebpf.Map `ebpf:"backend_count"`
 	BackendMap     *ebpf.Map `ebpf:"backend_map"`
+	BackendPortSet *ebpf.Map `ebpf:"backend_port_set"`
 	ConnectionMap  *ebpf.Map `ebpf:"connection_map"`
 	MetricsMap     *ebpf.Map `ebpf:"metrics_map"`
 	NatPortCounter *ebpf.Map `ebpf:"nat_port_counter"`
@@ -168,6 +170,7 @@ func (m *WgForwardProxyMaps) Close() error {
 	return _WgForwardProxyClose(
 		m.BackendCount,
 		m.BackendMap,
+		m.BackendPortSet,
 		m.ConnectionMap,
 		m.MetricsMap,
 		m.NatPortCounter,

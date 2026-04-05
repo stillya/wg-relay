@@ -451,6 +451,79 @@ func createObfuscatedAndPaddedWGPacket(srcIP, dstIP string, srcPort, dstPort uin
 	return packet
 }
 
+func TestReverseProxyWgPortConfig(t *testing.T) {
+	xorKey := "test-key-1234567890abcdef12345678"
+	keyBytes := []byte(xorKey)
+	var keyArray [32]byte
+	copy(keyArray[:], keyBytes)
+
+	tests := []struct {
+		name          string
+		wgPort        uint16
+		packetDstPort uint16
+		shouldProcess bool
+	}{
+		{
+			name:          "default_port",
+			wgPort:        51820,
+			packetDstPort: 51820,
+			shouldProcess: true,
+		},
+		{
+			name:          "custom_port",
+			wgPort:        11580,
+			packetDstPort: 11580,
+			shouldProcess: true,
+		},
+		{
+			name:          "wrong_port",
+			wgPort:        51820,
+			packetDstPort: 9999,
+			shouldProcess: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			spec, err := LoadWgReverseProxy()
+			if err != nil {
+				t.Fatalf("Failed to load spec: %v", err)
+			}
+
+			if err := spec.Variables["__cfg_xor_enabled"].Set(true); err != nil {
+				t.Fatalf("Failed to set xor_enabled: %v", err)
+			}
+			if err := spec.Variables["__cfg_xor_key"].Set(keyArray); err != nil {
+				t.Fatalf("Failed to set xor_key: %v", err)
+			}
+			if err := spec.Variables["__cfg_padding_enabled"].Set(false); err != nil {
+				t.Fatalf("Failed to set padding_enabled: %v", err)
+			}
+			if err := spec.Variables["__cfg_wg_port"].Set(tt.wgPort); err != nil {
+				t.Fatalf("Failed to set wg_port: %v", err)
+			}
+
+			objs := &WgReverseProxyObjects{}
+			if err := spec.LoadAndAssign(objs, nil); err != nil {
+				t.Fatalf("Failed to load objects: %v", err)
+			}
+			defer objs.Close()
+
+			inputPacket := createObfuscatedWGPacket("192.168.1.1", "192.168.1.2", 12345, tt.packetDstPort, keyBytes)
+			_, outputPacket, err := objs.WgReverseProxy.Test(inputPacket)
+			if err != nil {
+				t.Fatalf("Failed to run program: %v", err)
+			}
+
+			if tt.shouldProcess {
+				verifyXORDeobfuscation(t, inputPacket, outputPacket, keyBytes)
+			} else {
+				verifyPayloadUnchanged(t, inputPacket, outputPacket)
+			}
+		})
+	}
+}
+
 // TestReverseProxyPaddingObfuscateMTUExceededDrop verifies that a FROM_WG packet is dropped
 // when adding padding would cause it to exceed the configured link MTU.
 func TestReverseProxyPaddingObfuscateMTUExceededDrop(t *testing.T) {

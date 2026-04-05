@@ -31,6 +31,15 @@ struct {
 	__type(value, __u32);
 } backend_count SEC(".maps");
 
+// Set of ports that backends listen on, used to detect FROM_WG return traffic.
+// Key: backend port (host byte order), Value: unused.
+struct {
+	__uint(type, BPF_MAP_TYPE_HASH);
+	__uint(max_entries, MAX_BACKENDS);
+	__type(key, __u16);
+	__type(value, __u8);
+} backend_port_set SEC(".maps");
+
 // jhash - Jenkins hash for consistent backend selection
 static __always_inline __u32 jhash_2words(__u32 a, __u32 b, __u32 initval) {
 	__u32 c = initval;

@@ -91,23 +91,26 @@ def format_hex_dump(data: bytes, original_payload: bytes) -> str:
     return "\n".join(lines)
 
 
-def run_client(host: str, port: int, payload: bytes, count: int = 1):
+def run_client(host: str, port: int, payload: bytes, count: int = 1, timeout: float = 2.0):
     """
-    Run in client mode - send UDP packets.
+    Run in client mode - send UDP packets and wait for responses.
 
     Args:
         host: Destination IP address
         port: Destination port
         payload: Payload to send
         count: Number of packets to send
+        timeout: Seconds to wait for a response per packet
     """
     try:
         sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        sock.settimeout(timeout)
 
         print(f"{COLOR_BLUE}=== WireGuard Relay Probe - Client Mode ==={COLOR_RESET}")
         print(f"Target: {host}:{port}")
         print(f"Payload size: {len(payload)} bytes")
         print(f"Packets to send: {count}")
+        print(f"Response timeout: {timeout}s")
         print()
 
         for i in range(count):
@@ -116,13 +119,24 @@ def run_client(host: str, port: int, payload: bytes, count: int = 1):
             full_payload = payload + timestamp.encode()
 
             sock.sendto(full_payload, (host, port))
-
             print(f"[{i + 1}/{count}] Sent {len(full_payload)} bytes at {timestamp}")
+
+            try:
+                response, addr = sock.recvfrom(BUFFER_SIZE)
+                recv_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S.%f")[:-3]
+                print(f"[{i + 1}/{count}] Response from {addr[0]}:{addr[1]} at {recv_time} ({len(response)} bytes)")
+                print("  Hex dump:")
+                for line in format_hex_dump(response, full_payload).splitlines():
+                    print(f"  {line}")
+                print()
+            except TimeoutError:
+                print(f"{COLOR_RED}[{i + 1}/{count}] No response within {timeout}s{COLOR_RESET}")
+                print()
 
             if count > 1 and i < count - 1:
                 time.sleep(0.1)
 
-        print(f"\n{COLOR_GREEN}✓ All packets sent successfully{COLOR_RESET}")
+        print(f"{COLOR_GREEN}✓ Done{COLOR_RESET}")
 
     except PermissionError:
         print(
@@ -171,7 +185,7 @@ def run_server(port: int, original_payload: bytes):
                 timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S.%f")[:-3]
 
                 print(f"{COLOR_BLUE}[Packet #{packet_count}] {timestamp}{COLOR_RESET}")
-                print(f"From: {addr[0]}:{addr[1]}")
+                print(f"From: {addr[0]}:{addr[1]}  To: 0.0.0.0:{port}")
                 print(f"Size: {len(data)} bytes")
 
                 # Analyze packet structure
@@ -208,6 +222,13 @@ def run_server(port: int, original_payload: bytes):
                 print()
                 print("Hex dump:")
                 print(format_hex_dump(data, original_payload))
+                print()
+
+                # Send response back to client
+                response = b"WGPROBE_RESPONSE_" + data[:32]
+                sock.sendto(response, addr)
+                print(f"{COLOR_BLUE}→ Sent {len(response)}-byte response to {addr[0]}:{addr[1]}{COLOR_RESET}")
+
                 print()
                 print("=" * 80)
                 print()
@@ -279,6 +300,12 @@ Examples (run from project root):
         default=1,
         help="Number of packets to send in client mode (default: 1)",
     )
+    parser.add_argument(
+        "--timeout",
+        type=float,
+        default=2.0,
+        help="Seconds to wait for a response per packet in client mode (default: 2.0)",
+    )
 
     args = parser.parse_args()
 
@@ -290,7 +317,7 @@ Examples (run from project root):
         payload = (
             args.payload.encode() if isinstance(args.payload, str) else args.payload
         )
-        run_client(args.host, args.port, payload, args.count)
+        run_client(args.host, args.port, payload, args.count, args.timeout)
 
 
 if __name__ == "__main__":
