@@ -240,49 +240,9 @@ int wg_forward_proxy(struct xdp_md *xdp_ctx) {
 	__u16 src_port = ctx.src_port;
 	__u16 dst_port = ctx.dst_port;
 	__u16 wg_port = CONFIG(wg_port);
-	if (dst_port != wg_port && src_port != wg_port)
-		return XDP_PASS;
 
 	__u8 is_to_wg = (dst_port == wg_port) ? 1 : 0;
-	__u8 is_from_wg = (src_port == wg_port) ? 1 : 0;
-
 	__u32 pkt_len = (void *)(long)xdp_ctx->data_end - (void *)(long)xdp_ctx->data;
-
-	if (likely(is_from_wg)) {
-		struct connection_key original_conn = { 0 };
-		if (restore_nat_connection(&ctx, &original_conn) < 0) {
-			DEBUG_PRINTK("Failed to restore NAT connection for FROM WG packet, passing "
-				     "through");
-			return XDP_PASS;
-		}
-
-		struct connection_value *conn_value = bpf_map_lookup_elem(&connection_map, &original_conn);
-		if (!conn_value) {
-			DEBUG_PRINTK("No connection value found for FROM WG packet");
-			return XDP_PASS;
-		}
-
-		__u8 backend_index = conn_value->backend_index;
-
-		// FROM_WG path: backend->proxy (upstream rx), proxy->client (downstream tx)
-		update_metrics(backend_index, METRIC_UPSTREAM, pkt_len, 1, METRIC_REASON_FORWARDED);
-
-		if (instr_deobfuscate_xdp(&ctx) < 0) {
-			DEBUG_PRINTK("Deobfuscation failed, dropping packet");
-			update_metrics(backend_index, METRIC_UPSTREAM, pkt_len, 1, METRIC_REASON_DROPPED);
-			return XDP_DROP;
-		}
-
-		__u32 tx_pkt_len = (void *)(long)xdp_ctx->data_end - (void *)(long)xdp_ctx->data;
-
-		__u32 dst_addr = bpf_ntohl(ctx.ip->daddr);
-		__u32 client_ip = bpf_ntohl(original_conn.client_ip);
-		__u16 server_port = original_conn.server_port;
-		__u16 client_port = original_conn.client_port;
-
-		update_metrics(backend_index, METRIC_DOWNSTREAM, tx_pkt_len, 0, METRIC_REASON_FORWARDED);
-		return forward_packet(&ctx, dst_addr, server_port, client_ip, client_port);
-	}
 
 	if (unlikely(is_to_wg)) {
 		struct backend_entry backend = { 0 };
@@ -324,6 +284,44 @@ int wg_forward_proxy(struct xdp_md *xdp_ctx) {
 
 		update_metrics(conn_value->backend_index, METRIC_UPSTREAM, tx_pkt_len, 0, METRIC_REASON_FORWARDED);
 		return forward_packet(&ctx, proxy_ip, conn_value->nat_port, server_ip, target_port);
+	}
+
+	__u8 is_from_wg = bpf_map_lookup_elem(&backend_port_set, &src_port) != NULL ? 1 : 0;
+
+	if (likely(is_from_wg)) {
+		struct connection_key original_conn = { 0 };
+		if (restore_nat_connection(&ctx, &original_conn) < 0) {
+			DEBUG_PRINTK("Failed to restore NAT connection for FROM WG packet, passing "
+				     "through");
+			return XDP_PASS;
+		}
+
+		struct connection_value *conn_value = bpf_map_lookup_elem(&connection_map, &original_conn);
+		if (!conn_value) {
+			DEBUG_PRINTK("No connection value found for FROM WG packet");
+			return XDP_PASS;
+		}
+
+		__u8 backend_index = conn_value->backend_index;
+
+		// FROM_WG path: backend->proxy (upstream rx), proxy->client (downstream tx)
+		update_metrics(backend_index, METRIC_UPSTREAM, pkt_len, 1, METRIC_REASON_FORWARDED);
+
+		if (instr_deobfuscate_xdp(&ctx) < 0) {
+			DEBUG_PRINTK("Deobfuscation failed, dropping packet");
+			update_metrics(backend_index, METRIC_UPSTREAM, pkt_len, 1, METRIC_REASON_DROPPED);
+			return XDP_DROP;
+		}
+
+		__u32 tx_pkt_len = (void *)(long)xdp_ctx->data_end - (void *)(long)xdp_ctx->data;
+
+		__u32 dst_addr = bpf_ntohl(ctx.ip->daddr);
+		__u32 client_ip = bpf_ntohl(original_conn.client_ip);
+		__u16 server_port = original_conn.server_port;
+		__u16 client_port = original_conn.client_port;
+
+		update_metrics(backend_index, METRIC_DOWNSTREAM, tx_pkt_len, 0, METRIC_REASON_FORWARDED);
+		return forward_packet(&ctx, dst_addr, server_port, client_ip, client_port);
 	}
 
 	DEBUG_PRINTK("No matching handler for WG packet, passing through");

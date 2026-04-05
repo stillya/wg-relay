@@ -332,6 +332,40 @@ func TestMultipleBackends(t *testing.T) {
 	}
 }
 
+func TestBackendCustomPort(t *testing.T) {
+	spec, err := LoadWgForwardProxy()
+	if err != nil {
+		t.Fatalf("Failed to load spec: %v", err)
+	}
+
+	setVar(t, spec, "__cfg_xor_enabled", false)
+	setVar(t, spec, "__cfg_wg_port", uint16(wgPort))
+
+	objs := &WgForwardProxyObjects{}
+	if err := spec.LoadAndAssign(objs, nil); err != nil {
+		t.Fatalf("Failed to load objects: %v", err)
+	}
+	defer objs.Close()
+
+	if err := configureBackends(objs, []config.BackendServer{
+		{IP: "10.0.0.1", Port: 11580},
+	}); err != nil {
+		t.Fatalf("Failed to configure backends: %v", err)
+	}
+
+	packet := createWGPacket("192.168.1.1", "192.168.1.2", 12345, wgPort)
+	result, outputPacket, err := objs.WgForwardProxy.Test(packet)
+	if err != nil {
+		t.Fatalf("Failed to run program: %v", err)
+	}
+
+	if int(result) != xdpRedirect {
+		t.Errorf("Expected XDP_REDIRECT, got %d", result)
+	}
+
+	verifyPacket(t, outputPacket, "10.0.0.1", 11580)
+}
+
 func TestWgPortConfig(t *testing.T) {
 	tests := []struct {
 		name          string
@@ -568,5 +602,20 @@ func configureBackends(objs *WgForwardProxyObjects, backends []config.BackendSer
 
 	countKey := uint32(0)
 	count := uint32(len(backends)) //nolint:gosec // G304: it's fine
-	return objs.BackendCount.Put(&countKey, &count)
+	if err := objs.BackendCount.Put(&countKey, &count); err != nil {
+		return err
+	}
+
+	dummy := uint8(1)
+	for _, backend := range backends {
+		port := backend.Port
+		if port == 0 {
+			port = wgPort
+		}
+		if err := objs.BackendPortSet.Put(&port, &dummy); err != nil {
+			return err
+		}
+	}
+
+	return nil
 }
