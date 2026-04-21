@@ -14,6 +14,7 @@ import (
 	wgebpf "github.com/stillya/wg-relay/ebpf"
 	"github.com/stillya/wg-relay/pkg/bpf"
 	"github.com/stillya/wg-relay/pkg/dataplane/config"
+	dplinux "github.com/stillya/wg-relay/pkg/dataplane/linux"
 	"github.com/stillya/wg-relay/pkg/dataplane/maps"
 	"github.com/stillya/wg-relay/pkg/utils"
 )
@@ -33,6 +34,10 @@ func NewForwardLoader() (*ForwardLoader, error) {
 // LoadAndAttach loads the eBPF program and attaches it to the configured interfaces.
 func (fp *ForwardLoader) LoadAndAttach(ctx context.Context, cfg config.ProxyConfig) error {
 	fp.cfg = cfg
+
+	if err := dplinux.EnableIPForwarding(); err != nil {
+		return errors.Wrap(err, "failed to enable IP forwarding")
+	}
 
 	if err := fp.loadEBPF(); err != nil {
 		return errors.Wrap(err, "failed to load eBPF objects")
