@@ -3,12 +3,12 @@ FROM mcr.microsoft.com/devcontainers/go:${GO_VARIANT}
 
 ARG TARGETARCH
 ARG PWRU_VERSION=v1.0.9
+ARG XDP_TOOLS_VERSION=v1.6.3
 
 ENV GOFLAGS="-buildvcs=false"
 
 RUN asm_arch=$(if [ "${TARGETARCH}" = "arm64" ]; then echo "aarch64-linux-gnu"; else echo "x86_64-linux-gnu"; fi) && \
     kernel_arch=$(if [ "${TARGETARCH}" = "arm64" ]; then echo "arm64"; else echo "amd64"; fi) && \
-    pwru_arch=$(if [ "${TARGETARCH}" = "arm64" ]; then echo "arm64"; else echo "amd64"; fi) && \
     echo "wireshark-common wireshark-common/install-setuid boolean true" | debconf-set-selections && \
     apt-get update && \
     DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
@@ -43,7 +43,7 @@ RUN asm_arch=$(if [ "${TARGETARCH}" = "arm64" ]; then echo "aarch64-linux-gnu"; 
     libcap-ng-dev \
     libbfd-dev \
     libcap-dev \
-    xdp-tools \
+    zlib1g-dev \
     tshark \
     bear && \
     ln -sf /usr/bin/clang-18 /usr/bin/clang && \
@@ -54,13 +54,26 @@ RUN asm_arch=$(if [ "${TARGETARCH}" = "arm64" ]; then echo "aarch64-linux-gnu"; 
     ln -sf /usr/bin/llc-18 /usr/bin/llc && \
     ln -sf /usr/include/${asm_arch}/asm/ /usr/include/asm && \
     ln -sf /usr/local/go/bin/go /bin/go && \
-    git clone --recurse-submodules --depth 1 https://github.com/libbpf/bpftool.git /tmp/bpftool && \
+    rm -rf /var/lib/apt/lists/*
+
+RUN git clone --recurse-submodules --depth 1 https://github.com/libbpf/bpftool.git /tmp/bpftool && \
     make -C /tmp/bpftool/src/ install && \
-    rm -rf /tmp/bpftool && \
+    rm -rf /tmp/bpftool
+
+RUN asm_arch=$(if [ "${TARGETARCH}" = "arm64" ]; then echo "aarch64-linux-gnu"; else echo "x86_64-linux-gnu"; fi) && \
+    git clone --recurse-submodules --depth 1 --branch ${XDP_TOOLS_VERSION} \
+    https://github.com/xdp-project/xdp-tools.git /tmp/xdp-tools && \
+    ( cd /tmp/xdp-tools && \
+    PREFIX=/usr LIBDIR=/usr/lib/${asm_arch} ./configure && \
+    make PREFIX=/usr LIBDIR=/usr/lib/${asm_arch} && \
+    make PREFIX=/usr LIBDIR=/usr/lib/${asm_arch} install ) && \
+    ldconfig && \
+    rm -rf /tmp/xdp-tools
+
+RUN pwru_arch=$(if [ "${TARGETARCH}" = "arm64" ]; then echo "arm64"; else echo "amd64"; fi) && \
     wget -O /tmp/pwru.tar.gz "https://github.com/cilium/pwru/releases/download/${PWRU_VERSION}/pwru-linux-${pwru_arch}.tar.gz" && \
     tar -xzf /tmp/pwru.tar.gz -C /usr/local/bin && \
     chmod +x /usr/local/bin/pwru && \
-    rm -rf /tmp/pwru.tar.gz && \
-    rm -rf /var/lib/apt/lists/*
+    rm -rf /tmp/pwru.tar.gz
 
 WORKDIR /workspaces
