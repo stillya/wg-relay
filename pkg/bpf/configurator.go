@@ -34,7 +34,7 @@ func Configure(spec *ebpf.CollectionSpec, cfg interface{}) error {
 	}
 
 	v := reflect.ValueOf(cfg)
-	if v.Kind() == reflect.Ptr {
+	if v.Kind() == reflect.Pointer {
 		v = v.Elem()
 	}
 	if v.Kind() != reflect.Struct {
@@ -54,7 +54,7 @@ func configureStruct(spec *ebpf.CollectionSpec, v reflect.Value) error {
 		tag := field.Tag.Get("ebpf")
 
 		switch fieldValue.Kind() {
-		case reflect.Ptr:
+		case reflect.Pointer:
 			if fieldValue.IsNil() {
 				if err := setDefaultsForNilStruct(spec, field.Type.Elem()); err != nil {
 					return errors.Wrapf(err, "failed to set defaults for nil %s", field.Name)
@@ -149,7 +149,7 @@ func setVariable(spec *ebpf.CollectionSpec, name string, value reflect.Value) er
 
 	// Get the actual value to set
 	var val interface{}
-	if value.Kind() == reflect.Ptr {
+	if value.Kind() == reflect.Pointer {
 		if value.IsNil() {
 			return errors.Errorf("variable %s has nil value", fullName)
 		}
