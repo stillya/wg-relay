@@ -71,6 +71,7 @@ func (fp *ForwardLoader) loadEBPF() error {
 		}
 		fp.cfg.Instrumentations.Padding.LinkMTU = mtu
 		fp.cfg.Instrumentations.Padding.Randomize = fp.cfg.Instrumentations.Padding.Mode == "randomize"
+		fp.cfg.Instrumentations.Padding.AdaptiveResolved = fp.cfg.Instrumentations.Padding.IsAdaptive()
 		if err := fp.cfg.Instrumentations.Padding.ValidateMTU(); err != nil {
 			return errors.Wrap(err, "padding MTU validation failed")
 		}
@@ -264,6 +265,8 @@ func (fp *ForwardLoader) Maps() *maps.Maps {
 	mapsCollection := maps.NewMaps(metricsMap)
 
 	if fp.objs != nil {
+		mapsCollection.PaddingState = fp.objs.PaddingStateMap
+
 		if fp.objs.ConnectionMap != nil {
 			mapsCollection.AddOtherMap("ConnectionMap", fp.objs.ConnectionMap)
 		}

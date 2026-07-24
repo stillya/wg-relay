@@ -23,8 +23,16 @@ type DaemonConfig struct {
 
 // MonitoringConfig represents monitoring configuration
 type MonitoringConfig struct {
-	Prometheus PrometheusConfig `yaml:"prometheus"` // Prometheus HTTP exporter
-	Statistics StatisticsConfig `yaml:"statistics"` // vnstat-style console output
+	Prometheus     PrometheusConfig     `yaml:"prometheus"`      // Prometheus HTTP exporter
+	Statistics     StatisticsConfig     `yaml:"statistics"`      // vnstat-style console output
+	PaddingWatcher PaddingWatcherConfig `yaml:"padding_watcher"` // adaptive padding state watcher
+}
+
+// PaddingWatcherConfig configures the adaptive padding state watcher, which
+// logs whenever the AIMD working size changes for an interface/CPU.
+type PaddingWatcherConfig struct {
+	Enabled  bool          `yaml:"enabled"`  // Enable/disable the watcher
+	Interval time.Duration `yaml:"interval"` // Poll interval
 }
 
 // ProxyConfig represents proxy-specific configuration
@@ -52,11 +60,20 @@ type XORConfig struct {
 
 // PaddingConfig represents padding obfuscation configuration
 type PaddingConfig struct {
-	Enabled   bool   `yaml:"enabled" ebpf:"padding_enabled"`
-	Size      uint8  `yaml:"size" ebpf:"padding_size"`
-	Mode      string `yaml:"mode"`                       // "direct" or "randomize" (default: "direct")
-	Randomize bool   `yaml:"-" ebpf:"padding_randomize"` // computed at runtime from Mode, not yaml-exposed
-	LinkMTU   uint16 `yaml:"-" ebpf:"link_mtu"`          // computed at runtime, not yaml-exposed
+	Enabled  bool   `yaml:"enabled" ebpf:"padding_enabled"`
+	Size     uint8  `yaml:"size" ebpf:"padding_size"`
+	Mode     string `yaml:"mode"`     // "direct" or "randomize" (default: "direct")
+	Adaptive *bool  `yaml:"adaptive"` // AIMD tailroom probing; nil means enabled (default)
+
+	Randomize        bool   `yaml:"-" ebpf:"padding_randomize"` // computed at runtime from Mode, not yaml-exposed
+	AdaptiveResolved bool   `yaml:"-" ebpf:"padding_adaptive"`  // computed at runtime from Adaptive, not yaml-exposed
+	LinkMTU          uint16 `yaml:"-" ebpf:"link_mtu"`          // computed at runtime, not yaml-exposed
+}
+
+// IsAdaptive reports whether adaptive AIMD padding is enabled. It defaults to
+// true when the config omits the field.
+func (p *PaddingConfig) IsAdaptive() bool {
+	return p.Adaptive == nil || *p.Adaptive
 }
 
 // BackendServer represents a single backend server
@@ -128,6 +145,10 @@ func NewConfig() *Config {
 			Statistics: StatisticsConfig{
 				Enabled:  true,
 				Interval: 30 * time.Second,
+			},
+			PaddingWatcher: PaddingWatcherConfig{
+				Enabled:  true,
+				Interval: 10 * time.Second,
 			},
 		},
 	}

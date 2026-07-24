@@ -55,6 +55,11 @@ func configureStruct(spec *ebpf.CollectionSpec, v reflect.Value) error {
 
 		switch fieldValue.Kind() {
 		case reflect.Pointer:
+			// Only recurse into pointers to structs (nested config sections).
+			// Scalar pointers such as *bool are handled below via their `ebpf` tag.
+			if field.Type.Elem().Kind() != reflect.Struct {
+				break
+			}
 			if fieldValue.IsNil() {
 				if err := setDefaultsForNilStruct(spec, field.Type.Elem()); err != nil {
 					return errors.Wrapf(err, "failed to set defaults for nil %s", field.Name)

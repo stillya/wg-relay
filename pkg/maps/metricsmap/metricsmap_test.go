@@ -25,6 +25,25 @@ func TestDirectionToString(t *testing.T) {
 	}
 }
 
+func TestReasonToString(t *testing.T) {
+	testCases := []struct {
+		reason   uint8
+		expected string
+	}{
+		{MetricReasonForwarded, "forwarded"},
+		{MetricReasonDropped, "dropped"},
+		{MetricReasonNoTailroom, "no_tailroom"},
+		{99, "unknown"},
+	}
+
+	for _, tc := range testCases {
+		result := ReasonToString(tc.reason)
+		if result != tc.expected {
+			t.Errorf("ReasonToString(%d) = %s, expected %s", tc.reason, result, tc.expected)
+		}
+	}
+}
+
 func TestBackendIndexToString(t *testing.T) {
 	testCases := []struct {
 		index    uint8

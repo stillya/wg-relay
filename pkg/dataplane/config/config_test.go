@@ -131,6 +131,29 @@ func TestPaddingConfig_Validation(t *testing.T) {
 	}
 }
 
+func TestPaddingConfig_IsAdaptive(t *testing.T) {
+	tru := true
+	fls := false
+	tests := []struct {
+		name     string
+		adaptive *bool
+		want     bool
+	}{
+		{"nil defaults to enabled", nil, true},
+		{"explicit true", &tru, true},
+		{"explicit false", &fls, false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			p := &PaddingConfig{Adaptive: tt.adaptive}
+			if got := p.IsAdaptive(); got != tt.want {
+				t.Errorf("IsAdaptive() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
 func TestPaddingConfig_ValidateMTU(t *testing.T) {
 	tests := []struct {
 		name    string

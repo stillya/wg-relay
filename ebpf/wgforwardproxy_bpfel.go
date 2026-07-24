@@ -61,6 +61,14 @@ type WgForwardProxyNatKey struct {
 	NatPort  uint32
 }
 
+type WgForwardProxyPaddingState struct {
+	_           structs.HostLayout
+	CurrentSize uint8
+	Pad         uint8
+	OkStreak    uint16
+	Backoffs    uint32
+}
+
 type WgForwardProxyXorKey struct {
 	_   structs.HostLayout
 	Key [32]uint8
@@ -115,13 +123,14 @@ type WgForwardProxyProgramSpecs struct {
 //
 // It can be passed ebpf.CollectionSpec.Assign.
 type WgForwardProxyMapSpecs struct {
-	BackendCount   *ebpf.MapSpec `ebpf:"backend_count"`
-	BackendMap     *ebpf.MapSpec `ebpf:"backend_map"`
-	BackendPortSet *ebpf.MapSpec `ebpf:"backend_port_set"`
-	ConnectionMap  *ebpf.MapSpec `ebpf:"connection_map"`
-	MetricsMap     *ebpf.MapSpec `ebpf:"metrics_map"`
-	NatPortCounter *ebpf.MapSpec `ebpf:"nat_port_counter"`
-	NatReverseMap  *ebpf.MapSpec `ebpf:"nat_reverse_map"`
+	BackendCount    *ebpf.MapSpec `ebpf:"backend_count"`
+	BackendMap      *ebpf.MapSpec `ebpf:"backend_map"`
+	BackendPortSet  *ebpf.MapSpec `ebpf:"backend_port_set"`
+	ConnectionMap   *ebpf.MapSpec `ebpf:"connection_map"`
+	MetricsMap      *ebpf.MapSpec `ebpf:"metrics_map"`
+	NatPortCounter  *ebpf.MapSpec `ebpf:"nat_port_counter"`
+	NatReverseMap   *ebpf.MapSpec `ebpf:"nat_reverse_map"`
+	PaddingStateMap *ebpf.MapSpec `ebpf:"padding_state_map"`
 }
 
 // WgForwardProxyVariableSpecs contains global variables before they are loaded into the kernel.
@@ -129,6 +138,7 @@ type WgForwardProxyMapSpecs struct {
 // It can be passed ebpf.CollectionSpec.Assign.
 type WgForwardProxyVariableSpecs struct {
 	CfgLinkMtu          *ebpf.VariableSpec `ebpf:"__cfg_link_mtu"`
+	CfgPaddingAdaptive  *ebpf.VariableSpec `ebpf:"__cfg_padding_adaptive"`
 	CfgPaddingEnabled   *ebpf.VariableSpec `ebpf:"__cfg_padding_enabled"`
 	CfgPaddingRandomize *ebpf.VariableSpec `ebpf:"__cfg_padding_randomize"`
 	CfgPaddingSize      *ebpf.VariableSpec `ebpf:"__cfg_padding_size"`
@@ -157,13 +167,14 @@ func (o *WgForwardProxyObjects) Close() error {
 //
 // It can be passed to LoadWgForwardProxyObjects or ebpf.CollectionSpec.LoadAndAssign.
 type WgForwardProxyMaps struct {
-	BackendCount   *ebpf.Map `ebpf:"backend_count"`
-	BackendMap     *ebpf.Map `ebpf:"backend_map"`
-	BackendPortSet *ebpf.Map `ebpf:"backend_port_set"`
-	ConnectionMap  *ebpf.Map `ebpf:"connection_map"`
-	MetricsMap     *ebpf.Map `ebpf:"metrics_map"`
-	NatPortCounter *ebpf.Map `ebpf:"nat_port_counter"`
-	NatReverseMap  *ebpf.Map `ebpf:"nat_reverse_map"`
+	BackendCount    *ebpf.Map `ebpf:"backend_count"`
+	BackendMap      *ebpf.Map `ebpf:"backend_map"`
+	BackendPortSet  *ebpf.Map `ebpf:"backend_port_set"`
+	ConnectionMap   *ebpf.Map `ebpf:"connection_map"`
+	MetricsMap      *ebpf.Map `ebpf:"metrics_map"`
+	NatPortCounter  *ebpf.Map `ebpf:"nat_port_counter"`
+	NatReverseMap   *ebpf.Map `ebpf:"nat_reverse_map"`
+	PaddingStateMap *ebpf.Map `ebpf:"padding_state_map"`
 }
 
 func (m *WgForwardProxyMaps) Close() error {
@@ -175,6 +186,7 @@ func (m *WgForwardProxyMaps) Close() error {
 		m.MetricsMap,
 		m.NatPortCounter,
 		m.NatReverseMap,
+		m.PaddingStateMap,
 	)
 }
 
@@ -183,6 +195,7 @@ func (m *WgForwardProxyMaps) Close() error {
 // It can be passed to LoadWgForwardProxyObjects or ebpf.CollectionSpec.LoadAndAssign.
 type WgForwardProxyVariables struct {
 	CfgLinkMtu          *ebpf.Variable `ebpf:"__cfg_link_mtu"`
+	CfgPaddingAdaptive  *ebpf.Variable `ebpf:"__cfg_padding_adaptive"`
 	CfgPaddingEnabled   *ebpf.Variable `ebpf:"__cfg_padding_enabled"`
 	CfgPaddingRandomize *ebpf.Variable `ebpf:"__cfg_padding_randomize"`
 	CfgPaddingSize      *ebpf.Variable `ebpf:"__cfg_padding_size"`

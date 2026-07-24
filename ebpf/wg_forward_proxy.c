@@ -181,8 +181,8 @@ static __always_inline int instr_obfuscate_xdp(struct wg_ctx *ctx) {
 	int ret;
 
 	ret = xor_obfuscate_xdp(ctx);
-	if (ret == INSTR_ERROR) {
-		return INSTR_ERROR;
+	if (ret < 0) {
+		return ret;
 	}
 	if (ret == INSTR_PKT_INVD) {
 		if (parse_xdp_packet(ctx->xdp, ctx) < 0) {
@@ -191,8 +191,8 @@ static __always_inline int instr_obfuscate_xdp(struct wg_ctx *ctx) {
 	}
 
 	ret = padding_obfuscate_xdp(ctx);
-	if (ret == INSTR_ERROR) {
-		return INSTR_ERROR;
+	if (ret < 0) {
+		return ret;
 	}
 	if (ret == INSTR_PKT_INVD) {
 		if (parse_xdp_packet(ctx->xdp, ctx) < 0) {
@@ -209,8 +209,8 @@ static __always_inline int instr_deobfuscate_xdp(struct wg_ctx *ctx) {
 	int ret;
 
 	ret = padding_deobfuscate_xdp(ctx);
-	if (ret == INSTR_ERROR) {
-		return INSTR_ERROR;
+	if (ret < 0) {
+		return ret;
 	}
 	if (ret == INSTR_PKT_INVD) {
 		if (parse_xdp_packet(ctx->xdp, ctx) < 0) {
@@ -219,8 +219,8 @@ static __always_inline int instr_deobfuscate_xdp(struct wg_ctx *ctx) {
 	}
 
 	ret = xor_deobfuscate_xdp(ctx);
-	if (ret == INSTR_ERROR) {
-		return INSTR_ERROR;
+	if (ret < 0) {
+		return ret;
 	}
 	if (ret == INSTR_PKT_INVD) {
 		if (parse_xdp_packet(ctx->xdp, ctx) < 0) {
@@ -270,9 +270,11 @@ int wg_forward_proxy(struct xdp_md *xdp_ctx) {
 		// TO_WG path: client->proxy (downstream rx), proxy->backend (upstream tx)
 		update_metrics(conn_value->backend_index, METRIC_DOWNSTREAM, pkt_len, 1, METRIC_REASON_FORWARDED);
 
-		if (instr_obfuscate_xdp(&ctx) < 0) {
+		int obf_ret = instr_obfuscate_xdp(&ctx);
+		if (obf_ret < 0) {
 			DEBUG_PRINTK("Obfuscation failed, dropping packet");
-			update_metrics(conn_value->backend_index, METRIC_DOWNSTREAM, pkt_len, 1, METRIC_REASON_DROPPED);
+			update_metrics(conn_value->backend_index, METRIC_DOWNSTREAM, pkt_len, 1,
+				       instr_drop_reason(obf_ret));
 			return XDP_DROP;
 		}
 

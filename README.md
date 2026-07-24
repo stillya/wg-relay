@@ -122,42 +122,42 @@ make test-ebpf
 Create a `config.yaml` file:
 
 ```yaml
-daemon:                          # Daemon configuration
-  listen: ":8080"                # Address and port for daemon to bind to
+daemon: # Daemon configuration
+    listen: ":8080" # Address and port for daemon to bind to
 
-monitoring:                      # Monitoring configuration
-  statistics:                    # vnstat-style console output
-    enabled: true                # Enable/disable statistics display
-    interval: "5s"               # Statistics update interval
-  prometheus:                    # Prometheus HTTP exporter
-    enabled: true                # Enable/disable Prometheus metrics server
-    listen: ":8081"              # Address and port for metrics server
+monitoring: # Monitoring configuration
+    statistics: # vnstat-style console output
+        enabled: true # Enable/disable statistics display
+        interval: "5s" # Statistics update interval
+    prometheus: # Prometheus HTTP exporter
+        enabled: true # Enable/disable Prometheus metrics server
+        listen: ":8081" # Address and port for metrics server
 
 proxy:
-  enabled: true                  # Enable/disable proxy
-  mode: "forward"                # "forward" for forward proxy, "reverse" for reverse proxy
-  wg_port: 51820                 # WireGuard port to intercept (default: 51820)
+    enabled: true # Enable/disable proxy
+    mode: "forward" # "forward" for forward proxy, "reverse" for reverse proxy
+    wg_port: 51820 # WireGuard port to intercept (default: 51820)
 
-  instrumentations:              # Instrumentation configuration
-    xor:                         # XOR obfuscation
-      enabled: true
-      key: "your_xor_key"
-    padding:                     # Padding obfuscation
-      enabled: true
-      size: 32
-      mode: "direct"             # "direct" (fixed size) or "randomize" (random 1..size)
+    instrumentations: # Instrumentation configuration
+        xor: # XOR obfuscation
+            enabled: true
+            key: "your_xor_key"
+        padding: # Padding obfuscation
+            enabled: true
+            size: 32
+            mode: "direct" # "direct" (fixed size) or "randomize" (random 1..size)
 
-  driver_mode: "driver"          # "driver", "generic" or "offload" for XDP mode
-  interfaces:                    # Network interfaces to attach to
-    - "eth0"
-  forward:                       # Forward proxy configuration (forward mode)
-    backends:
-      - name: "wg-gateway-1"     # Optional: backend name for metrics (defaults to backend_<index>)
-        ip: "192.168.200.2"      # Backend 1 IP address
-        port: 51820              # Optional: port (defaults to wg_port)
-      - name: "wg-gateway-2"     # Named backend for low-cardinality metrics
-        ip: "192.168.200.3"      # Backend 2 IP address
-        port: 51820
+    driver_mode: "driver" # "driver", "generic" or "offload" for XDP mode
+    interfaces: # Network interfaces to attach to
+        - "eth0"
+    forward: # Forward proxy configuration (forward mode)
+        backends:
+            - name: "wg-gateway-1" # Optional: backend name for metrics (defaults to backend_<index>)
+              ip: "192.168.200.2" # Backend 1 IP address
+              port: 51820 # Optional: port (defaults to wg_port)
+            - name: "wg-gateway-2" # Named backend for low-cardinality metrics
+              ip: "192.168.200.3" # Backend 2 IP address
+              port: 51820
 ```
 
 Backend names: The optional name field allows you to assign human-readable labels to backends for Prometheus metrics and console statistics. If omitted, backends are labeled as backend_0, backend_1, etc. Named backends help with metric clarity and dashboard creation.
@@ -185,6 +185,32 @@ sudo make run-reverse-proxy    # wg-server namespace
 - **XOR**: Simple XOR-based obfuscation with a configurable key
 - **Padding**: Adds padding to packets to alter traffic patterns. Supports `direct` mode (fixed size) and `randomize` mode (random size between 1 and `size` per packet)
 - **None**: Pass-through mode for testing
+
+#### Adaptive padding (`adaptive: true`, default)
+
+In forward mode the padding is appended via `bpf_xdp_adjust_tail`, whose available room is bounded
+by the driver's per-packet buffer size (`frame_sz`), this limit varies widely by driver and mode (see the table below).
+Without adaptation, a too-large `size` makes **every** WireGuard packet tail to grow and get dropped.
+
+With `adaptive` enabled, the datapath runs an AIMD loop per interface/CPU: it caps the padding at a
+working ceiling, halves that ceiling whenever `adjust_tail` fails, and slowly grows it back toward the
+configured `size`. The floor is **1 byte**, if even 1 byte cannot be added is the packet dropped, counted under `reason="no_tailroom"`.
+
+#### Padding & XDP tailroom
+
+The table below is a **rough guide, not a guarantee** - the true limit depends on the size of each
+individual packet and on kernel/cacheline details. The only authoritative source is
+`wg_relay_padding_size_bytes` after real traffic has flowed. When in doubt, keep `adaptive: true`.
+
+| Driver / mode                                                      | `frame_sz`                 | Headroom on a 1514 B frame | Suggested `size`                |
+| ------------------------------------------------------------------ | -------------------------- | -------------------------- | ------------------------------- |
+| mlx5 (ConnectX-4+), striding RQ, MTU 1500                          | 4096                       | ~2000 B                    | up to 255                       |
+| ixgbe/i40e/ice, 3K buffers (`PAGE_SIZE ≥ 8192` or large cacheline) | 4096                       | ~2000 B                    | up to 255                       |
+| ixgbe/i40e/ice/igb, 2K page-split (typical x86, MTU 1500)          | 2048                       | ~20 B                      | 8–16, keep `adaptive`           |
+| virtio_net, mergeable buffers (clouds / VPS)                       | floats with traffic (EWMA) | ~0 to ~2000 B              | any + `adaptive`                |
+| veth / generic XDP (containers)                                    | skb slab bucket            | depends on allocation      | 16–32 + `adaptive`              |
+| Intel on `PAGE_SIZE ≥ 8192` (arm64 64K pages)                      | per-packet size            | 0–63 B                     | padding effectively unavailable |
+| **reverse mode (TC)**                                              | n/a                        | bounded only by MTU        | up to 255                       |
 
 ### XDP Driver Modes
 
@@ -228,9 +254,9 @@ Enable statistics monitoring in config:
 
 ```yaml
 monitoring:
-  statistics:
-    enabled: true
-    interval: 5s
+    statistics:
+        enabled: true
+        interval: 5s
 ```
 
 ### Prometheus Metrics
@@ -239,9 +265,9 @@ Expose Prometheus metrics for monitoring with Grafana dashboards:
 
 ```yaml
 monitoring:
-  prometheus:
-    enabled: true
-    listen: ":9090"
+    prometheus:
+        enabled: true
+        listen: ":9090"
 ```
 
 Available metrics:
@@ -268,9 +294,15 @@ Reverse Mode (no labels):
 - `wg_relay_reverse_upstream_rq_rx_bytes_total` - Bytes received from WireGuard server
 - `wg_relay_reverse_upstream_rq_tx_bytes_total` - Bytes sent to WireGuard server
 
+Adaptive padding (forward mode, when `padding.enabled`):
+
+- `wg_relay_padding_size_bytes` - Current AIMD padding working size
+
 Labels:
 
 - `backend`: Backend server name (forward mode only) - either the configured name from config or backend_<index> fallback
+- `interface`, `cpu`: Interface name and CPU for adaptive padding state
+- `reason`: `forwarded`, `dropped`,`no_tailroom` (packet dropped because not even 1 byte of padding fit the driver buffer)
 
 ## Development
 

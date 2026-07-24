@@ -4,11 +4,18 @@
 #include "vmlinux.h"
 #include <bpf/bpf_helpers.h>
 #include "common.h"
+#include "instrumentation/instrumentation.h"
 
 #define METRICS_MAP_SIZE 65536
 
 enum metric_direction { METRIC_DOWNSTREAM = 0, METRIC_UPSTREAM = 1 };
-enum metric_reason { METRIC_REASON_FORWARDED = 0, METRIC_REASON_DROPPED = 1 };
+enum metric_reason { METRIC_REASON_FORWARDED = 0, METRIC_REASON_DROPPED = 1, METRIC_REASON_NO_TAILROOM = 2 };
+
+// Map an instrumentation failure code (INSTR_*) to the metric reason recorded
+// when the packet is dropped.
+static __always_inline __maybe_unused __u8 instr_drop_reason(int instr_ret) {
+	return instr_ret == INSTR_NO_TAILROOM ? METRIC_REASON_NO_TAILROOM : METRIC_REASON_DROPPED;
+}
 
 struct metrics_key {
 	__u8 backend_index;

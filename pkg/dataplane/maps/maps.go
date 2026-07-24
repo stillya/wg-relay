@@ -12,8 +12,9 @@ type MapInfo struct {
 
 // Maps holds collections of different types of eBPF maps
 type Maps struct {
-	Metrics *ebpf.Map // Metrics map
-	Other   []MapInfo // Other maps (conntrack, etc.)
+	Metrics      *ebpf.Map // Metrics map
+	PaddingState *ebpf.Map // Adaptive padding state map (forward mode only, may be nil)
+	Other        []MapInfo // Other maps (conntrack, etc.)
 }
 
 // NewMaps creates a new Maps collection
