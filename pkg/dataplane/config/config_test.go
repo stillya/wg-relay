@@ -5,6 +5,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 )
 
 func TestPaddingConfig_Validation(t *testing.T) {
@@ -329,5 +330,65 @@ proxy:
 	}
 	if cfg.Proxy.Forward.Backends[1].Name != "" {
 		t.Errorf("expected empty backend name, got %q", cfg.Proxy.Forward.Backends[1].Name)
+	}
+}
+
+func TestMonitoringConfig_Validation(t *testing.T) {
+	tests := []struct {
+		name       string
+		monitoring MonitoringConfig
+		wantErr    string
+	}{
+		{
+			name:       "zero value, everything disabled",
+			monitoring: MonitoringConfig{},
+			wantErr:    "",
+		},
+		{
+			name: "statistics enabled with zero interval",
+			monitoring: MonitoringConfig{
+				Statistics: StatisticsConfig{Enabled: true, Interval: 0},
+			},
+			wantErr: "monitoring.statistics.interval must be positive",
+		},
+		{
+			name: "statistics enabled with negative interval",
+			monitoring: MonitoringConfig{
+				Statistics: StatisticsConfig{Enabled: true, Interval: -5 * time.Second},
+			},
+			wantErr: "monitoring.statistics.interval must be positive",
+		},
+		{
+			name: "statistics disabled with zero interval",
+			monitoring: MonitoringConfig{
+				Statistics: StatisticsConfig{Enabled: false, Interval: 0},
+			},
+			wantErr: "",
+		},
+		{
+			name: "prometheus enabled has no interval to check",
+			monitoring: MonitoringConfig{
+				Prometheus: PrometheusConfig{Enabled: true, Listen: ":9090"},
+			},
+			wantErr: "",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := tt.monitoring.validate()
+
+			if tt.wantErr == "" {
+				if err != nil {
+					t.Errorf("unexpected error: %v", err)
+				}
+			} else {
+				if err == nil {
+					t.Error("expected error, got nil")
+				} else if !strings.Contains(err.Error(), tt.wantErr) {
+					t.Errorf("error %q should contain %q", err.Error(), tt.wantErr)
+				}
+			}
+		})
 	}
 }
