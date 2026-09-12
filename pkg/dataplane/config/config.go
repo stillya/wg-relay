@@ -159,8 +159,22 @@ func (cfg *Config) validate() error {
 		return errors.New("mode must be 'forward' or 'reverse'")
 	}
 
+	// Validate monitoring configuration
+	if err := cfg.Monitoring.validate(); err != nil {
+		return err
+	}
+
 	// Validate proxy configuration
 	return cfg.Proxy.validate(cfg.Proxy.Mode)
+}
+
+// validate validates the monitoring configuration
+func (m *MonitoringConfig) validate() error {
+	if m.Statistics.Enabled && m.Statistics.Interval <= 0 {
+		return errors.Errorf("monitoring.statistics.interval must be positive, got %s", m.Statistics.Interval)
+	}
+
+	return nil
 }
 
 // ValidateMTU validates padding size against the link MTU. Must be called after LinkMTU is populated.
