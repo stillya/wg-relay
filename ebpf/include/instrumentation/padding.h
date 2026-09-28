@@ -11,7 +11,24 @@
 DECLARE_CONFIG(bool, padding_enabled, "Enable padding obfuscation");
 DECLARE_CONFIG(__u8, padding_size, "Padding size in bytes");
 DECLARE_CONFIG(bool, padding_randomize, "Randomize padding size between 1 and padding_size");
+DECLARE_CONFIG(bool, padding_adaptive, "Adaptively probe available XDP tailroom (AIMD)");
 DECLARE_CONFIG(__u16, link_mtu, "Link MTU size in bytes");
+
+#define PADDING_PROBE_STREAK 1024
+
+struct padding_state {
+	__u8 current_size;
+	__u8 _pad;
+	__u16 ok_streak;
+	__u32 backoffs;
+};
+
+struct {
+	__uint(type, BPF_MAP_TYPE_PERCPU_HASH);
+	__uint(max_entries, 64);
+	__type(key, __u32); // ifindex
+	__type(value, struct padding_state);
+} padding_state_map SEC(".maps");
 
 static __always_inline __maybe_unused int padding_obfuscate_xdp(struct wg_ctx *ctx) {
 	if (!CONFIG(padding_enabled)) {
@@ -31,8 +48,45 @@ static __always_inline __maybe_unused int padding_obfuscate_xdp(struct wg_ctx *c
 		return INSTR_ERROR;
 	}
 
-	if (bpf_xdp_adjust_tail(ctx->xdp, actual_size) != 0) {
-		return INSTR_ERROR;
+	__u8 want = actual_size;
+	struct padding_state *st = NULL;
+
+	if (CONFIG(padding_adaptive)) {
+		__u32 ifindex = ctx->xdp->ingress_ifindex;
+		st = bpf_map_lookup_elem(&padding_state_map, &ifindex);
+		if (!st) {
+			struct padding_state zero = { 0 };
+			bpf_map_update_elem(&padding_state_map, &ifindex, &zero, BPF_ANY);
+			st = bpf_map_lookup_elem(&padding_state_map, &ifindex);
+		}
+		if (st) {
+			// A zero current_size means this CPU's slot has not been seeded yet.
+			if (st->current_size == 0) {
+				st->current_size = cfg_padding_size;
+			}
+			if (want > st->current_size) {
+				want = st->current_size;
+			}
+		}
+	}
+
+	if (bpf_xdp_adjust_tail(ctx->xdp, want) != 0) {
+		if (!st) {
+			return INSTR_NO_TAILROOM;
+		}
+		st->current_size = want > 1 ? (__u8)(want >> 1) : 1;
+		st->ok_streak = 0;
+		st->backoffs++;
+		// -EINVAL leaves the packet unmodified, so retrying with size 1 is safe.
+		if (bpf_xdp_adjust_tail(ctx->xdp, 1) != 0) {
+			return INSTR_NO_TAILROOM;
+		}
+		want = 1;
+	} else if (st && ++st->ok_streak >= PADDING_PROBE_STREAK) {
+		st->ok_streak = 0;
+		if (st->current_size < cfg_padding_size) {
+			st->current_size++;
+		}
 	}
 
 	// Write the marker at the last byte using bpf_xdp_store_bytes to avoid direct
@@ -40,8 +94,8 @@ static __always_inline __maybe_unused int padding_obfuscate_xdp(struct wg_ctx *c
 	// the offset has a non-zero var_off.mask (i.e. any runtime-computed value).
 	// Example: https://github.com/cilium/cilium/blob/main/bpf/include/bpf/ctx/xdp.h#L66
 	// Little about var_off: https://github.com/google/security-research/security/advisories/GHSA-hfqc-63c7-rj9f
-	__u32 mrk_offset = (__u32)current_len + actual_size - 1;
-	__u8 marker = actual_size;
+	__u32 mrk_offset = (__u32)current_len + want - 1;
+	__u8 marker = want;
 	if (bpf_xdp_store_bytes(ctx->xdp, mrk_offset, &marker, sizeof(marker)) != 0) {
 		return INSTR_ERROR;
 	}

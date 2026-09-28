@@ -30,6 +30,14 @@ type WgReverseProxyMetricsValue struct {
 	TxBytes   uint64
 }
 
+type WgReverseProxyPaddingState struct {
+	_           structs.HostLayout
+	CurrentSize uint8
+	Pad         uint8
+	OkStreak    uint16
+	Backoffs    uint32
+}
+
 type WgReverseProxyXorKey struct {
 	_   structs.HostLayout
 	Key [32]uint8
@@ -84,7 +92,8 @@ type WgReverseProxyProgramSpecs struct {
 //
 // It can be passed ebpf.CollectionSpec.Assign.
 type WgReverseProxyMapSpecs struct {
-	MetricsMap *ebpf.MapSpec `ebpf:"metrics_map"`
+	MetricsMap      *ebpf.MapSpec `ebpf:"metrics_map"`
+	PaddingStateMap *ebpf.MapSpec `ebpf:"padding_state_map"`
 }
 
 // WgReverseProxyVariableSpecs contains global variables before they are loaded into the kernel.
@@ -92,6 +101,7 @@ type WgReverseProxyMapSpecs struct {
 // It can be passed ebpf.CollectionSpec.Assign.
 type WgReverseProxyVariableSpecs struct {
 	CfgLinkMtu          *ebpf.VariableSpec `ebpf:"__cfg_link_mtu"`
+	CfgPaddingAdaptive  *ebpf.VariableSpec `ebpf:"__cfg_padding_adaptive"`
 	CfgPaddingEnabled   *ebpf.VariableSpec `ebpf:"__cfg_padding_enabled"`
 	CfgPaddingRandomize *ebpf.VariableSpec `ebpf:"__cfg_padding_randomize"`
 	CfgPaddingSize      *ebpf.VariableSpec `ebpf:"__cfg_padding_size"`
@@ -120,12 +130,14 @@ func (o *WgReverseProxyObjects) Close() error {
 //
 // It can be passed to LoadWgReverseProxyObjects or ebpf.CollectionSpec.LoadAndAssign.
 type WgReverseProxyMaps struct {
-	MetricsMap *ebpf.Map `ebpf:"metrics_map"`
+	MetricsMap      *ebpf.Map `ebpf:"metrics_map"`
+	PaddingStateMap *ebpf.Map `ebpf:"padding_state_map"`
 }
 
 func (m *WgReverseProxyMaps) Close() error {
 	return _WgReverseProxyClose(
 		m.MetricsMap,
+		m.PaddingStateMap,
 	)
 }
 
@@ -134,6 +146,7 @@ func (m *WgReverseProxyMaps) Close() error {
 // It can be passed to LoadWgReverseProxyObjects or ebpf.CollectionSpec.LoadAndAssign.
 type WgReverseProxyVariables struct {
 	CfgLinkMtu          *ebpf.Variable `ebpf:"__cfg_link_mtu"`
+	CfgPaddingAdaptive  *ebpf.Variable `ebpf:"__cfg_padding_adaptive"`
 	CfgPaddingEnabled   *ebpf.Variable `ebpf:"__cfg_padding_enabled"`
 	CfgPaddingRandomize *ebpf.Variable `ebpf:"__cfg_padding_randomize"`
 	CfgPaddingSize      *ebpf.Variable `ebpf:"__cfg_padding_size"`

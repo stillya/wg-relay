@@ -264,6 +264,8 @@ func (fp *ForwardLoader) Maps() *maps.Maps {
 	mapsCollection := maps.NewMaps(metricsMap)
 
 	if fp.objs != nil {
+		mapsCollection.PaddingState = fp.objs.PaddingStateMap
+
 		if fp.objs.ConnectionMap != nil {
 			mapsCollection.AddOtherMap("ConnectionMap", fp.objs.ConnectionMap)
 		}

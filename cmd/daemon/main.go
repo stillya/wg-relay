@@ -21,6 +21,7 @@ import (
 	"github.com/stillya/wg-relay/pkg/dataplane"
 	"github.com/stillya/wg-relay/pkg/discovery"
 	"github.com/stillya/wg-relay/pkg/maps/metricsmap"
+	"github.com/stillya/wg-relay/pkg/maps/paddingmap"
 	"github.com/stillya/wg-relay/pkg/monitor"
 )
 
@@ -156,6 +157,25 @@ func main() {
 			}, metricsSource, backends)
 			go statsMonitor.Start(ctx)
 			defer statsMonitor.Stop()
+		}
+	}
+
+	padding := cfg.Proxy.Instrumentations.Padding
+	adaptivePadding := padding != nil && padding.Enabled && padding.Adaptive
+	if maps != nil && maps.PaddingState != nil && adaptivePadding {
+		paddingSource := paddingmap.NewBPFMapSource("wg-relay-padding", maps.PaddingState)
+
+		if cfg.Monitoring.Prometheus.Enabled {
+			prometheus.MustRegister(metrics.NewPaddingCollector(paddingSource))
+		}
+
+		if cfg.Monitoring.PaddingWatcher.Enabled {
+			paddingWatcher := monitor.NewPaddingWatcher(monitor.PaddingWatcherParams{
+				Interval:       cfg.Monitoring.PaddingWatcher.Interval,
+				ConfiguredSize: padding.Size,
+			}, paddingSource)
+			go paddingWatcher.Start(ctx)
+			defer paddingWatcher.Stop()
 		}
 	}
 

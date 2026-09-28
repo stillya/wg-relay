@@ -3,6 +3,7 @@ package ebpf
 import (
 	"testing"
 
+	"github.com/cilium/ebpf"
 	"github.com/stillya/wg-relay/pkg/dataplane/config"
 	"github.com/stillya/wg-relay/pkg/utils"
 )
@@ -618,4 +619,243 @@ func configureBackends(objs *WgForwardProxyObjects, backends []config.BackendSer
 	}
 
 	return nil
+}
+
+// paddingState mirrors `struct padding_state` in
+// ebpf/include/instrumentation/padding.h.
+type paddingState struct {
+	CurrentSize uint8
+	Pad         uint8
+	OkStreak    uint16
+	Backoffs    uint32
+}
+
+// readPaddingStates returns every per-CPU padding_state entry, flattened. Note
+// that a per-CPU map zero-fills the slots of CPUs that never ran, so most
+// entries will have CurrentSize == 0.
+func readPaddingStates(t *testing.T, m *ebpf.Map) (states []paddingState, ncpu int) {
+	t.Helper()
+	var key uint32
+	var vals []paddingState
+	iter := m.Iterate()
+	for iter.Next(&key, &vals) {
+		ncpu = len(vals)
+		states = append(states, vals...)
+	}
+	if err := iter.Err(); err != nil {
+		t.Fatalf("Failed to iterate padding state map: %v", err)
+	}
+	return states, ncpu
+}
+
+// firstPaddingKey returns the ifindex key of the first padding_state entry and
+// the number of possible CPUs (slice width) for that map.
+func firstPaddingKey(t *testing.T, m *ebpf.Map) (key uint32, ncpu int) {
+	t.Helper()
+	var vals []paddingState
+	iter := m.Iterate()
+	if !iter.Next(&key, &vals) {
+		t.Fatal("padding state map is empty")
+	}
+	if err := iter.Err(); err != nil {
+		t.Fatalf("Failed to iterate padding state map: %v", err)
+	}
+	return key, len(vals)
+}
+
+func maxPaddingSize(states []paddingState) uint8 {
+	var maxSize uint8
+	for _, s := range states {
+		if s.CurrentSize > maxSize {
+			maxSize = s.CurrentSize
+		}
+	}
+	return maxSize
+}
+
+// TestPaddingAdaptiveDisabledMatchesFixed checks adaptive=false matches fixed-size padding.
+func TestPaddingAdaptiveDisabledMatchesFixed(t *testing.T) {
+	spec, err := LoadWgForwardProxy()
+	if err != nil {
+		t.Fatalf("Failed to load spec: %v", err)
+	}
+	if spec.Variables["__cfg_padding_adaptive"] == nil {
+		t.Skip("__cfg_padding_adaptive not present; recompile after updating padding.h")
+	}
+
+	setVar(t, spec, "__cfg_xor_enabled", false)
+	setVar(t, spec, "__cfg_padding_enabled", true)
+	setVar(t, spec, "__cfg_padding_size", uint8(64))
+	setVar(t, spec, "__cfg_padding_adaptive", false)
+	setVar(t, spec, "__cfg_wg_port", uint16(wgPort))
+
+	objs := &WgForwardProxyObjects{}
+	if err := spec.LoadAndAssign(objs, nil); err != nil {
+		t.Fatalf("Failed to load objects: %v", err)
+	}
+	defer objs.Close()
+
+	if err := configureBackends(objs, []config.BackendServer{{IP: "10.0.0.1", Port: 51820}}); err != nil {
+		t.Fatalf("Failed to configure backends: %v", err)
+	}
+
+	inputPacket := createWGPacket("192.168.1.1", "192.168.1.2", 12345, wgPort)
+	_, outputPacket, err := objs.WgForwardProxy.Test(inputPacket)
+	if err != nil {
+		t.Fatalf("Failed to run program: %v", err)
+	}
+
+	verifyPacket(t, outputPacket, "10.0.0.1", 51820)
+	verifyPaddingObfuscation(t, inputPacket, outputPacket, 64)
+
+	// No state must be created when adaptive is off.
+	if states, _ := readPaddingStates(t, objs.PaddingStateMap); maxPaddingSize(states) != 0 {
+		t.Errorf("Expected no padding state when adaptive disabled, got max size %d", maxPaddingSize(states))
+	}
+}
+
+// TestPaddingAdaptiveStateInitialized verifies state is created at the configured size on first use.
+func TestPaddingAdaptiveStateInitialized(t *testing.T) {
+	spec, err := LoadWgForwardProxy()
+	if err != nil {
+		t.Fatalf("Failed to load spec: %v", err)
+	}
+	if spec.Variables["__cfg_padding_adaptive"] == nil {
+		t.Skip("__cfg_padding_adaptive not present; recompile after updating padding.h")
+	}
+
+	setVar(t, spec, "__cfg_xor_enabled", false)
+	setVar(t, spec, "__cfg_padding_enabled", true)
+	setVar(t, spec, "__cfg_padding_size", uint8(64))
+	setVar(t, spec, "__cfg_padding_adaptive", true)
+	setVar(t, spec, "__cfg_wg_port", uint16(wgPort))
+
+	objs := &WgForwardProxyObjects{}
+	if err := spec.LoadAndAssign(objs, nil); err != nil {
+		t.Fatalf("Failed to load objects: %v", err)
+	}
+	defer objs.Close()
+
+	if err := configureBackends(objs, []config.BackendServer{{IP: "10.0.0.1", Port: 51820}}); err != nil {
+		t.Fatalf("Failed to configure backends: %v", err)
+	}
+
+	inputPacket := createWGPacket("192.168.1.1", "192.168.1.2", 12345, wgPort)
+	_, outputPacket, err := objs.WgForwardProxy.Test(inputPacket)
+	if err != nil {
+		t.Fatalf("Failed to run program: %v", err)
+	}
+
+	// Under BPF_PROG_TEST_RUN frame_sz == PAGE_SIZE, so the full size fits.
+	verifyPaddingObfuscation(t, inputPacket, outputPacket, 64)
+
+	states, _ := readPaddingStates(t, objs.PaddingStateMap)
+	if len(states) == 0 {
+		t.Fatal("Expected an adaptive padding state entry, found none")
+	}
+	if got := maxPaddingSize(states); got != 64 {
+		t.Errorf("Expected initialized working size 64, got %d", got)
+	}
+}
+
+// TestPaddingAdaptiveHonorsWorkingCeiling verifies padding is capped at the working size, not the configured size.
+func TestPaddingAdaptiveHonorsWorkingCeiling(t *testing.T) {
+	spec, err := LoadWgForwardProxy()
+	if err != nil {
+		t.Fatalf("Failed to load spec: %v", err)
+	}
+	if spec.Variables["__cfg_padding_adaptive"] == nil {
+		t.Skip("__cfg_padding_adaptive not present; recompile after updating padding.h")
+	}
+
+	setVar(t, spec, "__cfg_xor_enabled", false)
+	setVar(t, spec, "__cfg_padding_enabled", true)
+	setVar(t, spec, "__cfg_padding_size", uint8(64))
+	setVar(t, spec, "__cfg_padding_adaptive", true)
+	setVar(t, spec, "__cfg_wg_port", uint16(wgPort))
+
+	objs := &WgForwardProxyObjects{}
+	if err := spec.LoadAndAssign(objs, nil); err != nil {
+		t.Fatalf("Failed to load objects: %v", err)
+	}
+	defer objs.Close()
+
+	if err := configureBackends(objs, []config.BackendServer{{IP: "10.0.0.1", Port: 51820}}); err != nil {
+		t.Fatalf("Failed to configure backends: %v", err)
+	}
+
+	inputPacket := createWGPacket("192.168.1.1", "192.168.1.2", 12345, wgPort)
+
+	// Priming packet creates the state; use it to learn the map key and CPU width.
+	if _, _, err := objs.WgForwardProxy.Test(inputPacket); err != nil {
+		t.Fatalf("Failed to run priming packet: %v", err)
+	}
+	key, ncpu := firstPaddingKey(t, objs.PaddingStateMap)
+
+	// Force the working ceiling down to 4 on every CPU, as a real backoff would.
+	forced := make([]paddingState, ncpu)
+	for i := range forced {
+		forced[i] = paddingState{CurrentSize: 4}
+	}
+	if err := objs.PaddingStateMap.Put(&key, forced); err != nil {
+		t.Fatalf("Failed to force padding ceiling: %v", err)
+	}
+
+	_, outputPacket, err := objs.WgForwardProxy.Test(inputPacket)
+	if err != nil {
+		t.Fatalf("Failed to run capped packet: %v", err)
+	}
+
+	verifyPacket(t, outputPacket, "10.0.0.1", 51820)
+	// Only 4 bytes must be added even though the configured size is 64.
+	verifyPaddingObfuscation(t, inputPacket, outputPacket, 4)
+}
+
+// TestPaddingAdaptiveReseedsZeroedState verifies a zeroed working size (an
+// unseeded per-CPU slot) is reseeded to the configured size, not used as-is.
+func TestPaddingAdaptiveReseedsZeroedState(t *testing.T) {
+	spec, err := LoadWgForwardProxy()
+	if err != nil {
+		t.Fatalf("Failed to load spec: %v", err)
+	}
+	if spec.Variables["__cfg_padding_adaptive"] == nil {
+		t.Skip("__cfg_padding_adaptive not present; recompile after updating padding.h")
+	}
+
+	setVar(t, spec, "__cfg_xor_enabled", false)
+	setVar(t, spec, "__cfg_padding_enabled", true)
+	setVar(t, spec, "__cfg_padding_size", uint8(64))
+	setVar(t, spec, "__cfg_padding_adaptive", true)
+	setVar(t, spec, "__cfg_wg_port", uint16(wgPort))
+
+	objs := &WgForwardProxyObjects{}
+	if err := spec.LoadAndAssign(objs, nil); err != nil {
+		t.Fatalf("Failed to load objects: %v", err)
+	}
+	defer objs.Close()
+
+	if err := configureBackends(objs, []config.BackendServer{{IP: "10.0.0.1", Port: 51820}}); err != nil {
+		t.Fatalf("Failed to configure backends: %v", err)
+	}
+
+	inputPacket := createWGPacket("192.168.1.1", "192.168.1.2", 12345, wgPort)
+
+	// Prime to learn the map key / CPU width, then zero every CPU slot.
+	if _, _, err := objs.WgForwardProxy.Test(inputPacket); err != nil {
+		t.Fatalf("Failed to run priming packet: %v", err)
+	}
+	key, ncpu := firstPaddingKey(t, objs.PaddingStateMap)
+	zeroed := make([]paddingState, ncpu) // all fields zero, incl. CurrentSize
+	if err := objs.PaddingStateMap.Put(&key, zeroed); err != nil {
+		t.Fatalf("Failed to zero padding state: %v", err)
+	}
+
+	_, outputPacket, err := objs.WgForwardProxy.Test(inputPacket)
+	if err != nil {
+		t.Fatalf("Failed to run packet against zeroed state: %v", err)
+	}
+
+	verifyPacket(t, outputPacket, "10.0.0.1", 51820)
+	// Must reseed to the configured 64 and add 64 bytes — NOT 0.
+	verifyPaddingObfuscation(t, inputPacket, outputPacket, 64)
 }

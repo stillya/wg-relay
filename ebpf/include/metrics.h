@@ -8,7 +8,7 @@
 #define METRICS_MAP_SIZE 65536
 
 enum metric_direction { METRIC_DOWNSTREAM = 0, METRIC_UPSTREAM = 1 };
-enum metric_reason { METRIC_REASON_FORWARDED = 0, METRIC_REASON_DROPPED = 1 };
+enum metric_reason { METRIC_REASON_FORWARDED = 0, METRIC_REASON_DROPPED = 1, METRIC_REASON_NO_TAILROOM = 2 };
 
 struct metrics_key {
 	__u8 backend_index;
@@ -36,7 +36,7 @@ struct {
 // Update metrics with packet count and bytes
 // direction: 0=downstream (client->proxy), 1=upstream (proxy->backend)
 // rx: 1 for rx (incoming), 0 for tx (outgoing)
-// reason: 0=forwarded, 1=dropped
+// reason: 0=forwarded, 1=dropped, 2=no_tailroom
 static __always_inline __maybe_unused void update_metrics(__u8 backend_index, __u8 direction, __u64 bytes, __u8 rx,
 							  __u8 reason) {
 	struct metrics_key key = {

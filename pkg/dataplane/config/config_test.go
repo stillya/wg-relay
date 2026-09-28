@@ -1,6 +1,7 @@
 package config
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -126,6 +127,55 @@ func TestPaddingConfig_Validation(t *testing.T) {
 				} else if !strings.Contains(err.Error(), tt.wantErr) {
 					t.Errorf("error %q should contain %q", err.Error(), tt.wantErr)
 				}
+			}
+		})
+	}
+}
+
+func TestPaddingConfig_Adaptive(t *testing.T) {
+	tests := []struct {
+		name         string
+		paddingExtra string
+		want         bool
+	}{
+		{"adaptive omitted defaults to true", "", true},
+		{"adaptive false", "adaptive: false", false},
+		{"adaptive true", "adaptive: true", true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			yamlContent := fmt.Sprintf(`
+daemon:
+  listen: ":8080"
+proxy:
+  enabled: true
+  mode: forward
+  wg_port: 51820
+  interfaces:
+    - eth0
+  instrumentations:
+    padding:
+      enabled: true
+      size: 32
+      %s
+  forward:
+    backends:
+      - ip: 10.0.0.1
+`, tt.paddingExtra)
+
+			tmpDir := t.TempDir()
+			configPath := filepath.Join(tmpDir, "config.yaml")
+			if err := os.WriteFile(configPath, []byte(yamlContent), 0600); err != nil {
+				t.Fatalf("failed to write test config: %v", err)
+			}
+
+			cfg, err := Load(configPath)
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			if got := cfg.Proxy.Instrumentations.Padding.Adaptive; got != tt.want {
+				t.Errorf("Adaptive = %v, want %v", got, tt.want)
 			}
 		})
 	}
@@ -369,6 +419,27 @@ func TestMonitoringConfig_Validation(t *testing.T) {
 			name: "prometheus enabled has no interval to check",
 			monitoring: MonitoringConfig{
 				Prometheus: PrometheusConfig{Enabled: true, Listen: ":9090"},
+			},
+			wantErr: "",
+		},
+		{
+			name: "padding watcher enabled with zero interval",
+			monitoring: MonitoringConfig{
+				PaddingWatcher: PaddingWatcherConfig{Enabled: true, Interval: 0},
+			},
+			wantErr: "monitoring.padding_watcher.interval must be positive",
+		},
+		{
+			name: "padding watcher enabled with negative interval",
+			monitoring: MonitoringConfig{
+				PaddingWatcher: PaddingWatcherConfig{Enabled: true, Interval: -5 * time.Second},
+			},
+			wantErr: "monitoring.padding_watcher.interval must be positive",
+		},
+		{
+			name: "padding watcher disabled with zero interval",
+			monitoring: MonitoringConfig{
+				PaddingWatcher: PaddingWatcherConfig{Enabled: false, Interval: 0},
 			},
 			wantErr: "",
 		},

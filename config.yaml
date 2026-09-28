@@ -9,6 +9,9 @@ monitoring: # Monitoring configuration
   prometheus: # Prometheus HTTP exporter
     enabled: true               # Enable/disable Prometheus metrics server
     listen: ":8081"              # Address and port for metrics server
+  padding_watcher: # Adaptive padding state watcher (logs AIMD size changes)
+    enabled: true                # Enable/disable the watcher
+    interval: "10s"              # Poll interval
 
 proxy:
   enabled: true                    # Enable/disable proxy
@@ -23,6 +26,7 @@ proxy:
       enabled: true
       size: 64
       mode: "direct"              # "direct" (fixed size) or "randomize" (random 1..size)
+      adaptive: true              # AIMD: probe real XDP tailroom, shrink padding instead of dropping (default: true)
 
   driver_mode: "driver"                  # "driver", "generic" or "offload" for XDP mode
   interfaces: # Network interfaces to attach to

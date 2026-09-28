@@ -14,10 +14,12 @@ const (
 	MetricUpstream           uint8 = 1
 	MetricReasonForwarded    uint8 = 0
 	MetricReasonDropped      uint8 = 1
+	MetricReasonNoTailroom   uint8 = 2
 	DirectionLabelDownstream       = "downstream"
 	DirectionLabelUpstream         = "upstream"
 	ReasonLabelForwarded           = "forwarded"
 	ReasonLabelDropped             = "dropped"
+	ReasonLabelNoTailroom          = "no_tailroom"
 )
 
 // MetricsKey represents the key structure for the BPF metrics map.
@@ -120,6 +122,8 @@ func ReasonToString(reason uint8) string {
 		return ReasonLabelForwarded
 	case MetricReasonDropped:
 		return ReasonLabelDropped
+	case MetricReasonNoTailroom:
+		return ReasonLabelNoTailroom
 	default:
 		return "unknown"
 	}
