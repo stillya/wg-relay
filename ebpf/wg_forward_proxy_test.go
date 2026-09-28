@@ -1,7 +1,9 @@
 package ebpf
 
 import (
+	"fmt"
 	"testing"
+	"time"
 
 	"github.com/cilium/ebpf"
 	"github.com/stillya/wg-relay/pkg/dataplane/config"
@@ -858,4 +860,408 @@ func TestPaddingAdaptiveReseedsZeroedState(t *testing.T) {
 	verifyPacket(t, outputPacket, "10.0.0.1", 51820)
 	// Must reseed to the configured 64 and add 64 bytes — NOT 0.
 	verifyPaddingObfuscation(t, inputPacket, outputPacket, 64)
+}
+
+// newForwardProxy loads the forward program with obfuscation disabled and the given backends configured.
+func newForwardProxy(t *testing.T, backends []config.BackendServer) *WgForwardProxyObjects {
+	t.Helper()
+	spec, err := LoadWgForwardProxy()
+	if err != nil {
+		t.Fatalf("Failed to load spec: %v", err)
+	}
+
+	setVar(t, spec, "__cfg_xor_enabled", false)
+	setVar(t, spec, "__cfg_wg_port", uint16(wgPort))
+
+	objs := &WgForwardProxyObjects{}
+	if err := spec.LoadAndAssign(objs, nil); err != nil {
+		t.Fatalf("Failed to load objects: %v", err)
+	}
+	t.Cleanup(func() { _ = objs.Close() })
+
+	if err := configureBackends(objs, backends); err != nil {
+		t.Fatalf("Failed to configure backends: %v", err)
+	}
+	return objs
+}
+
+// runForward runs one packet through the forward program and parses the output packet.
+func runForward(t *testing.T, objs *WgForwardProxyObjects, packet []byte) (int, *packetInfo) {
+	t.Helper()
+	result, output, err := objs.WgForwardProxy.Test(packet)
+	if err != nil {
+		t.Fatalf("Failed to run program: %v", err)
+	}
+	info, err := parseUDPPacket(output)
+	if err != nil || info == nil {
+		t.Fatalf("Failed to parse output packet: %v", err)
+	}
+	return int(result), info
+}
+
+func lookupCtEntry(t *testing.T, objs *WgForwardProxyObjects, tuple WgForwardProxyIpv4CtTuple) WgForwardProxyIpv4CtEntry {
+	t.Helper()
+	var entry WgForwardProxyIpv4CtEntry
+	if err := objs.Ipv4CtMap.Lookup(&tuple, &entry); err != nil {
+		t.Fatalf("Failed to look up ct entry: %v", err)
+	}
+	return entry
+}
+
+func TestConntrackNewFlow(t *testing.T) {
+	objs := newForwardProxy(t, []config.BackendServer{{IP: "10.0.0.1", Port: 51820}})
+
+	result, out := runForward(t, objs, createWGPacket("192.168.1.1", "192.168.1.2", 12345, wgPort))
+	if result != xdpRedirect {
+		t.Fatalf("Expected XDP_REDIRECT, got %d", result)
+	}
+
+	cts := dumpMap[WgForwardProxyIpv4CtTuple, WgForwardProxyIpv4CtEntry](t, objs.Ipv4CtMap)
+	revs := dumpMap[WgForwardProxyIpv4CtTuple, WgForwardProxyIpv4CtTuple](t, objs.Ipv4CtRevMap)
+	if len(cts) != 1 || len(revs) != 1 {
+		t.Fatalf("Expected 1 ct and 1 reverse entry, got %d and %d", len(cts), len(revs))
+	}
+
+	client := ctTuple("192.168.1.1", "192.168.1.2", 12345, wgPort)
+	entry, ok := cts[client]
+	if !ok {
+		t.Fatalf("No ct entry for the client tuple, got %+v", cts)
+	}
+	if entry.ToDaddr != netIP("10.0.0.1") || entry.ToDport != htons(51820) {
+		t.Errorf("Expected target 10.0.0.1:51820, got %#x:%d", entry.ToDaddr, ntohs(entry.ToDport))
+	}
+	if entry.BackendIdx != 0 {
+		t.Errorf("Expected backend index 0, got %d", entry.BackendIdx)
+	}
+	if entry.LastSeen == 0 {
+		t.Error("Expected last_seen to be set")
+	}
+
+	natPort := ntohs(entry.NatPort)
+	if natPort < ctPortMin || natPort > ctPortMax {
+		t.Errorf("NAT port %d outside [%d, %d]", natPort, ctPortMin, ctPortMax)
+	}
+	if out.srcIP != "192.168.1.2" || out.srcPort != natPort {
+		t.Errorf("Expected source 192.168.1.2:%d, got %s:%d", natPort, out.srcIP, out.srcPort)
+	}
+
+	rev := ctTuple("10.0.0.1", "192.168.1.2", 51820, natPort)
+	if got, ok := revs[rev]; !ok || got != client {
+		t.Errorf("Expected reverse entry %+v -> %+v, got %+v", rev, client, revs)
+	}
+}
+
+func TestConntrackReusesNatPort(t *testing.T) {
+	objs := newForwardProxy(t, []config.BackendServer{{IP: "10.0.0.1", Port: 51820}})
+	packet := createWGPacket("192.168.1.1", "192.168.1.2", 12345, wgPort)
+
+	_, first := runForward(t, objs, packet)
+	result, second := runForward(t, objs, packet)
+	if result != xdpRedirect {
+		t.Fatalf("Expected XDP_REDIRECT, got %d", result)
+	}
+	if second.srcPort != first.srcPort {
+		t.Errorf("Expected NAT port %d to be reused, got %d", first.srcPort, second.srcPort)
+	}
+
+	cts := dumpMap[WgForwardProxyIpv4CtTuple, WgForwardProxyIpv4CtEntry](t, objs.Ipv4CtMap)
+	revs := dumpMap[WgForwardProxyIpv4CtTuple, WgForwardProxyIpv4CtTuple](t, objs.Ipv4CtRevMap)
+	if len(cts) != 1 || len(revs) != 1 {
+		t.Errorf("Expected 1 ct and 1 reverse entry, got %d and %d", len(cts), len(revs))
+	}
+}
+
+func TestConntrackRestoresReturnTraffic(t *testing.T) {
+	objs := newForwardProxy(t, []config.BackendServer{{IP: "10.0.0.1", Port: 51820}})
+
+	_, out := runForward(t, objs, createWGPacket("192.168.1.1", "192.168.1.2", 12345, wgPort))
+
+	result, back := runForward(t, objs, createWGPacket("10.0.0.1", "192.168.1.2", 51820, out.srcPort))
+	if result != xdpRedirect {
+		t.Fatalf("Expected XDP_REDIRECT, got %d", result)
+	}
+	if back.srcIP != "192.168.1.2" || back.srcPort != wgPort {
+		t.Errorf("Expected source 192.168.1.2:%d, got %s:%d", wgPort, back.srcIP, back.srcPort)
+	}
+	if back.dstIP != "192.168.1.1" || back.dstPort != 12345 {
+		t.Errorf("Expected destination 192.168.1.1:12345, got %s:%d", back.dstIP, back.dstPort)
+	}
+}
+
+func TestConntrackAllocNeverOverwritesReservedPorts(t *testing.T) {
+	objs := newForwardProxy(t, []config.BackendServer{{IP: "10.0.0.1", Port: 51820}})
+
+	seeded := make(map[WgForwardProxyIpv4CtTuple]WgForwardProxyIpv4CtTuple, ctPortMax-ctPortMin+1)
+	for i := range uint16(ctPortMax - ctPortMin + 1) {
+		port := ctPortMin + i
+		rev := ctTuple("10.0.0.1", "192.168.1.2", 51820, port)
+		owner := ctTuple("192.168.1.99", "192.168.1.2", port, wgPort)
+		if err := objs.Ipv4CtRevMap.Put(&rev, &owner); err != nil {
+			t.Fatalf("Failed to seed reverse entry: %v", err)
+		}
+		seeded[rev] = owner
+	}
+
+	result, _ := runForward(t, objs, createWGPacket("192.168.1.1", "192.168.1.2", 12345, wgPort))
+	if result != xdpPass {
+		t.Errorf("Expected XDP_PASS with every NAT port reserved, got %d", result)
+	}
+
+	if cts := dumpMap[WgForwardProxyIpv4CtTuple, WgForwardProxyIpv4CtEntry](t, objs.Ipv4CtMap); len(cts) != 0 {
+		t.Errorf("Expected no ct entry, got %+v", cts)
+	}
+	revs := dumpMap[WgForwardProxyIpv4CtTuple, WgForwardProxyIpv4CtTuple](t, objs.Ipv4CtRevMap)
+	if len(revs) != len(seeded) {
+		t.Errorf("Expected %d reverse entries, got %d", len(seeded), len(revs))
+	}
+	for rev, owner := range seeded {
+		if got, ok := revs[rev]; !ok || got != owner {
+			t.Errorf("Seeded reverse entry %+v changed: expected %+v, got %+v", rev, owner, got)
+		}
+	}
+}
+
+func TestConntrackAllocSkipsWgPort(t *testing.T) {
+	objs := newForwardProxy(t, []config.BackendServer{{IP: "10.0.0.1", Port: 51820}})
+
+	for i := range uint16(ctPortMax - ctPortMin + 1) {
+		port := ctPortMin + i
+		if port == wgPort {
+			continue
+		}
+		rev := ctTuple("10.0.0.1", "192.168.1.2", 51820, port)
+		owner := ctTuple("192.168.1.99", "192.168.1.2", port, wgPort)
+		if err := objs.Ipv4CtRevMap.Put(&rev, &owner); err != nil {
+			t.Fatalf("Failed to seed reverse entry: %v", err)
+		}
+	}
+
+	// Every run starts at a new random port, so repeat until one walk almost surely reaches wg_port.
+	result, err := objs.WgForwardProxy.Run(&ebpf.RunOptions{
+		Data:   createWGPacket("192.168.1.1", "192.168.1.2", 12345, wgPort),
+		Repeat: 10000,
+	})
+	if err != nil {
+		t.Fatalf("Failed to run program: %v", err)
+	}
+	if result != xdpPass {
+		t.Errorf("Expected XDP_PASS when only wg_port is free, got %d", result)
+	}
+
+	if cts := dumpMap[WgForwardProxyIpv4CtTuple, WgForwardProxyIpv4CtEntry](t, objs.Ipv4CtMap); len(cts) != 0 {
+		t.Errorf("Expected no ct entry, got %+v", cts)
+	}
+	revs := dumpMap[WgForwardProxyIpv4CtTuple, WgForwardProxyIpv4CtTuple](t, objs.Ipv4CtRevMap)
+	if owner, ok := revs[ctTuple("10.0.0.1", "192.168.1.2", 51820, wgPort)]; ok {
+		t.Errorf("wg_port %d was reserved as a NAT port for %+v", wgPort, owner)
+	}
+	if len(revs) != ctPortMax-ctPortMin {
+		t.Errorf("Expected %d reverse entries, got %d", ctPortMax-ctPortMin, len(revs))
+	}
+}
+
+func TestConntrackStaleReverseEntry(t *testing.T) {
+	tests := []struct {
+		name           string
+		clientDaddr    string
+		toDaddr        string
+		toDport        uint16
+		natPort        uint16
+		expectedResult int
+	}{
+		{"matching", "192.168.1.2", "10.0.0.1", 51820, 60000, xdpRedirect},
+		{"stale_nat_port", "192.168.1.2", "10.0.0.1", 51820, 60001, xdpPass},
+		{"different_backend_addr", "192.168.1.2", "10.0.0.9", 51820, 60000, xdpPass},
+		{"different_backend_port", "192.168.1.2", "10.0.0.1", 51821, 60000, xdpPass},
+		{"different_proxy_addr", "192.168.1.5", "10.0.0.1", 51820, 60000, xdpPass},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			objs := newForwardProxy(t, []config.BackendServer{{IP: "10.0.0.1", Port: 51820}})
+
+			client := ctTuple("192.168.1.1", tt.clientDaddr, 12345, wgPort)
+			rev := ctTuple("10.0.0.1", "192.168.1.2", 51820, 60000)
+			entry := WgForwardProxyIpv4CtEntry{
+				LastSeen: 1,
+				ToDaddr:  netIP(tt.toDaddr),
+				ToDport:  htons(tt.toDport),
+				NatPort:  htons(tt.natPort),
+			}
+			if err := objs.Ipv4CtRevMap.Put(&rev, &client); err != nil {
+				t.Fatalf("Failed to seed reverse entry: %v", err)
+			}
+			if err := objs.Ipv4CtMap.Put(&client, &entry); err != nil {
+				t.Fatalf("Failed to seed ct entry: %v", err)
+			}
+
+			result, _ := runForward(t, objs, createWGPacket("10.0.0.1", "192.168.1.2", 51820, 60000))
+			if result != tt.expectedResult {
+				t.Errorf("Expected result %d, got %d", tt.expectedResult, result)
+			}
+		})
+	}
+}
+
+func TestConntrackRevMapFull(t *testing.T) {
+	const revMapSize = 4
+
+	spec, err := LoadWgForwardProxy()
+	if err != nil {
+		t.Fatalf("Failed to load spec: %v", err)
+	}
+	setVar(t, spec, "__cfg_xor_enabled", false)
+	setVar(t, spec, "__cfg_wg_port", uint16(wgPort))
+	spec.Maps["ipv4_ct_rev_map"].MaxEntries = revMapSize
+
+	objs := &WgForwardProxyObjects{}
+	if err := spec.LoadAndAssign(objs, nil); err != nil {
+		t.Fatalf("Failed to load objects: %v", err)
+	}
+	defer objs.Close()
+
+	if err := configureBackends(objs, []config.BackendServer{{IP: "10.0.0.1", Port: 51820}}); err != nil {
+		t.Fatalf("Failed to configure backends: %v", err)
+	}
+
+	seeded := make(map[WgForwardProxyIpv4CtTuple]WgForwardProxyIpv4CtTuple, revMapSize)
+	for i := range uint16(revMapSize) {
+		rev := ctTuple("10.0.0.1", "192.168.1.2", 51820, 60000+i)
+		owner := ctTuple("192.168.1.99", "192.168.1.2", 40000+i, wgPort)
+		if err := objs.Ipv4CtRevMap.Put(&rev, &owner); err != nil {
+			t.Fatalf("Failed to seed reverse entry: %v", err)
+		}
+		seeded[rev] = owner
+	}
+
+	result, _ := runForward(t, objs, createWGPacket("192.168.1.1", "192.168.1.2", 12345, wgPort))
+	if result != xdpPass {
+		t.Errorf("Expected XDP_PASS with a full reverse map, got %d", result)
+	}
+
+	if cts := dumpMap[WgForwardProxyIpv4CtTuple, WgForwardProxyIpv4CtEntry](t, objs.Ipv4CtMap); len(cts) != 0 {
+		t.Errorf("Expected no ct entry, got %+v", cts)
+	}
+	revs := dumpMap[WgForwardProxyIpv4CtTuple, WgForwardProxyIpv4CtTuple](t, objs.Ipv4CtRevMap)
+	if len(revs) != len(seeded) {
+		t.Errorf("Expected %d reverse entries, got %d", len(seeded), len(revs))
+	}
+	for rev, owner := range seeded {
+		if got, ok := revs[rev]; !ok || got != owner {
+			t.Errorf("Seeded reverse entry %+v changed: expected %+v, got %+v", rev, owner, got)
+		}
+	}
+}
+
+func TestConntrackFlowSurvivesBackendChange(t *testing.T) {
+	objs := newForwardProxy(t, []config.BackendServer{{IP: "10.0.0.1", Port: 51820}})
+	packet := createWGPacket("192.168.1.1", "192.168.1.2", 12345, wgPort)
+
+	_, out := runForward(t, objs, packet)
+	if out.dstIP != "10.0.0.1" || out.dstPort != 51820 {
+		t.Fatalf("Expected destination 10.0.0.1:51820, got %s:%d", out.dstIP, out.dstPort)
+	}
+
+	if err := configureBackends(objs, []config.BackendServer{{IP: "10.0.0.9", Port: 51830}}); err != nil {
+		t.Fatalf("Failed to reconfigure backends: %v", err)
+	}
+
+	_, out = runForward(t, objs, packet)
+	if out.dstIP != "10.0.0.1" || out.dstPort != 51820 {
+		t.Errorf("Existing flow moved: expected 10.0.0.1:51820, got %s:%d", out.dstIP, out.dstPort)
+	}
+
+	_, out = runForward(t, objs, createWGPacket("192.168.1.3", "192.168.1.2", 12345, wgPort))
+	if out.dstIP != "10.0.0.9" || out.dstPort != 51830 {
+		t.Errorf("New flow: expected 10.0.0.9:51830, got %s:%d", out.dstIP, out.dstPort)
+	}
+}
+
+func TestConntrackSameIPBackendsDistinctReverseKeys(t *testing.T) {
+	objs := newForwardProxy(t, []config.BackendServer{
+		{IP: "10.0.0.1", Port: 51820},
+		{IP: "10.0.0.1", Port: 51821},
+	})
+
+	type flow struct {
+		clientIP string
+		natPort  uint16
+	}
+	flows := make(map[uint16]flow)
+	for i := 1; i <= 64 && len(flows) < 2; i++ {
+		clientIP := fmt.Sprintf("192.168.1.%d", i+2)
+		result, out := runForward(t, objs, createWGPacket(clientIP, "192.168.1.2", 12345, wgPort))
+		if result != xdpRedirect {
+			t.Fatalf("Expected XDP_REDIRECT for %s, got %d", clientIP, result)
+		}
+		if out.srcPort < ctPortMin {
+			t.Errorf("NAT port %d outside [%d, %d]", out.srcPort, ctPortMin, ctPortMax)
+		}
+		if _, seen := flows[out.dstPort]; !seen {
+			flows[out.dstPort] = flow{clientIP: clientIP, natPort: out.srcPort}
+		}
+	}
+	if len(flows) != 2 {
+		t.Fatalf("Expected flows on both backends, got %v", flows)
+	}
+
+	for backendPort, f := range flows {
+		rev := ctTuple("10.0.0.1", "192.168.1.2", backendPort, f.natPort)
+		var got WgForwardProxyIpv4CtTuple
+		if err := objs.Ipv4CtRevMap.Lookup(&rev, &got); err != nil {
+			t.Fatalf("No reverse entry for backend port %d: %v", backendPort, err)
+		}
+		if client := ctTuple(f.clientIP, "192.168.1.2", 12345, wgPort); got != client {
+			t.Errorf("Reverse entry for backend port %d: expected %+v, got %+v", backendPort, client, got)
+		}
+
+		result, back := runForward(t, objs, createWGPacket("10.0.0.1", "192.168.1.2", backendPort, f.natPort))
+		if result != xdpRedirect {
+			t.Fatalf("Expected XDP_REDIRECT for return traffic from port %d, got %d", backendPort, result)
+		}
+		if back.dstIP != f.clientIP || back.dstPort != 12345 {
+			t.Errorf("Return traffic from port %d: expected %s:12345, got %s:%d",
+				backendPort, f.clientIP, back.dstIP, back.dstPort)
+		}
+	}
+}
+
+func TestConntrackTouchThrottled(t *testing.T) {
+	objs := newForwardProxy(t, []config.BackendServer{{IP: "10.0.0.1", Port: 51820}})
+	client := ctTuple("192.168.1.1", "192.168.1.2", 12345, wgPort)
+	packet := createWGPacket("192.168.1.1", "192.168.1.2", 12345, wgPort)
+
+	_, out := runForward(t, objs, packet)
+	created := lookupCtEntry(t, objs, client).LastSeen
+
+	runForward(t, objs, packet)
+	if got := lookupCtEntry(t, objs, client).LastSeen; got != created {
+		t.Errorf("last_seen rewritten within the refresh interval: %d -> %d", created, got)
+	}
+
+	stale := created - uint64(2*time.Second)
+	tests := []struct {
+		name   string
+		packet []byte
+	}{
+		{name: "to_wg", packet: packet},
+		{name: "from_wg", packet: createWGPacket("10.0.0.1", "192.168.1.2", 51820, out.srcPort)},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			entry := lookupCtEntry(t, objs, client)
+			entry.LastSeen = stale
+			if err := objs.Ipv4CtMap.Put(&client, &entry); err != nil {
+				t.Fatalf("Failed to age ct entry: %v", err)
+			}
+
+			if result, _ := runForward(t, objs, tt.packet); result != xdpRedirect {
+				t.Fatalf("Expected XDP_REDIRECT, got %d", result)
+			}
+			if got := lookupCtEntry(t, objs, client).LastSeen; got < created {
+				t.Errorf("Stale last_seen %d not refreshed, got %d", stale, got)
+			}
+		})
+	}
 }

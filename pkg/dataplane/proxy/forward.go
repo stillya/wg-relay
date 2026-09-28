@@ -265,14 +265,8 @@ func (fp *ForwardLoader) Maps() *maps.Maps {
 
 	if fp.objs != nil {
 		mapsCollection.PaddingState = fp.objs.PaddingStateMap
-
-		if fp.objs.ConnectionMap != nil {
-			mapsCollection.AddOtherMap("ConnectionMap", fp.objs.ConnectionMap)
-		}
-
-		if fp.objs.NatReverseMap != nil {
-			mapsCollection.AddOtherMap("NatReverseMap", fp.objs.NatReverseMap)
-		}
+		mapsCollection.CT = fp.objs.Ipv4CtMap
+		mapsCollection.CTRev = fp.objs.Ipv4CtRevMap
 	}
 
 	return mapsCollection

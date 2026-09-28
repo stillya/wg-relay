@@ -14,6 +14,10 @@ const (
 
 	metricDownstream = 0
 	metricUpstream   = 1
+
+	// ctPortMin and ctPortMax mirror CT_PORT_MIN and CT_PORT_MAX in ct.h
+	ctPortMin = 50000
+	ctPortMax = 65535
 )
 
 // MetricsKey represents the key structure for eBPF metrics map
@@ -392,4 +396,42 @@ func verifyPaddingDeobfuscation(t *testing.T, paddedInput, output []byte, paddin
 	if len(output) != expectedLen {
 		t.Errorf("Expected output packet length %d, got %d", expectedLen, len(output))
 	}
+}
+
+// ctTuple builds an ipv4_ct_tuple in network byte order
+func ctTuple(saddr, daddr string, sport, dport uint16) WgForwardProxyIpv4CtTuple {
+	return WgForwardProxyIpv4CtTuple{
+		Saddr: netIP(saddr),
+		Daddr: netIP(daddr),
+		Sport: htons(sport),
+		Dport: htons(dport),
+	}
+}
+
+func netIP(ip string) uint32 {
+	return binary.NativeEndian.Uint32(net.ParseIP(ip).To4())
+}
+
+func htons(v uint16) uint16 {
+	return binary.NativeEndian.Uint16(binary.BigEndian.AppendUint16(nil, v))
+}
+
+func ntohs(v uint16) uint16 {
+	return binary.BigEndian.Uint16(binary.NativeEndian.AppendUint16(nil, v))
+}
+
+// dumpMap returns every entry of a hash map.
+func dumpMap[K comparable, V any](t *testing.T, m *ebpf.Map) map[K]V {
+	t.Helper()
+	entries := make(map[K]V)
+	var key K
+	var value V
+	iter := m.Iterate()
+	for iter.Next(&key, &value) {
+		entries[key] = value
+	}
+	if err := iter.Err(); err != nil {
+		t.Fatalf("Failed to iterate map: %v", err)
+	}
+	return entries
 }

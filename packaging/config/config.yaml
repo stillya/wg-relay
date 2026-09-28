@@ -37,3 +37,6 @@ proxy:
       # - name: "wg-gateway-1"
       #   ip: "192.0.2.1"
       #   port: 51820
+    conntrack:
+      timeout: "5m"              # Idle time after which a flow is expired
+      gc_interval: "30s"         # How often expired flows are swept (must not exceed timeout)
