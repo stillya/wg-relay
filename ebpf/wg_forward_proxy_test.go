@@ -673,8 +673,7 @@ func maxPaddingSize(states []paddingState) uint8 {
 	return maxSize
 }
 
-// TestPaddingAdaptiveDisabledMatchesFixed locks in that adaptive=false behaves
-// exactly like the original fixed-size padding.
+// TestPaddingAdaptiveDisabledMatchesFixed checks adaptive=false matches fixed-size padding.
 func TestPaddingAdaptiveDisabledMatchesFixed(t *testing.T) {
 	spec, err := LoadWgForwardProxy()
 	if err != nil {
@@ -715,8 +714,7 @@ func TestPaddingAdaptiveDisabledMatchesFixed(t *testing.T) {
 	}
 }
 
-// TestPaddingAdaptiveStateInitialized verifies the per-interface state is
-// created at the configured size on first use.
+// TestPaddingAdaptiveStateInitialized verifies state is created at the configured size on first use.
 func TestPaddingAdaptiveStateInitialized(t *testing.T) {
 	spec, err := LoadWgForwardProxy()
 	if err != nil {
@@ -760,8 +758,7 @@ func TestPaddingAdaptiveStateInitialized(t *testing.T) {
 	}
 }
 
-// TestPaddingAdaptiveHonorsWorkingCeiling verifies the datapath caps padding at
-// the current working size rather than the configured size.
+// TestPaddingAdaptiveHonorsWorkingCeiling verifies padding is capped at the working size, not the configured size.
 func TestPaddingAdaptiveHonorsWorkingCeiling(t *testing.T) {
 	spec, err := LoadWgForwardProxy()
 	if err != nil {
@@ -789,8 +786,7 @@ func TestPaddingAdaptiveHonorsWorkingCeiling(t *testing.T) {
 
 	inputPacket := createWGPacket("192.168.1.1", "192.168.1.2", 12345, wgPort)
 
-	// First packet creates the per-interface state; use it to learn the map key
-	// and CPU width.
+	// Priming packet creates the state; use it to learn the map key and CPU width.
 	if _, _, err := objs.WgForwardProxy.Test(inputPacket); err != nil {
 		t.Fatalf("Failed to run priming packet: %v", err)
 	}
@@ -811,16 +807,12 @@ func TestPaddingAdaptiveHonorsWorkingCeiling(t *testing.T) {
 	}
 
 	verifyPacket(t, outputPacket, "10.0.0.1", 51820)
-	// Only 4 bytes must be added even though the configured size is 64, and the
-	// marker must reflect the actual applied size so the receiver strips 4.
+	// Only 4 bytes must be added even though the configured size is 64.
 	verifyPaddingObfuscation(t, inputPacket, outputPacket, 4)
 }
 
-// TestPaddingAdaptiveReseedsZeroedState guards against the per-CPU init gap: on
-// a PERCPU_HASH a BPF-side update seeds only the current CPU, so other CPUs
-// first observe a zero-valued slot. A zeroed working size must be reseeded to
-// the configured size, never used to drive the applied padding (and its marker)
-// to 0 — which would corrupt the last payload byte of an unpadded packet.
+// TestPaddingAdaptiveReseedsZeroedState verifies a zeroed working size (an
+// unseeded per-CPU slot) is reseeded to the configured size, not used as-is.
 func TestPaddingAdaptiveReseedsZeroedState(t *testing.T) {
 	spec, err := LoadWgForwardProxy()
 	if err != nil {
@@ -848,8 +840,7 @@ func TestPaddingAdaptiveReseedsZeroedState(t *testing.T) {
 
 	inputPacket := createWGPacket("192.168.1.1", "192.168.1.2", 12345, wgPort)
 
-	// Prime to learn the map key / CPU width, then force EVERY CPU slot to zero,
-	// simulating CPUs the initial insert never seeded.
+	// Prime to learn the map key / CPU width, then zero every CPU slot.
 	if _, _, err := objs.WgForwardProxy.Test(inputPacket); err != nil {
 		t.Fatalf("Failed to run priming packet: %v", err)
 	}

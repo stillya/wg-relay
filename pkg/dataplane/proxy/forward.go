@@ -71,7 +71,6 @@ func (fp *ForwardLoader) loadEBPF() error {
 		}
 		fp.cfg.Instrumentations.Padding.LinkMTU = mtu
 		fp.cfg.Instrumentations.Padding.Randomize = fp.cfg.Instrumentations.Padding.Mode == "randomize"
-		fp.cfg.Instrumentations.Padding.AdaptiveResolved = fp.cfg.Instrumentations.Padding.IsAdaptive()
 		if err := fp.cfg.Instrumentations.Padding.ValidateMTU(); err != nil {
 			return errors.Wrap(err, "padding MTU validation failed")
 		}

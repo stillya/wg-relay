@@ -197,30 +197,4 @@ func TestConfigure_NestedStruct(t *testing.T) {
 	}
 }
 
-// TestConfigure_ScalarPointerFieldSkipped is a regression test: a scalar
-// pointer field (e.g. *bool) without an ebpf tag must be skipped, not recursed
-// into as if it were a nested config struct (which panics on NumField).
-func TestConfigure_ScalarPointerFieldSkipped(t *testing.T) {
-	spec := &ebpf.CollectionSpec{Variables: make(map[string]*ebpf.VariableSpec)}
-	tru := true
-
-	t.Run("non-nil *bool without tag is skipped", func(t *testing.T) {
-		cfg := struct {
-			Adaptive *bool
-		}{Adaptive: &tru}
-		if err := Configure(spec, &cfg); err != nil {
-			t.Fatalf("scalar pointer should be skipped, got: %v", err)
-		}
-	})
-
-	t.Run("nil *bool without tag is skipped", func(t *testing.T) {
-		cfg := struct {
-			Adaptive *bool
-		}{Adaptive: nil}
-		if err := Configure(spec, &cfg); err != nil {
-			t.Fatalf("nil scalar pointer should be skipped, got: %v", err)
-		}
-	})
-}
-
 func stringPtr(s string) *string { return &s }

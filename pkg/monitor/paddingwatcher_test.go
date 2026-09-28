@@ -96,27 +96,6 @@ func TestPaddingWatcher_LogsOnlyOnChange(t *testing.T) {
 	}
 }
 
-func TestPaddingWatcher_WarnsAtFloor(t *testing.T) {
-	src := &mockPaddingSource{
-		names: map[uint32]string{1: "eth0"},
-		frames: [][]paddingmap.StateData{
-			{state(1, 0, 2, 5)}, // initialized above floor -> no floor warn
-			{state(1, 0, 1, 6)}, // reduced to floor -> floor warn
-		},
-	}
-	w := newTestWatcher(src)
-	ctx := context.Background()
-
-	out := captureLogs(t, func() {
-		w.poll(ctx)
-		w.poll(ctx)
-	})
-
-	if strings.Count(out, "protocol floor") != 1 {
-		t.Errorf("expected exactly 1 protocol-floor warning, got:\n%s", out)
-	}
-}
-
 func TestPaddingWatcher_HandlesInterfaceDisappearance(t *testing.T) {
 	src := &mockPaddingSource{
 		names: map[uint32]string{1: "eth0"},

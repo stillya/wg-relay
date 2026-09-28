@@ -28,8 +28,7 @@ func TestBPFMapSource_CollectNilMap(t *testing.T) {
 
 func TestBPFMapSource_IfNameFallsBackToIndex(t *testing.T) {
 	source := NewBPFMapSource("test_map", nil)
-	// A very large, almost-certainly-nonexistent ifindex must fall back to its
-	// numeric form rather than returning an empty label.
+	// A very large, almost-certainly-nonexistent ifindex must fall back to its numeric form.
 	if got := source.IfName(4294967000); got != "4294967000" {
 		t.Errorf("Expected numeric fallback '4294967000', got '%s'", got)
 	}
@@ -64,8 +63,7 @@ func TestBPFMapSource_CollectDoesNotAggregatePerCPU(t *testing.T) {
 		t.Fatalf("Failed to look up primed key: %v", err)
 	}
 
-	// Give each CPU a distinct working size so aggregation (summing) would be
-	// detectable as a single collapsed value.
+	// Give each CPU a distinct working size so aggregation (summing) would be detectable.
 	vals := make([]State, len(width))
 	for i := range vals {
 		vals[i] = State{CurrentSize: uint8(i + 1)} //nolint:gosec // small loop index
@@ -96,5 +94,41 @@ func TestBPFMapSource_CollectDoesNotAggregatePerCPU(t *testing.T) {
 			t.Errorf("CPU %d: expected CurrentSize %d, got %d (values must not be summed)",
 				r.CPU, want, r.State.CurrentSize)
 		}
+	}
+}
+
+func TestBPFMapSource_CollectSkipsUnseededCPUSlots(t *testing.T) {
+	m := newPaddingMap(t)
+	defer m.Close()
+
+	ifindex := uint32(42)
+
+	// Discover the per-CPU width by priming a single-value Put then reading back.
+	if err := m.Put(&ifindex, []State{{CurrentSize: 10}}); err != nil {
+		t.Fatalf("Failed to prime map: %v", err)
+	}
+	var width []State
+	if err := m.Lookup(&ifindex, &width); err != nil {
+		t.Fatalf("Failed to look up primed key: %v", err)
+	}
+
+	// Only the first CPU is seeded; the rest are left zero-filled (never ran).
+	vals := make([]State, len(width))
+	vals[0] = State{CurrentSize: 10}
+	if err := m.Put(&ifindex, vals); err != nil {
+		t.Fatalf("Failed to put per-CPU values: %v", err)
+	}
+
+	source := NewBPFMapSource("test_map", m)
+	results, err := source.Collect(context.Background())
+	if err != nil {
+		t.Fatalf("Collect failed: %v", err)
+	}
+
+	if len(results) != 1 {
+		t.Fatalf("Expected the zeroed (unseeded) CPU slots to be skipped, got %d entries", len(results))
+	}
+	if results[0].State.CurrentSize != 10 {
+		t.Errorf("Expected the seeded slot's CurrentSize 10, got %d", results[0].State.CurrentSize)
 	}
 }

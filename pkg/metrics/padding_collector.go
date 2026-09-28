@@ -16,8 +16,7 @@ type PaddingStateSource interface {
 	Name() string
 }
 
-// PaddingCollector exposes the current adaptive padding working size per
-// interface and CPU. Aggregates (min/max/avg) are intentionally left to PromQL.
+// PaddingCollector exposes the current adaptive padding working size per interface and CPU.
 type PaddingCollector struct {
 	source PaddingStateSource
 

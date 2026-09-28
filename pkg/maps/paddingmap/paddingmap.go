@@ -10,13 +10,12 @@ import (
 	"github.com/pkg/errors"
 )
 
-// State mirrors `struct padding_state` in ebpf/include/instrumentation/padding.h.
-// The byte layout must stay in sync with the eBPF definition.
+// State mirrors `struct padding_state` in ebpf/include/instrumentation/padding.h; the byte layout must stay in sync.
 type State struct {
-	CurrentSize uint8  // current working padding ceiling, 1..configured size
-	Pad         uint8  // alignment padding (unused)
-	OkStreak    uint16 // consecutive successes since last increase
-	Backoffs    uint32 // total multiplicative decreases
+	CurrentSize uint8
+	Pad         uint8
+	OkStreak    uint16
+	Backoffs    uint32
 }
 
 // StateData is a single per-CPU state entry for one interface.
@@ -24,12 +23,6 @@ type StateData struct {
 	IfIndex uint32
 	CPU     int
 	State   State
-}
-
-// StateSource provides access to the adaptive padding state.
-type StateSource interface {
-	Collect(ctx context.Context) ([]StateData, error)
-	Name() string
 }
 
 // BPFMapSource reads the adaptive padding state from a per-CPU BPF hash map.
@@ -55,9 +48,7 @@ func (s *BPFMapSource) Name() string {
 	return s.name
 }
 
-// Collect reads every per-interface, per-CPU padding state entry. Unlike the
-// metrics map, per-CPU values are NOT summed: each CPU holds an independent
-// working state, so every CPU is returned as its own StateData.
+// Collect reads every per-interface, per-CPU padding state entry; values are NOT summed across CPUs.
 func (s *BPFMapSource) Collect(ctx context.Context) ([]StateData, error) {
 	if s.m == nil {
 		return nil, errors.New("map is nil")
@@ -76,6 +67,9 @@ func (s *BPFMapSource) Collect(ctx context.Context) ([]StateData, error) {
 		}
 
 		for cpu, st := range perCPU {
+			if st.CurrentSize == 0 {
+				continue
+			}
 			results = append(results, StateData{
 				IfIndex: ifindex,
 				CPU:     cpu,
@@ -91,9 +85,7 @@ func (s *BPFMapSource) Collect(ctx context.Context) ([]StateData, error) {
 	return results, nil
 }
 
-// IfName resolves an ifindex to its interface name, caching results. On
-// resolution failure it falls back to the numeric index so callers always get
-// a stable, non-empty label.
+// IfName resolves an ifindex to its interface name, caching results, falling back to the numeric index on failure.
 func (s *BPFMapSource) IfName(ifindex uint32) string {
 	s.mu.Lock()
 	defer s.mu.Unlock()

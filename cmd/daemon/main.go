@@ -160,10 +160,8 @@ func main() {
 		}
 	}
 
-	// Adaptive padding state observability. Only meaningful in forward mode with
-	// adaptive padding, where the datapath populates the per-interface state map.
 	padding := cfg.Proxy.Instrumentations.Padding
-	adaptivePadding := padding != nil && padding.Enabled && padding.IsAdaptive()
+	adaptivePadding := padding != nil && padding.Enabled && padding.Adaptive
 	if maps != nil && maps.PaddingState != nil && adaptivePadding {
 		paddingSource := paddingmap.NewBPFMapSource("wg-relay-padding", maps.PaddingState)
 

@@ -274,7 +274,7 @@ int wg_forward_proxy(struct xdp_md *xdp_ctx) {
 		if (obf_ret < 0) {
 			DEBUG_PRINTK("Obfuscation failed, dropping packet");
 			update_metrics(conn_value->backend_index, METRIC_DOWNSTREAM, pkt_len, 1,
-				       instr_drop_reason(obf_ret));
+				       obf_ret == INSTR_NO_TAILROOM ? METRIC_REASON_NO_TAILROOM : METRIC_REASON_DROPPED);
 			return XDP_DROP;
 		}
 

@@ -28,8 +28,7 @@ type MonitoringConfig struct {
 	PaddingWatcher PaddingWatcherConfig `yaml:"padding_watcher"` // adaptive padding state watcher
 }
 
-// PaddingWatcherConfig configures the adaptive padding state watcher, which
-// logs whenever the AIMD working size changes for an interface/CPU.
+// PaddingWatcherConfig configures the adaptive padding state watcher, which logs AIMD working-size changes.
 type PaddingWatcherConfig struct {
 	Enabled  bool          `yaml:"enabled"`  // Enable/disable the watcher
 	Interval time.Duration `yaml:"interval"` // Poll interval
@@ -62,18 +61,22 @@ type XORConfig struct {
 type PaddingConfig struct {
 	Enabled  bool   `yaml:"enabled" ebpf:"padding_enabled"`
 	Size     uint8  `yaml:"size" ebpf:"padding_size"`
-	Mode     string `yaml:"mode"`     // "direct" or "randomize" (default: "direct")
-	Adaptive *bool  `yaml:"adaptive"` // AIMD tailroom probing; nil means enabled (default)
+	Mode     string `yaml:"mode"`                             // "direct" or "randomize" (default: "direct")
+	Adaptive bool   `yaml:"adaptive" ebpf:"padding_adaptive"` // AIMD tailroom probing; defaults to true
 
-	Randomize        bool   `yaml:"-" ebpf:"padding_randomize"` // computed at runtime from Mode, not yaml-exposed
-	AdaptiveResolved bool   `yaml:"-" ebpf:"padding_adaptive"`  // computed at runtime from Adaptive, not yaml-exposed
-	LinkMTU          uint16 `yaml:"-" ebpf:"link_mtu"`          // computed at runtime, not yaml-exposed
+	Randomize bool   `yaml:"-" ebpf:"padding_randomize"` // computed at runtime from Mode, not yaml-exposed
+	LinkMTU   uint16 `yaml:"-" ebpf:"link_mtu"`          // computed at runtime, not yaml-exposed
 }
 
-// IsAdaptive reports whether adaptive AIMD padding is enabled. It defaults to
-// true when the config omits the field.
-func (p *PaddingConfig) IsAdaptive() bool {
-	return p.Adaptive == nil || *p.Adaptive
+// UnmarshalYAML decodes a PaddingConfig with Adaptive defaulting to true when omitted.
+func (p *PaddingConfig) UnmarshalYAML(value *yaml.Node) error {
+	type plain PaddingConfig
+	alias := plain{Adaptive: true}
+	if err := value.Decode(&alias); err != nil {
+		return err
+	}
+	*p = PaddingConfig(alias)
+	return nil
 }
 
 // BackendServer represents a single backend server
@@ -193,6 +196,10 @@ func (cfg *Config) validate() error {
 func (m *MonitoringConfig) validate() error {
 	if m.Statistics.Enabled && m.Statistics.Interval <= 0 {
 		return errors.Errorf("monitoring.statistics.interval must be positive, got %s", m.Statistics.Interval)
+	}
+
+	if m.PaddingWatcher.Enabled && m.PaddingWatcher.Interval <= 0 {
+		return errors.Errorf("monitoring.padding_watcher.interval must be positive, got %s", m.PaddingWatcher.Interval)
 	}
 
 	return nil

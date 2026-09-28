@@ -18,7 +18,7 @@ type PaddingStateSource interface {
 // PaddingWatcherParams contains configuration for PaddingWatcher.
 type PaddingWatcherParams struct {
 	Interval       time.Duration
-	ConfiguredSize uint8 // the configured padding size (AIMD ceiling), for context in logs
+	ConfiguredSize uint8
 }
 
 type paddingKey struct {
@@ -26,10 +26,7 @@ type paddingKey struct {
 	CPU     int
 }
 
-// PaddingWatcher periodically reads the adaptive padding state and logs whenever
-// the AIMD working size changes for an interface/CPU. It is a diagnostic aid for
-// operators: a sustained drop means the driver's tailroom cannot fit the
-// configured padding, and obfuscation strength is being reduced automatically.
+// PaddingWatcher periodically reads the adaptive padding state and logs whenever the AIMD working size changes.
 type PaddingWatcher struct {
 	PaddingWatcherParams
 	source PaddingStateSource
@@ -47,8 +44,7 @@ func NewPaddingWatcher(params PaddingWatcherParams, source PaddingStateSource) *
 	}
 }
 
-// Start begins periodic polling of the padding state until the context is
-// cancelled or Stop is called.
+// Start begins periodic polling of the padding state until the context is cancelled or Stop is called.
 func (w *PaddingWatcher) Start(ctx context.Context) {
 	log.Info("Starting padding watcher", "interval", w.Interval, "configured_size", w.ConfiguredSize)
 
@@ -86,23 +82,19 @@ func (w *PaddingWatcher) poll(ctx context.Context) {
 		cur := s.State.CurrentSize
 
 		prev, seen := w.last[key]
-		if !seen {
-			log.Info("padding state initialized",
-				"interface", w.source.IfName(s.IfIndex),
-				"cpu", s.CPU,
-				"size", cur,
-				"configured", w.ConfiguredSize)
-			w.last[key] = cur
-			w.warnIfFloor(s.IfIndex, s.CPU, cur, s.State.Backoffs)
+		if seen && prev == cur {
 			continue
 		}
-
-		if cur == prev {
-			continue
-		}
+		w.last[key] = cur
 
 		iface := w.source.IfName(s.IfIndex)
 		switch {
+		case !seen:
+			log.Info("padding state initialized",
+				"interface", iface,
+				"cpu", s.CPU,
+				"size", cur,
+				"configured", w.ConfiguredSize)
 		case cur < prev:
 			log.Warn("padding size reduced",
 				"interface", iface,
@@ -119,21 +111,5 @@ func (w *PaddingWatcher) poll(ctx context.Context) {
 				"to", cur,
 				"configured", w.ConfiguredSize)
 		}
-
-		w.last[key] = cur
-		w.warnIfFloor(s.IfIndex, s.CPU, cur, s.State.Backoffs)
 	}
-}
-
-// warnIfFloor emits a distinct warning when the working size hits the protocol
-// floor of 1, meaning size-based obfuscation is effectively disabled for that
-// interface/CPU.
-func (w *PaddingWatcher) warnIfFloor(ifindex uint32, cpu int, cur uint8, backoffs uint32) {
-	if cur > 1 {
-		return
-	}
-	log.Warn("padding size at protocol floor; size-based obfuscation effectively off",
-		"interface", w.source.IfName(ifindex),
-		"cpu", cpu,
-		"backoffs", backoffs)
 }

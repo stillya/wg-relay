@@ -122,41 +122,41 @@ make test-ebpf
 Create a `config.yaml` file:
 
 ```yaml
-daemon: # Daemon configuration
-    listen: ":8080" # Address and port for daemon to bind to
+daemon:                            # Daemon configuration
+    listen: ":8080"                # Address and port for daemon to bind to
 
-monitoring: # Monitoring configuration
-    statistics: # vnstat-style console output
-        enabled: true # Enable/disable statistics display
-        interval: "5s" # Statistics update interval
-    prometheus: # Prometheus HTTP exporter
-        enabled: true # Enable/disable Prometheus metrics server
-        listen: ":8081" # Address and port for metrics server
+monitoring:                        # Monitoring configuration
+    statistics:                    # vnstat-style console output
+        enabled: true              # Enable/disable statistics display
+        interval: "5s"             # Statistics update interval
+    prometheus:                    # Prometheus HTTP exporter
+        enabled: true              # Enable/disable Prometheus metrics server
+        listen: ":8081"            # Address and port for metrics server
 
 proxy:
-    enabled: true # Enable/disable proxy
-    mode: "forward" # "forward" for forward proxy, "reverse" for reverse proxy
-    wg_port: 51820 # WireGuard port to intercept (default: 51820)
+    enabled: true                  # Enable/disable proxy
+    mode: "forward"                # "forward" for forward proxy, "reverse" for reverse proxy
+    wg_port: 51820                 # WireGuard port to intercept (default: 51820)
 
-    instrumentations: # Instrumentation configuration
-        xor: # XOR obfuscation
+    instrumentations:              # Instrumentation configuration
+        xor:                       # XOR obfuscation
             enabled: true
             key: "your_xor_key"
-        padding: # Padding obfuscation
+        padding:                   # Padding obfuscation
             enabled: true
             size: 32
-            mode: "direct" # "direct" (fixed size) or "randomize" (random 1..size)
+            mode: "direct"         # "direct" (fixed size) or "randomize" (random 1..size)
 
-    driver_mode: "driver" # "driver", "generic" or "offload" for XDP mode
-    interfaces: # Network interfaces to attach to
+    driver_mode: "driver"          # "driver", "generic" or "offload" for XDP mode
+    interfaces:                    # Network interfaces to attach to
         - "eth0"
-    forward: # Forward proxy configuration (forward mode)
+    forward:                       # Forward proxy configuration (forward mode)
         backends:
             - name: "wg-gateway-1" # Optional: backend name for metrics (defaults to backend_<index>)
-              ip: "192.168.200.2" # Backend 1 IP address
-              port: 51820 # Optional: port (defaults to wg_port)
+              ip: "192.168.200.2"  # Backend 1 IP address
+              port: 51820          # Optional: port (defaults to wg_port)
             - name: "wg-gateway-2" # Named backend for low-cardinality metrics
-              ip: "192.168.200.3" # Backend 2 IP address
+              ip: "192.168.200.3"  # Backend 2 IP address
               port: 51820
 ```
 
