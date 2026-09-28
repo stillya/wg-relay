@@ -21,21 +21,22 @@ type WgForwardProxyBackendEntry struct {
 	Pad   uint8
 }
 
-type WgForwardProxyConnectionKey struct {
+type WgForwardProxyIpv4CtEntry struct {
 	_          structs.HostLayout
-	ClientIp   uint32
-	ClientPort uint32
-	ServerIp   uint32
-	ServerPort uint32
+	LastSeen   uint64
+	ToDaddr    uint32
+	ToDport    uint16
+	NatPort    uint16
+	BackendIdx uint8
+	Pad        [7]uint8
 }
 
-type WgForwardProxyConnectionValue struct {
-	_            structs.HostLayout
-	Timestamp    uint64
-	NatPort      uint16
-	BackendIndex uint8
-	Pad          uint8
-	_            [4]byte
+type WgForwardProxyIpv4CtTuple struct {
+	_     structs.HostLayout
+	Saddr uint32
+	Daddr uint32
+	Sport uint16
+	Dport uint16
 }
 
 type WgForwardProxyMetricsKey struct {
@@ -53,12 +54,6 @@ type WgForwardProxyMetricsValue struct {
 	TxPackets uint64
 	RxBytes   uint64
 	TxBytes   uint64
-}
-
-type WgForwardProxyNatKey struct {
-	_        structs.HostLayout
-	ServerIp uint32
-	NatPort  uint32
 }
 
 type WgForwardProxyPaddingState struct {
@@ -126,10 +121,9 @@ type WgForwardProxyMapSpecs struct {
 	BackendCount    *ebpf.MapSpec `ebpf:"backend_count"`
 	BackendMap      *ebpf.MapSpec `ebpf:"backend_map"`
 	BackendPortSet  *ebpf.MapSpec `ebpf:"backend_port_set"`
-	ConnectionMap   *ebpf.MapSpec `ebpf:"connection_map"`
+	Ipv4CtMap       *ebpf.MapSpec `ebpf:"ipv4_ct_map"`
+	Ipv4CtRevMap    *ebpf.MapSpec `ebpf:"ipv4_ct_rev_map"`
 	MetricsMap      *ebpf.MapSpec `ebpf:"metrics_map"`
-	NatPortCounter  *ebpf.MapSpec `ebpf:"nat_port_counter"`
-	NatReverseMap   *ebpf.MapSpec `ebpf:"nat_reverse_map"`
 	PaddingStateMap *ebpf.MapSpec `ebpf:"padding_state_map"`
 }
 
@@ -170,10 +164,9 @@ type WgForwardProxyMaps struct {
 	BackendCount    *ebpf.Map `ebpf:"backend_count"`
 	BackendMap      *ebpf.Map `ebpf:"backend_map"`
 	BackendPortSet  *ebpf.Map `ebpf:"backend_port_set"`
-	ConnectionMap   *ebpf.Map `ebpf:"connection_map"`
+	Ipv4CtMap       *ebpf.Map `ebpf:"ipv4_ct_map"`
+	Ipv4CtRevMap    *ebpf.Map `ebpf:"ipv4_ct_rev_map"`
 	MetricsMap      *ebpf.Map `ebpf:"metrics_map"`
-	NatPortCounter  *ebpf.Map `ebpf:"nat_port_counter"`
-	NatReverseMap   *ebpf.Map `ebpf:"nat_reverse_map"`
 	PaddingStateMap *ebpf.Map `ebpf:"padding_state_map"`
 }
 
@@ -182,10 +175,9 @@ func (m *WgForwardProxyMaps) Close() error {
 		m.BackendCount,
 		m.BackendMap,
 		m.BackendPortSet,
-		m.ConnectionMap,
+		m.Ipv4CtMap,
+		m.Ipv4CtRevMap,
 		m.MetricsMap,
-		m.NatPortCounter,
-		m.NatReverseMap,
 		m.PaddingStateMap,
 	)
 }

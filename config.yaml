@@ -39,3 +39,6 @@ proxy:
       - name: "wg-gateway-2"  # Named backend for low-cardinality metrics
         ip: "192.168.200.3"   # Backend 2
         port: 51820
+    conntrack: # Conntrack entry expiry (forward mode)
+      timeout: "5m"           # Idle time after which a flow is expired
+      gc_interval: "30s"      # How often expired flows are swept (must not exceed timeout)

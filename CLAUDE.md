@@ -79,6 +79,7 @@ Client → Obfuscator Proxy → WireGuard Server
   - Forward mode: Uses backend label with values from BackendServer.Name or backend_<index>
   - Reverse mode: No labels (aggregated by direction only)
 - **Backend Labels**: Map from backend index (uint8) to human-readable name, passed from loader to collector/monitor
+- **Conntrack GC Metrics**: Forward mode only, no labels except `reason` (expired|orphan) on deleted_total and `status` (success|error) on runs_total: `wg_relay_forward_ct_entries`, `wg_relay_forward_ct_gc_deleted_total`, `wg_relay_forward_ct_gc_runs_total`, `wg_relay_forward_ct_gc_duration_seconds`
 
 ## Key Constraints
 

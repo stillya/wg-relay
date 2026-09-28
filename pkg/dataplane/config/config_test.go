@@ -109,6 +109,7 @@ func TestPaddingConfig_Validation(t *testing.T) {
 							IP: "10.0.0.1",
 						},
 					},
+					Conntrack: validConntrack(),
 				},
 				Instrumentations: InstrumentationConfig{
 					Padding: tt.padding,
@@ -303,7 +304,7 @@ func TestInstrumentationConfig_Combined(t *testing.T) {
 					{
 						IP: "10.0.0.1",
 					},
-				}},
+				}, Conntrack: validConntrack()},
 				Instrumentations: tt.instr,
 			}
 
@@ -328,7 +329,7 @@ func TestBackendServer_NameField(t *testing.T) {
 	namedCfg := &ProxyConfig{
 		Mode:       "forward",
 		Interfaces: []string{"eth0"},
-		Forward:    ForwardConfig{Backends: []BackendServer{{Name: "backend-1", IP: "10.0.0.1", Port: 51820}}},
+		Forward:    ForwardConfig{Backends: []BackendServer{{Name: "backend-1", IP: "10.0.0.1", Port: 51820}}, Conntrack: validConntrack()},
 	}
 	if err := namedCfg.validate("forward"); err != nil {
 		t.Errorf("named backend: unexpected error: %v", err)
@@ -337,7 +338,7 @@ func TestBackendServer_NameField(t *testing.T) {
 	unnamedCfg := &ProxyConfig{
 		Mode:       "forward",
 		Interfaces: []string{"eth0"},
-		Forward:    ForwardConfig{Backends: []BackendServer{{IP: "10.0.0.2", Port: 51820}}},
+		Forward:    ForwardConfig{Backends: []BackendServer{{IP: "10.0.0.2", Port: 51820}}, Conntrack: validConntrack()},
 	}
 	if err := unnamedCfg.validate("forward"); err != nil {
 		t.Errorf("unnamed backend: unexpected error: %v", err)
@@ -459,6 +460,182 @@ func TestMonitoringConfig_Validation(t *testing.T) {
 				} else if !strings.Contains(err.Error(), tt.wantErr) {
 					t.Errorf("error %q should contain %q", err.Error(), tt.wantErr)
 				}
+			}
+		})
+	}
+}
+
+func validConntrack() ConntrackConfig {
+	return ConntrackConfig{Timeout: 5 * time.Minute, GCInterval: 30 * time.Second}
+}
+
+func TestConntrackConfig_Validation(t *testing.T) {
+	tests := []struct {
+		name      string
+		mode      string
+		conntrack ConntrackConfig
+		wantErr   string
+	}{
+		{
+			name:      "defaults are valid",
+			mode:      "forward",
+			conntrack: NewConfig().Proxy.Forward.Conntrack,
+			wantErr:   "",
+		},
+		{
+			name:      "zero timeout",
+			mode:      "forward",
+			conntrack: ConntrackConfig{Timeout: 0, GCInterval: 30 * time.Second},
+			wantErr:   "proxy.forward.conntrack.timeout must be positive",
+		},
+		{
+			name:      "timeout below minimum",
+			mode:      "forward",
+			conntrack: ConntrackConfig{Timeout: 9 * time.Second, GCInterval: 5 * time.Second},
+			wantErr:   "proxy.forward.conntrack.timeout 9s must be at least 10s",
+		},
+		{
+			name:      "timeout at minimum",
+			mode:      "forward",
+			conntrack: ConntrackConfig{Timeout: 10 * time.Second, GCInterval: 5 * time.Second},
+			wantErr:   "",
+		},
+		{
+			name:      "negative timeout",
+			mode:      "forward",
+			conntrack: ConntrackConfig{Timeout: -time.Minute, GCInterval: 30 * time.Second},
+			wantErr:   "proxy.forward.conntrack.timeout must be positive",
+		},
+		{
+			name:      "zero gc interval",
+			mode:      "forward",
+			conntrack: ConntrackConfig{Timeout: 5 * time.Minute, GCInterval: 0},
+			wantErr:   "proxy.forward.conntrack.gc_interval must be positive",
+		},
+		{
+			name:      "negative gc interval",
+			mode:      "forward",
+			conntrack: ConntrackConfig{Timeout: 5 * time.Minute, GCInterval: -time.Second},
+			wantErr:   "proxy.forward.conntrack.gc_interval must be positive",
+		},
+		{
+			name:      "gc interval exceeds timeout",
+			mode:      "forward",
+			conntrack: ConntrackConfig{Timeout: 10 * time.Second, GCInterval: 30 * time.Second},
+			wantErr:   "proxy.forward.conntrack.gc_interval 30s must not exceed timeout 10s",
+		},
+		{
+			name:      "gc interval equal to timeout",
+			mode:      "forward",
+			conntrack: ConntrackConfig{Timeout: 30 * time.Second, GCInterval: 30 * time.Second},
+			wantErr:   "",
+		},
+		{
+			name:      "reverse mode ignores zero-value conntrack",
+			mode:      "reverse",
+			conntrack: ConntrackConfig{},
+			wantErr:   "",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			cfg := &ProxyConfig{
+				Mode:       tt.mode,
+				Interfaces: []string{"eth0"},
+				Forward: ForwardConfig{
+					Backends:  []BackendServer{{IP: "10.0.0.1"}},
+					Conntrack: tt.conntrack,
+				},
+			}
+
+			err := cfg.validate(tt.mode)
+
+			if tt.wantErr == "" {
+				if err != nil {
+					t.Errorf("unexpected error: %v", err)
+				}
+			} else {
+				if err == nil {
+					t.Error("expected error, got nil")
+				} else if !strings.Contains(err.Error(), tt.wantErr) {
+					t.Errorf("error %q should contain %q", err.Error(), tt.wantErr)
+				}
+			}
+		})
+	}
+}
+
+func TestLoad_Conntrack(t *testing.T) {
+	tests := []struct {
+		name        string
+		conntrack   string
+		wantTimeout time.Duration
+		wantGC      time.Duration
+	}{
+		{
+			name:        "omitted uses defaults",
+			conntrack:   "",
+			wantTimeout: 5 * time.Minute,
+			wantGC:      30 * time.Second,
+		},
+		{
+			name: "explicit values",
+			conntrack: `
+    conntrack:
+      timeout: 10m
+      gc_interval: 1m
+`,
+			wantTimeout: 10 * time.Minute,
+			wantGC:      time.Minute,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			yamlData := `
+proxy:
+  enabled: true
+  mode: forward
+  interfaces:
+    - eth0
+  forward:
+    backends:
+      - ip: 10.0.0.1
+` + tt.conntrack
+			configPath := filepath.Join(t.TempDir(), "config.yaml")
+			if err := os.WriteFile(configPath, []byte(yamlData), 0600); err != nil {
+				t.Fatalf("failed to write test config: %v", err)
+			}
+
+			cfg, err := Load(configPath)
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+
+			got := cfg.Proxy.Forward.Conntrack
+			if got.Timeout != tt.wantTimeout {
+				t.Errorf("timeout: got %s, want %s", got.Timeout, tt.wantTimeout)
+			}
+			if got.GCInterval != tt.wantGC {
+				t.Errorf("gc_interval: got %s, want %s", got.GCInterval, tt.wantGC)
+			}
+		})
+	}
+}
+
+func TestExampleConfigsLoad(t *testing.T) {
+	for _, path := range []string{"../../../config.yaml", "../../../hack/config-forward.yaml"} {
+		t.Run(path, func(t *testing.T) {
+			cfg, err := Load(path)
+			if err != nil {
+				t.Fatalf("Load(%s) failed: %v", path, err)
+			}
+			if cfg.Proxy.Forward.Conntrack.Timeout != 5*time.Minute {
+				t.Errorf("timeout = %s, want 5m", cfg.Proxy.Forward.Conntrack.Timeout)
+			}
+			if cfg.Proxy.Forward.Conntrack.GCInterval != 30*time.Second {
+				t.Errorf("gc_interval = %s, want 30s", cfg.Proxy.Forward.Conntrack.GCInterval)
 			}
 		})
 	}

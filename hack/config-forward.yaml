@@ -30,3 +30,6 @@ proxy:
     backends:
       - ip: "192.168.200.2"
         port: 51820
+    conntrack:
+      timeout: "5m"
+      gc_interval: "30s"

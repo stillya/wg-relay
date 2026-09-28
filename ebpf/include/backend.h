@@ -2,8 +2,10 @@
 #define __BACKEND_H__
 
 #include "vmlinux.h"
+#include <bpf/bpf_endian.h>
 #include <bpf/bpf_helpers.h>
 #include "common.h"
+#include "ct.h"
 
 // Maximum number of backends
 #define MAX_BACKENDS 256
@@ -92,6 +94,14 @@ static __always_inline __maybe_unused int select_backend_hash(__u32 client_ip, _
 	backend->index = (__u8)idx;
 
 	return (__s32)idx;
+}
+
+// Backends are stored in host byte order; a port of 0 means default_port.
+static __always_inline __maybe_unused void backend_to_ct_target(const struct backend_entry *backend, __u16 default_port,
+								struct ipv4_ct_target *target) {
+	target->addr = bpf_htonl(backend->ip);
+	target->port = bpf_htons(backend->port > 0 ? backend->port : default_port);
+	target->backend_idx = backend->index;
 }
 
 #endif // __BACKEND_H__

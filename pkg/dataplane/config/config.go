@@ -88,7 +88,17 @@ type BackendServer struct {
 
 // ForwardConfig represents forward proxy configuration (forward mode)
 type ForwardConfig struct {
-	Backends []BackendServer `yaml:"backends"` // List of backend servers
+	Backends  []BackendServer `yaml:"backends"`  // List of backend servers
+	Conntrack ConntrackConfig `yaml:"conntrack"` // Conntrack entry lifetime and GC schedule
+}
+
+// MinConntrackTimeout is the smallest allowed conntrack timeout; last_seen is refreshed at most once per second
+const MinConntrackTimeout = 10 * time.Second
+
+// ConntrackConfig configures forward-mode conntrack expiry and its garbage collection
+type ConntrackConfig struct {
+	Timeout    time.Duration `yaml:"timeout"`     // Idle time after which a flow is expired
+	GCInterval time.Duration `yaml:"gc_interval"` // How often the GC sweep runs
 }
 
 // PrometheusConfig represents Prometheus monitoring configuration
@@ -132,7 +142,12 @@ func NewConfig() *Config {
 			WGPort:     51820,
 			Interfaces: []string{},
 			DriverMode: "driver",
-			Forward:    ForwardConfig{},
+			Forward: ForwardConfig{
+				Conntrack: ConntrackConfig{
+					Timeout:    5 * time.Minute,
+					GCInterval: 30 * time.Second,
+				},
+			},
 			Instrumentations: InstrumentationConfig{
 				XOR: &XORConfig{
 					Enabled: false,
@@ -275,6 +290,27 @@ func (fc *ForwardConfig) validate() error {
 		if ip.To4() == nil {
 			return errors.Errorf("backend[%d]: IP must be IPv4: %s", i, backend.IP)
 		}
+	}
+
+	return fc.Conntrack.validate()
+}
+
+// validate validates the conntrack configuration
+func (c *ConntrackConfig) validate() error {
+	if c.Timeout <= 0 {
+		return errors.Errorf("proxy.forward.conntrack.timeout must be positive, got %s", c.Timeout)
+	}
+
+	if c.Timeout < MinConntrackTimeout {
+		return errors.Errorf("proxy.forward.conntrack.timeout %s must be at least %s", c.Timeout, MinConntrackTimeout)
+	}
+
+	if c.GCInterval <= 0 {
+		return errors.Errorf("proxy.forward.conntrack.gc_interval must be positive, got %s", c.GCInterval)
+	}
+
+	if c.GCInterval > c.Timeout {
+		return errors.Errorf("proxy.forward.conntrack.gc_interval %s must not exceed timeout %s", c.GCInterval, c.Timeout)
 	}
 
 	return nil

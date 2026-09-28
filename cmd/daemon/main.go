@@ -20,6 +20,8 @@ import (
 
 	"github.com/stillya/wg-relay/pkg/dataplane"
 	"github.com/stillya/wg-relay/pkg/discovery"
+	"github.com/stillya/wg-relay/pkg/maps/ctmap"
+	"github.com/stillya/wg-relay/pkg/maps/ctmap/gc"
 	"github.com/stillya/wg-relay/pkg/maps/metricsmap"
 	"github.com/stillya/wg-relay/pkg/maps/paddingmap"
 	"github.com/stillya/wg-relay/pkg/monitor"
@@ -177,6 +179,23 @@ func main() {
 			go paddingWatcher.Start(ctx)
 			defer paddingWatcher.Stop()
 		}
+	}
+
+	if maps != nil && maps.CT != nil && maps.CTRev != nil {
+		var observer gc.Observer
+		if cfg.Monitoring.Prometheus.Enabled {
+			ctGCCollector := metrics.NewCTGCCollector()
+			prometheus.MustRegister(ctGCCollector)
+			observer = ctGCCollector
+		}
+
+		conntrack := cfg.Proxy.Forward.Conntrack
+		ctGC := gc.New(gc.Params{
+			Interval: conntrack.GCInterval,
+			Timeout:  conntrack.Timeout,
+		}, ctmap.New(maps.CT, maps.CTRev), observer)
+		go ctGC.Start(ctx)
+		defer ctGC.Stop()
 	}
 
 	log.Info("Daemon started successfully",
