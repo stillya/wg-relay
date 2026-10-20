@@ -1,0 +1,20 @@
+global:
+  scrape_interval: 15s
+
+# Every target of one relay (wg-relay and node-exporter endpoints) must carry the same
+# `relay` label: the dashboard and the vmalert rules select on it.
+# The wg-relay job must be named `wg-relay`, or change the dashboard's hidden `job` variable to match.
+scrape_configs:
+  - job_name: wg-relay
+    scrape_interval: 5s
+    metrics_path: /metrics
+    static_configs:
+      - targets: ["192.168.100.2:8081"]
+        labels:
+          relay: reverse-wg-main
+
+  - job_name: node
+    static_configs:
+      - targets: ["192.168.100.2:9100"]
+        labels:
+          relay: reverse-wg-main

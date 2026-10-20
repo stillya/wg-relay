@@ -1,0 +1,135 @@
+# vmalert recording rules for the wg-relay dashboard. The expressions are MetricsQL, so they need
+# vmalert in front of VictoriaMetrics. Every series is grouped by the `relay` scrape label.
+groups:
+  # Traffic health, modelled on multi-window multi-burn-rate alerting. The signal is forwarded
+  # downstream rx+tx bytes/s. For a window W, ratioW = W-average now / median of the same W-average
+  # at this time of day on each of the previous 7 days. Both sides are floored at 10 KiB/s so
+  # near-zero night traffic reads as 1 instead of a drop or a spike. A relay gets ratios once it has
+  # one day of history.
+  - name: wg-relay-traffic
+    interval: 1m
+    rules:
+      - record: wg_relay:traffic_bytes:rate5m
+        expr: |
+          sum by (relay) (rate({__name__=~"wg_relay_(forward|reverse)_downstream_rq_(rx|tx)_bytes_total", reason="forwarded"}[5m]))
+
+      - record: wg_relay:traffic_bytes:ratio5m
+        expr: |
+          WITH (
+            bytes = {__name__=~"wg_relay_(forward|reverse)_downstream_rq_(rx|tx)_bytes_total", reason="forwarded"},
+            floor = 10240,
+            day(n, off) = label_set(sum by (relay) (rate(bytes[5m] offset off)), "baseline_day", n),
+          )
+          clamp_min(sum by (relay) (rate(bytes[5m])), floor)
+            / clamp_min(median by (relay) (union(
+                day("1", 1d), day("2", 2d), day("3", 3d), day("4", 4d), day("5", 5d), day("6", 6d), day("7", 7d)
+              )), floor)
+
+      - record: wg_relay:traffic_bytes:ratio30m
+        expr: |
+          WITH (
+            bytes = {__name__=~"wg_relay_(forward|reverse)_downstream_rq_(rx|tx)_bytes_total", reason="forwarded"},
+            floor = 10240,
+            day(n, off) = label_set(sum by (relay) (rate(bytes[30m] offset off)), "baseline_day", n),
+          )
+          clamp_min(sum by (relay) (rate(bytes[30m])), floor)
+            / clamp_min(median by (relay) (union(
+                day("1", 1d), day("2", 2d), day("3", 3d), day("4", 4d), day("5", 5d), day("6", 6d), day("7", 7d)
+              )), floor)
+
+      - record: wg_relay:traffic_bytes:ratio1h
+        expr: |
+          WITH (
+            bytes = {__name__=~"wg_relay_(forward|reverse)_downstream_rq_(rx|tx)_bytes_total", reason="forwarded"},
+            floor = 10240,
+            day(n, off) = label_set(sum by (relay) (rate(bytes[1h] offset off)), "baseline_day", n),
+          )
+          clamp_min(sum by (relay) (rate(bytes[1h])), floor)
+            / clamp_min(median by (relay) (union(
+                day("1", 1d), day("2", 2d), day("3", 3d), day("4", 4d), day("5", 5d), day("6", 6d), day("7", 7d)
+              )), floor)
+
+      - record: wg_relay:traffic_bytes:ratio6h
+        expr: |
+          WITH (
+            bytes = {__name__=~"wg_relay_(forward|reverse)_downstream_rq_(rx|tx)_bytes_total", reason="forwarded"},
+            floor = 10240,
+            day(n, off) = label_set(sum by (relay) (rate(bytes[6h] offset off)), "baseline_day", n),
+          )
+          clamp_min(sum by (relay) (rate(bytes[6h])), floor)
+            / clamp_min(median by (relay) (union(
+                day("1", 1d), day("2", 2d), day("3", 3d), day("4", 4d), day("5", 5d), day("6", 6d), day("7", 7d)
+              )), floor)
+
+      # 2 critical drop, 1 sustained drop, 3 spike, 0 normal. A state needs a long and a short window
+      # to agree: the long one proves the deviation is significant, the short one that it is still
+      # happening. It reads the ratios recorded one evaluation earlier, so it lags them by 1m.
+      - record: wg_relay:traffic:health
+        expr: |
+          (0 * (wg_relay:traffic_bytes:ratio1h < 0.5 and wg_relay:traffic_bytes:ratio5m < 0.5) + 2)
+          or (0 * (wg_relay:traffic_bytes:ratio6h < 0.75 and wg_relay:traffic_bytes:ratio30m < 0.75) + 1)
+          or (0 * (wg_relay:traffic_bytes:ratio1h > 2 and wg_relay:traffic_bytes:ratio5m > 2) + 3)
+          or (0 * wg_relay:traffic_bytes:ratio5m)
+
+  # All-time byte counters that survive relay restarts and the raw-data retention. Each run adds the
+  # last minute's increase to the previous value, so the interval must stay equal to the increase
+  # window, and this group must never be run through `vmalert -replay`. Traffic that flows while
+  # VictoriaMetrics or vmalert is down is not added.
+  - name: wg-relay-lifetime
+    interval: 1m
+    rules:
+      - record: wg_relay:forward_downstream_rx_bytes:lifetime
+        expr: |
+          sum by (relay, backend) (union(
+            last_over_time(wg_relay:forward_downstream_rx_bytes:lifetime[180d]),
+            increase(wg_relay_forward_downstream_rq_rx_bytes_total{reason="forwarded"}[1m])
+          ))
+
+      - record: wg_relay:forward_downstream_tx_bytes:lifetime
+        expr: |
+          sum by (relay, backend) (union(
+            last_over_time(wg_relay:forward_downstream_tx_bytes:lifetime[180d]),
+            increase(wg_relay_forward_downstream_rq_tx_bytes_total{reason="forwarded"}[1m])
+          ))
+
+      - record: wg_relay:forward_upstream_rx_bytes:lifetime
+        expr: |
+          sum by (relay, backend) (union(
+            last_over_time(wg_relay:forward_upstream_rx_bytes:lifetime[180d]),
+            increase(wg_relay_forward_upstream_rq_rx_bytes_total{reason="forwarded"}[1m])
+          ))
+
+      - record: wg_relay:forward_upstream_tx_bytes:lifetime
+        expr: |
+          sum by (relay, backend) (union(
+            last_over_time(wg_relay:forward_upstream_tx_bytes:lifetime[180d]),
+            increase(wg_relay_forward_upstream_rq_tx_bytes_total{reason="forwarded"}[1m])
+          ))
+
+      - record: wg_relay:reverse_downstream_rx_bytes:lifetime
+        expr: |
+          sum by (relay) (union(
+            last_over_time(wg_relay:reverse_downstream_rx_bytes:lifetime[180d]),
+            increase(wg_relay_reverse_downstream_rq_rx_bytes_total{reason="forwarded"}[1m])
+          ))
+
+      - record: wg_relay:reverse_downstream_tx_bytes:lifetime
+        expr: |
+          sum by (relay) (union(
+            last_over_time(wg_relay:reverse_downstream_tx_bytes:lifetime[180d]),
+            increase(wg_relay_reverse_downstream_rq_tx_bytes_total{reason="forwarded"}[1m])
+          ))
+
+      - record: wg_relay:reverse_upstream_rx_bytes:lifetime
+        expr: |
+          sum by (relay) (union(
+            last_over_time(wg_relay:reverse_upstream_rx_bytes:lifetime[180d]),
+            increase(wg_relay_reverse_upstream_rq_rx_bytes_total{reason="forwarded"}[1m])
+          ))
+
+      - record: wg_relay:reverse_upstream_tx_bytes:lifetime
+        expr: |
+          sum by (relay) (union(
+            last_over_time(wg_relay:reverse_upstream_tx_bytes:lifetime[180d]),
+            increase(wg_relay_reverse_upstream_rq_tx_bytes_total{reason="forwarded"}[1m])
+          ))

@@ -7,12 +7,14 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"runtime"
 	"syscall"
 	"time"
 
 	"github.com/jessevdk/go-flags"
 	"github.com/pkg/errors"
 	"github.com/prometheus/client_golang/prometheus"
+	"github.com/prometheus/client_golang/prometheus/collectors"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/stillya/wg-relay/pkg/dataplane/config"
 	"github.com/stillya/wg-relay/pkg/dataplane/proxy"
@@ -127,6 +129,19 @@ func main() {
 		if cfg.Monitoring.Prometheus.Enabled {
 			bpfCollector = metrics.NewBpfCollector(metricsSource, cfg.Proxy.Mode, backends)
 			prometheus.MustRegister(bpfCollector)
+
+			// The default registry already holds a Go collector without scheduler and GC metrics.
+			prometheus.Unregister(collectors.NewGoCollector())
+			prometheus.MustRegister(collectors.NewGoCollector(
+				collectors.WithGoCollectorRuntimeMetrics(collectors.MetricsScheduler, collectors.MetricsGC),
+			))
+
+			buildInfo := prometheus.NewGaugeVec(prometheus.GaugeOpts{
+				Name: "wg_relay_build_info",
+				Help: "Build information of the running wg-relay; always 1.",
+			}, []string{"revision", "mode", "goversion"})
+			buildInfo.WithLabelValues(revision, cfg.Proxy.Mode, runtime.Version()).Set(1)
+			prometheus.MustRegister(buildInfo)
 
 			// Start Prometheus HTTP server
 			go func() {

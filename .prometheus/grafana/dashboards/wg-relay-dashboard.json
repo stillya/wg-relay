@@ -30,6 +30,530 @@
         "x": 0,
         "y": 0
       },
+      "id": 90,
+      "panels": [],
+      "title": "Traffic health",
+      "type": "row"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${ds_prometheus}"
+      },
+      "description": "Normal / Sustained drop / Critical drop / Spike / Relay down / No baseline yet",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "mappings": [
+            {
+              "options": {
+                "-1": {
+                  "color": "#8e8e8e",
+                  "index": 1,
+                  "text": "No baseline yet"
+                },
+                "-2": {
+                  "color": "red",
+                  "index": 0,
+                  "text": "Relay down"
+                },
+                "0": {
+                  "color": "green",
+                  "index": 2,
+                  "text": "Normal"
+                },
+                "1": {
+                  "color": "orange",
+                  "index": 3,
+                  "text": "Sustained drop"
+                },
+                "2": {
+                  "color": "red",
+                  "index": 4,
+                  "text": "Critical drop"
+                },
+                "3": {
+                  "color": "blue",
+                  "index": 5,
+                  "text": "Spike"
+                }
+              },
+              "type": "value"
+            }
+          ],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "#8e8e8e",
+                "value": null
+              }
+            ]
+          },
+          "unit": "none"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 5,
+        "w": 8,
+        "x": 0,
+        "y": 1
+      },
+      "id": 91,
+      "options": {
+        "colorMode": "background",
+        "graphMode": "none",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "textMode": "value_and_name"
+      },
+      "pluginVersion": "10.0.0",
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${ds_prometheus}"
+          },
+          "editorMode": "code",
+          "expr": "(max by (relay) (up{job=~\"$job\", relay=~\"$relay\"}) == 0) - 2\nor max by (relay) (wg_relay:traffic:health{relay=~\"$relay\"})\nor max by (relay) (up{job=~\"$job\", relay=~\"$relay\"}) - 2",
+          "instant": true,
+          "legendFormat": "{{relay}}",
+          "range": false,
+          "refId": "A"
+        }
+      ],
+      "title": "Traffic health",
+      "type": "stat"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${ds_prometheus}"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "decimals": 0,
+          "mappings": [],
+          "noValue": "No baseline yet",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "red",
+                "value": null
+              },
+              {
+                "color": "green",
+                "value": 0.5
+              },
+              {
+                "color": "blue",
+                "value": 2
+              }
+            ]
+          },
+          "unit": "percentunit"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 5,
+        "w": 4,
+        "x": 8,
+        "y": 1
+      },
+      "id": 92,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "none",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "textMode": "value_and_name"
+      },
+      "pluginVersion": "10.0.0",
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${ds_prometheus}"
+          },
+          "editorMode": "code",
+          "expr": "max by (relay) (wg_relay:traffic_bytes:ratio5m{relay=~\"$relay\"})",
+          "instant": true,
+          "legendFormat": "{{relay}}",
+          "range": false,
+          "refId": "A"
+        }
+      ],
+      "title": "5m ratio",
+      "type": "stat"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${ds_prometheus}"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "decimals": 0,
+          "mappings": [],
+          "noValue": "No baseline yet",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "orange",
+                "value": null
+              },
+              {
+                "color": "green",
+                "value": 0.75
+              }
+            ]
+          },
+          "unit": "percentunit"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 5,
+        "w": 4,
+        "x": 12,
+        "y": 1
+      },
+      "id": 93,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "none",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "textMode": "value_and_name"
+      },
+      "pluginVersion": "10.0.0",
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${ds_prometheus}"
+          },
+          "editorMode": "code",
+          "expr": "max by (relay) (wg_relay:traffic_bytes:ratio30m{relay=~\"$relay\"})",
+          "instant": true,
+          "legendFormat": "{{relay}}",
+          "range": false,
+          "refId": "A"
+        }
+      ],
+      "title": "30m ratio",
+      "type": "stat"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${ds_prometheus}"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "decimals": 0,
+          "mappings": [],
+          "noValue": "No baseline yet",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "red",
+                "value": null
+              },
+              {
+                "color": "green",
+                "value": 0.5
+              },
+              {
+                "color": "blue",
+                "value": 2
+              }
+            ]
+          },
+          "unit": "percentunit"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 5,
+        "w": 4,
+        "x": 16,
+        "y": 1
+      },
+      "id": 94,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "none",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "textMode": "value_and_name"
+      },
+      "pluginVersion": "10.0.0",
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${ds_prometheus}"
+          },
+          "editorMode": "code",
+          "expr": "max by (relay) (wg_relay:traffic_bytes:ratio1h{relay=~\"$relay\"})",
+          "instant": true,
+          "legendFormat": "{{relay}}",
+          "range": false,
+          "refId": "A"
+        }
+      ],
+      "title": "1h ratio",
+      "type": "stat"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${ds_prometheus}"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "decimals": 0,
+          "mappings": [],
+          "noValue": "No baseline yet",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "orange",
+                "value": null
+              },
+              {
+                "color": "green",
+                "value": 0.75
+              }
+            ]
+          },
+          "unit": "percentunit"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 5,
+        "w": 4,
+        "x": 20,
+        "y": 1
+      },
+      "id": 95,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "none",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "textMode": "value_and_name"
+      },
+      "pluginVersion": "10.0.0",
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${ds_prometheus}"
+          },
+          "editorMode": "code",
+          "expr": "max by (relay) (wg_relay:traffic_bytes:ratio6h{relay=~\"$relay\"})",
+          "instant": true,
+          "legendFormat": "{{relay}}",
+          "range": false,
+          "refId": "A"
+        }
+      ],
+      "title": "6h ratio",
+      "type": "stat"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${ds_prometheus}"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "drawStyle": "line",
+            "fillOpacity": 0,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "lineInterpolation": "linear",
+            "lineWidth": 1,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "auto",
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          },
+          "unit": "Bps"
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byFrameRefID",
+              "options": "B"
+            },
+            "properties": [
+              {
+                "id": "custom.lineStyle",
+                "value": {
+                  "dash": [
+                    10,
+                    10
+                  ],
+                  "fill": "dash"
+                }
+              }
+            ]
+          }
+        ]
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 24,
+        "x": 0,
+        "y": 6
+      },
+      "id": 96,
+      "options": {
+        "legend": {
+          "calcs": [
+            "last"
+          ],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${ds_prometheus}"
+          },
+          "editorMode": "code",
+          "expr": "wg_relay:traffic_bytes:rate5m{relay=~\"$relay\"}",
+          "instant": false,
+          "legendFormat": "{{relay}} current",
+          "range": true,
+          "refId": "A"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${ds_prometheus}"
+          },
+          "editorMode": "code",
+          "expr": "quantile by (relay) (0.5,\n  label_replace(wg_relay:traffic_bytes:rate5m{relay=~\"$relay\"} offset 1d, \"baseline_day\", \"1\", \"\", \"\")\n  or label_replace(wg_relay:traffic_bytes:rate5m{relay=~\"$relay\"} offset 2d, \"baseline_day\", \"2\", \"\", \"\")\n  or label_replace(wg_relay:traffic_bytes:rate5m{relay=~\"$relay\"} offset 3d, \"baseline_day\", \"3\", \"\", \"\")\n  or label_replace(wg_relay:traffic_bytes:rate5m{relay=~\"$relay\"} offset 4d, \"baseline_day\", \"4\", \"\", \"\")\n  or label_replace(wg_relay:traffic_bytes:rate5m{relay=~\"$relay\"} offset 5d, \"baseline_day\", \"5\", \"\", \"\")\n  or label_replace(wg_relay:traffic_bytes:rate5m{relay=~\"$relay\"} offset 6d, \"baseline_day\", \"6\", \"\", \"\")\n  or label_replace(wg_relay:traffic_bytes:rate5m{relay=~\"$relay\"} offset 7d, \"baseline_day\", \"7\", \"\", \"\")\n)",
+          "instant": false,
+          "legendFormat": "{{relay}} baseline",
+          "range": true,
+          "refId": "B"
+        }
+      ],
+      "title": "Traffic vs 7-day baseline",
+      "type": "timeseries"
+    },
+    {
+      "collapsed": false,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 14
+      },
       "id": 100,
       "panels": [],
       "title": "Downstream (Client → Proxy)",
@@ -40,7 +564,6 @@
         "type": "prometheus",
         "uid": "${ds_prometheus}"
       },
-      "description": "Forward downstream: packets received from clients",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -64,12 +587,12 @@
         "h": 3,
         "w": 6,
         "x": 0,
-        "y": 1
+        "y": 15
       },
       "id": 200,
       "options": {
         "colorMode": "value",
-        "graphMode": "area",
+        "graphMode": "none",
         "justifyMode": "auto",
         "orientation": "auto",
         "reduceOptions": {
@@ -89,14 +612,14 @@
             "uid": "${ds_prometheus}"
           },
           "editorMode": "code",
-          "expr": "sum(wg_relay_forward_downstream_rq_rx_packets_total{reason=\"forwarded\", host=~\"$forward_host\", backend=~\"$backend\"})",
-          "instant": false,
+          "expr": "sum(increase(wg_relay_forward_downstream_rq_rx_packets_total{reason=\"forwarded\", relay=~\"$relay\", backend=~\"$backend\"}[$total_range]))",
+          "instant": true,
           "legendFormat": "RX Packets",
-          "range": true,
+          "range": false,
           "refId": "A"
         }
       ],
-      "title": "RX Packets",
+      "title": "RX Packets ($total_range)",
       "type": "stat"
     },
     {
@@ -104,7 +627,6 @@
         "type": "prometheus",
         "uid": "${ds_prometheus}"
       },
-      "description": "Forward downstream: packets transmitted to clients",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -128,12 +650,12 @@
         "h": 3,
         "w": 6,
         "x": 6,
-        "y": 1
+        "y": 15
       },
       "id": 201,
       "options": {
         "colorMode": "value",
-        "graphMode": "area",
+        "graphMode": "none",
         "justifyMode": "auto",
         "orientation": "auto",
         "reduceOptions": {
@@ -153,14 +675,14 @@
             "uid": "${ds_prometheus}"
           },
           "editorMode": "code",
-          "expr": "sum(wg_relay_forward_downstream_rq_tx_packets_total{reason=\"forwarded\", host=~\"$forward_host\", backend=~\"$backend\"})",
-          "instant": false,
+          "expr": "sum(increase(wg_relay_forward_downstream_rq_tx_packets_total{reason=\"forwarded\", relay=~\"$relay\", backend=~\"$backend\"}[$total_range]))",
+          "instant": true,
           "legendFormat": "TX Packets",
-          "range": true,
+          "range": false,
           "refId": "A"
         }
       ],
-      "title": "TX Packets",
+      "title": "TX Packets ($total_range)",
       "type": "stat"
     },
     {
@@ -168,7 +690,6 @@
         "type": "prometheus",
         "uid": "${ds_prometheus}"
       },
-      "description": "Forward downstream: bytes received from clients",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -192,12 +713,12 @@
         "h": 3,
         "w": 6,
         "x": 12,
-        "y": 1
+        "y": 15
       },
       "id": 202,
       "options": {
         "colorMode": "value",
-        "graphMode": "area",
+        "graphMode": "none",
         "justifyMode": "auto",
         "orientation": "auto",
         "reduceOptions": {
@@ -217,14 +738,14 @@
             "uid": "${ds_prometheus}"
           },
           "editorMode": "code",
-          "expr": "sum(wg_relay_forward_downstream_rq_rx_bytes_total{reason=\"forwarded\", host=~\"$forward_host\", backend=~\"$backend\"})",
-          "instant": false,
+          "expr": "sum(increase(wg_relay_forward_downstream_rq_rx_bytes_total{reason=\"forwarded\", relay=~\"$relay\", backend=~\"$backend\"}[$total_range]))",
+          "instant": true,
           "legendFormat": "RX Bytes",
-          "range": true,
+          "range": false,
           "refId": "A"
         }
       ],
-      "title": "RX Bytes",
+      "title": "RX Bytes ($total_range)",
       "type": "stat"
     },
     {
@@ -232,7 +753,6 @@
         "type": "prometheus",
         "uid": "${ds_prometheus}"
       },
-      "description": "Forward downstream: bytes transmitted to clients",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -256,12 +776,12 @@
         "h": 3,
         "w": 6,
         "x": 18,
-        "y": 1
+        "y": 15
       },
       "id": 203,
       "options": {
         "colorMode": "value",
-        "graphMode": "area",
+        "graphMode": "none",
         "justifyMode": "auto",
         "orientation": "auto",
         "reduceOptions": {
@@ -281,14 +801,14 @@
             "uid": "${ds_prometheus}"
           },
           "editorMode": "code",
-          "expr": "sum(wg_relay_forward_downstream_rq_tx_bytes_total{reason=\"forwarded\", host=~\"$forward_host\", backend=~\"$backend\"})",
-          "instant": false,
+          "expr": "sum(increase(wg_relay_forward_downstream_rq_tx_bytes_total{reason=\"forwarded\", relay=~\"$relay\", backend=~\"$backend\"}[$total_range]))",
+          "instant": true,
           "legendFormat": "TX Bytes",
-          "range": true,
+          "range": false,
           "refId": "A"
         }
       ],
-      "title": "TX Bytes",
+      "title": "TX Bytes ($total_range)",
       "type": "stat"
     },
     {
@@ -296,7 +816,6 @@
         "type": "prometheus",
         "uid": "${ds_prometheus}"
       },
-      "description": "Bidirectional traffic for Forward downstream (Client → Proxy)",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -350,7 +869,7 @@
         "h": 8,
         "w": 24,
         "x": 0,
-        "y": 4
+        "y": 18
       },
       "id": 210,
       "options": {
@@ -376,9 +895,9 @@
             "uid": "${ds_prometheus}"
           },
           "editorMode": "code",
-          "expr": "sum by (backend) (rate(wg_relay_forward_downstream_rq_tx_bytes_total{reason=\"forwarded\", host=~\"$forward_host\", backend=~\"$backend\"}[$__rate_interval]))",
+          "expr": "sum by (relay, backend) (rate(wg_relay_forward_downstream_rq_tx_bytes_total{reason=\"forwarded\", relay=~\"$relay\", backend=~\"$backend\"}[$__rate_interval]))",
           "instant": false,
-          "legendFormat": "{{backend}} - TX",
+          "legendFormat": "{{relay}} {{backend}} - TX",
           "range": true,
           "refId": "A"
         },
@@ -388,9 +907,9 @@
             "uid": "${ds_prometheus}"
           },
           "editorMode": "code",
-          "expr": "-sum by (backend) (rate(wg_relay_forward_downstream_rq_rx_bytes_total{reason=\"forwarded\", host=~\"$forward_host\", backend=~\"$backend\"}[$__rate_interval]))",
+          "expr": "-sum by (relay, backend) (rate(wg_relay_forward_downstream_rq_rx_bytes_total{reason=\"forwarded\", relay=~\"$relay\", backend=~\"$backend\"}[$__rate_interval]))",
           "instant": false,
-          "legendFormat": "{{backend}} - RX",
+          "legendFormat": "{{relay}} {{backend}} - RX",
           "range": true,
           "refId": "B"
         }
@@ -404,7 +923,7 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 12
+        "y": 26
       },
       "id": 101,
       "panels": [],
@@ -416,7 +935,6 @@
         "type": "prometheus",
         "uid": "${ds_prometheus}"
       },
-      "description": "Forward upstream: packets received from backends",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -440,12 +958,12 @@
         "h": 3,
         "w": 6,
         "x": 0,
-        "y": 13
+        "y": 27
       },
       "id": 220,
       "options": {
         "colorMode": "value",
-        "graphMode": "area",
+        "graphMode": "none",
         "justifyMode": "auto",
         "orientation": "auto",
         "reduceOptions": {
@@ -465,14 +983,14 @@
             "uid": "${ds_prometheus}"
           },
           "editorMode": "code",
-          "expr": "sum(wg_relay_forward_upstream_rq_rx_packets_total{reason=\"forwarded\", host=~\"$forward_host\", backend=~\"$backend\"})",
-          "instant": false,
+          "expr": "sum(increase(wg_relay_forward_upstream_rq_rx_packets_total{reason=\"forwarded\", relay=~\"$relay\", backend=~\"$backend\"}[$total_range]))",
+          "instant": true,
           "legendFormat": "RX Packets",
-          "range": true,
+          "range": false,
           "refId": "A"
         }
       ],
-      "title": "RX Packets",
+      "title": "RX Packets ($total_range)",
       "type": "stat"
     },
     {
@@ -480,7 +998,6 @@
         "type": "prometheus",
         "uid": "${ds_prometheus}"
       },
-      "description": "Forward upstream: packets transmitted to backends",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -504,12 +1021,12 @@
         "h": 3,
         "w": 6,
         "x": 6,
-        "y": 13
+        "y": 27
       },
       "id": 221,
       "options": {
         "colorMode": "value",
-        "graphMode": "area",
+        "graphMode": "none",
         "justifyMode": "auto",
         "orientation": "auto",
         "reduceOptions": {
@@ -529,14 +1046,14 @@
             "uid": "${ds_prometheus}"
           },
           "editorMode": "code",
-          "expr": "sum(wg_relay_forward_upstream_rq_tx_packets_total{reason=\"forwarded\", host=~\"$forward_host\", backend=~\"$backend\"})",
-          "instant": false,
+          "expr": "sum(increase(wg_relay_forward_upstream_rq_tx_packets_total{reason=\"forwarded\", relay=~\"$relay\", backend=~\"$backend\"}[$total_range]))",
+          "instant": true,
           "legendFormat": "TX Packets",
-          "range": true,
+          "range": false,
           "refId": "A"
         }
       ],
-      "title": "TX Packets",
+      "title": "TX Packets ($total_range)",
       "type": "stat"
     },
     {
@@ -544,7 +1061,6 @@
         "type": "prometheus",
         "uid": "${ds_prometheus}"
       },
-      "description": "Forward upstream: bytes received from backends",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -568,12 +1084,12 @@
         "h": 3,
         "w": 6,
         "x": 12,
-        "y": 13
+        "y": 27
       },
       "id": 222,
       "options": {
         "colorMode": "value",
-        "graphMode": "area",
+        "graphMode": "none",
         "justifyMode": "auto",
         "orientation": "auto",
         "reduceOptions": {
@@ -593,14 +1109,14 @@
             "uid": "${ds_prometheus}"
           },
           "editorMode": "code",
-          "expr": "sum(wg_relay_forward_upstream_rq_rx_bytes_total{reason=\"forwarded\", host=~\"$forward_host\", backend=~\"$backend\"})",
-          "instant": false,
+          "expr": "sum(increase(wg_relay_forward_upstream_rq_rx_bytes_total{reason=\"forwarded\", relay=~\"$relay\", backend=~\"$backend\"}[$total_range]))",
+          "instant": true,
           "legendFormat": "RX Bytes",
-          "range": true,
+          "range": false,
           "refId": "A"
         }
       ],
-      "title": "RX Bytes",
+      "title": "RX Bytes ($total_range)",
       "type": "stat"
     },
     {
@@ -608,7 +1124,6 @@
         "type": "prometheus",
         "uid": "${ds_prometheus}"
       },
-      "description": "Forward upstream: bytes transmitted to backends",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -632,12 +1147,12 @@
         "h": 3,
         "w": 6,
         "x": 18,
-        "y": 13
+        "y": 27
       },
       "id": 223,
       "options": {
         "colorMode": "value",
-        "graphMode": "area",
+        "graphMode": "none",
         "justifyMode": "auto",
         "orientation": "auto",
         "reduceOptions": {
@@ -657,14 +1172,14 @@
             "uid": "${ds_prometheus}"
           },
           "editorMode": "code",
-          "expr": "sum(wg_relay_forward_upstream_rq_tx_bytes_total{reason=\"forwarded\", host=~\"$forward_host\", backend=~\"$backend\"})",
-          "instant": false,
+          "expr": "sum(increase(wg_relay_forward_upstream_rq_tx_bytes_total{reason=\"forwarded\", relay=~\"$relay\", backend=~\"$backend\"}[$total_range]))",
+          "instant": true,
           "legendFormat": "TX Bytes",
-          "range": true,
+          "range": false,
           "refId": "A"
         }
       ],
-      "title": "TX Bytes",
+      "title": "TX Bytes ($total_range)",
       "type": "stat"
     },
     {
@@ -672,7 +1187,6 @@
         "type": "prometheus",
         "uid": "${ds_prometheus}"
       },
-      "description": "Bidirectional traffic for Forward upstream (Proxy → Backend)",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -726,7 +1240,7 @@
         "h": 8,
         "w": 24,
         "x": 0,
-        "y": 16
+        "y": 30
       },
       "id": 230,
       "options": {
@@ -752,9 +1266,9 @@
             "uid": "${ds_prometheus}"
           },
           "editorMode": "code",
-          "expr": "sum by (backend) (rate(wg_relay_forward_upstream_rq_tx_bytes_total{reason=\"forwarded\", host=~\"$forward_host\", backend=~\"$backend\"}[$__rate_interval]))",
+          "expr": "sum by (relay, backend) (rate(wg_relay_forward_upstream_rq_tx_bytes_total{reason=\"forwarded\", relay=~\"$relay\", backend=~\"$backend\"}[$__rate_interval]))",
           "instant": false,
-          "legendFormat": "{{backend}} - TX",
+          "legendFormat": "{{relay}} {{backend}} - TX",
           "range": true,
           "refId": "A"
         },
@@ -764,9 +1278,9 @@
             "uid": "${ds_prometheus}"
           },
           "editorMode": "code",
-          "expr": "-sum by (backend) (rate(wg_relay_forward_upstream_rq_rx_bytes_total{reason=\"forwarded\", host=~\"$forward_host\", backend=~\"$backend\"}[$__rate_interval]))",
+          "expr": "-sum by (relay, backend) (rate(wg_relay_forward_upstream_rq_rx_bytes_total{reason=\"forwarded\", relay=~\"$relay\", backend=~\"$backend\"}[$__rate_interval]))",
           "instant": false,
-          "legendFormat": "{{backend}} - RX",
+          "legendFormat": "{{relay}} {{backend}} - RX",
           "range": true,
           "refId": "B"
         }
@@ -780,7 +1294,7 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 24
+        "y": 38
       },
       "id": 102,
       "panels": [],
@@ -792,7 +1306,6 @@
         "type": "prometheus",
         "uid": "${ds_prometheus}"
       },
-      "description": "Forward total: all packets received",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -816,12 +1329,12 @@
         "h": 3,
         "w": 6,
         "x": 0,
-        "y": 25
+        "y": 39
       },
       "id": 240,
       "options": {
         "colorMode": "value",
-        "graphMode": "area",
+        "graphMode": "none",
         "justifyMode": "auto",
         "orientation": "auto",
         "reduceOptions": {
@@ -841,14 +1354,14 @@
             "uid": "${ds_prometheus}"
           },
           "editorMode": "code",
-          "expr": "sum(wg_relay_forward_downstream_rq_rx_packets_total{reason=\"forwarded\", host=~\"$forward_host\", backend=~\"$backend\"}) + sum(wg_relay_forward_upstream_rq_rx_packets_total{reason=\"forwarded\", host=~\"$forward_host\", backend=~\"$backend\"})",
-          "instant": false,
+          "expr": "(sum(increase(wg_relay_forward_downstream_rq_rx_packets_total{reason=\"forwarded\", relay=~\"$relay\", backend=~\"$backend\"}[$total_range])) or vector(0)) + (sum(increase(wg_relay_forward_upstream_rq_rx_packets_total{reason=\"forwarded\", relay=~\"$relay\", backend=~\"$backend\"}[$total_range])) or vector(0))",
+          "instant": true,
           "legendFormat": "Total RX Packets",
-          "range": true,
+          "range": false,
           "refId": "A"
         }
       ],
-      "title": "Total RX Packets",
+      "title": "Total RX Packets ($total_range)",
       "type": "stat"
     },
     {
@@ -856,7 +1369,6 @@
         "type": "prometheus",
         "uid": "${ds_prometheus}"
       },
-      "description": "Forward total: all packets transmitted",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -880,12 +1392,12 @@
         "h": 3,
         "w": 6,
         "x": 6,
-        "y": 25
+        "y": 39
       },
       "id": 241,
       "options": {
         "colorMode": "value",
-        "graphMode": "area",
+        "graphMode": "none",
         "justifyMode": "auto",
         "orientation": "auto",
         "reduceOptions": {
@@ -905,14 +1417,14 @@
             "uid": "${ds_prometheus}"
           },
           "editorMode": "code",
-          "expr": "sum(wg_relay_forward_downstream_rq_tx_packets_total{reason=\"forwarded\", host=~\"$forward_host\", backend=~\"$backend\"}) + sum(wg_relay_forward_upstream_rq_tx_packets_total{reason=\"forwarded\", host=~\"$forward_host\", backend=~\"$backend\"})",
-          "instant": false,
+          "expr": "(sum(increase(wg_relay_forward_downstream_rq_tx_packets_total{reason=\"forwarded\", relay=~\"$relay\", backend=~\"$backend\"}[$total_range])) or vector(0)) + (sum(increase(wg_relay_forward_upstream_rq_tx_packets_total{reason=\"forwarded\", relay=~\"$relay\", backend=~\"$backend\"}[$total_range])) or vector(0))",
+          "instant": true,
           "legendFormat": "Total TX Packets",
-          "range": true,
+          "range": false,
           "refId": "A"
         }
       ],
-      "title": "Total TX Packets",
+      "title": "Total TX Packets ($total_range)",
       "type": "stat"
     },
     {
@@ -920,7 +1432,6 @@
         "type": "prometheus",
         "uid": "${ds_prometheus}"
       },
-      "description": "Forward total: all bytes received",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -944,12 +1455,12 @@
         "h": 3,
         "w": 6,
         "x": 12,
-        "y": 25
+        "y": 39
       },
       "id": 242,
       "options": {
         "colorMode": "value",
-        "graphMode": "area",
+        "graphMode": "none",
         "justifyMode": "auto",
         "orientation": "auto",
         "reduceOptions": {
@@ -969,14 +1480,14 @@
             "uid": "${ds_prometheus}"
           },
           "editorMode": "code",
-          "expr": "sum(wg_relay_forward_downstream_rq_rx_bytes_total{reason=\"forwarded\", host=~\"$forward_host\", backend=~\"$backend\"}) + sum(wg_relay_forward_upstream_rq_rx_bytes_total{reason=\"forwarded\", host=~\"$forward_host\", backend=~\"$backend\"})",
-          "instant": false,
+          "expr": "(sum(increase(wg_relay_forward_downstream_rq_rx_bytes_total{reason=\"forwarded\", relay=~\"$relay\", backend=~\"$backend\"}[$total_range])) or vector(0)) + (sum(increase(wg_relay_forward_upstream_rq_rx_bytes_total{reason=\"forwarded\", relay=~\"$relay\", backend=~\"$backend\"}[$total_range])) or vector(0))",
+          "instant": true,
           "legendFormat": "Total RX Bytes",
-          "range": true,
+          "range": false,
           "refId": "A"
         }
       ],
-      "title": "Total RX Bytes",
+      "title": "Total RX Bytes ($total_range)",
       "type": "stat"
     },
     {
@@ -984,7 +1495,6 @@
         "type": "prometheus",
         "uid": "${ds_prometheus}"
       },
-      "description": "Forward total: all bytes transmitted",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -1008,12 +1518,12 @@
         "h": 3,
         "w": 6,
         "x": 18,
-        "y": 25
+        "y": 39
       },
       "id": 243,
       "options": {
         "colorMode": "value",
-        "graphMode": "area",
+        "graphMode": "none",
         "justifyMode": "auto",
         "orientation": "auto",
         "reduceOptions": {
@@ -1033,14 +1543,14 @@
             "uid": "${ds_prometheus}"
           },
           "editorMode": "code",
-          "expr": "sum(wg_relay_forward_downstream_rq_tx_bytes_total{reason=\"forwarded\", host=~\"$forward_host\", backend=~\"$backend\"}) + sum(wg_relay_forward_upstream_rq_tx_bytes_total{reason=\"forwarded\", host=~\"$forward_host\", backend=~\"$backend\"})",
-          "instant": false,
+          "expr": "(sum(increase(wg_relay_forward_downstream_rq_tx_bytes_total{reason=\"forwarded\", relay=~\"$relay\", backend=~\"$backend\"}[$total_range])) or vector(0)) + (sum(increase(wg_relay_forward_upstream_rq_tx_bytes_total{reason=\"forwarded\", relay=~\"$relay\", backend=~\"$backend\"}[$total_range])) or vector(0))",
+          "instant": true,
           "legendFormat": "Total TX Bytes",
-          "range": true,
+          "range": false,
           "refId": "A"
         }
       ],
-      "title": "Total TX Bytes",
+      "title": "Total TX Bytes ($total_range)",
       "type": "stat"
     },
     {
@@ -1048,7 +1558,6 @@
         "type": "prometheus",
         "uid": "${ds_prometheus}"
       },
-      "description": "Combined bidirectional traffic for Forward mode",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -1102,7 +1611,7 @@
         "h": 8,
         "w": 24,
         "x": 0,
-        "y": 28
+        "y": 42
       },
       "id": 250,
       "options": {
@@ -1128,9 +1637,9 @@
             "uid": "${ds_prometheus}"
           },
           "editorMode": "code",
-          "expr": "sum by (backend) (rate(wg_relay_forward_upstream_rq_tx_bytes_total{reason=\"forwarded\", host=~\"$forward_host\", backend=~\"$backend\"}[$__rate_interval]))",
+          "expr": "sum by (relay, backend) (rate(wg_relay_forward_downstream_rq_tx_bytes_total{reason=\"forwarded\", relay=~\"$relay\", backend=~\"$backend\"}[$__rate_interval])) + sum by (relay, backend) (rate(wg_relay_forward_upstream_rq_tx_bytes_total{reason=\"forwarded\", relay=~\"$relay\", backend=~\"$backend\"}[$__rate_interval]))",
           "instant": false,
-          "legendFormat": "{{backend}} - TX",
+          "legendFormat": "{{relay}} {{backend}} - TX",
           "range": true,
           "refId": "A"
         },
@@ -1140,9 +1649,9 @@
             "uid": "${ds_prometheus}"
           },
           "editorMode": "code",
-          "expr": "-sum by (backend) (rate(wg_relay_forward_upstream_rq_rx_bytes_total{reason=\"forwarded\", host=~\"$forward_host\", backend=~\"$backend\"}[$__rate_interval]))",
+          "expr": "-(sum by (relay, backend) (rate(wg_relay_forward_downstream_rq_rx_bytes_total{reason=\"forwarded\", relay=~\"$relay\", backend=~\"$backend\"}[$__rate_interval])) + sum by (relay, backend) (rate(wg_relay_forward_upstream_rq_rx_bytes_total{reason=\"forwarded\", relay=~\"$relay\", backend=~\"$backend\"}[$__rate_interval])))",
           "instant": false,
-          "legendFormat": "{{backend}} - RX",
+          "legendFormat": "{{relay}} {{backend}} - RX",
           "range": true,
           "refId": "B"
         }
@@ -1156,7 +1665,7 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 36
+        "y": 50
       },
       "id": 103,
       "panels": [],
@@ -1168,7 +1677,6 @@
         "type": "prometheus",
         "uid": "${ds_prometheus}"
       },
-      "description": "Reverse downstream: packets received from clients",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -1192,12 +1700,12 @@
         "h": 3,
         "w": 6,
         "x": 0,
-        "y": 37
+        "y": 51
       },
       "id": 300,
       "options": {
         "colorMode": "value",
-        "graphMode": "area",
+        "graphMode": "none",
         "justifyMode": "auto",
         "orientation": "auto",
         "reduceOptions": {
@@ -1217,14 +1725,14 @@
             "uid": "${ds_prometheus}"
           },
           "editorMode": "code",
-          "expr": "sum(wg_relay_reverse_downstream_rq_rx_packets_total{reason=\"forwarded\", host=~\"$reverse_host\"})",
-          "instant": false,
+          "expr": "sum(increase(wg_relay_reverse_downstream_rq_rx_packets_total{reason=\"forwarded\", relay=~\"$relay\"}[$total_range]))",
+          "instant": true,
           "legendFormat": "RX Packets",
-          "range": true,
+          "range": false,
           "refId": "A"
         }
       ],
-      "title": "RX Packets",
+      "title": "RX Packets ($total_range)",
       "type": "stat"
     },
     {
@@ -1232,7 +1740,6 @@
         "type": "prometheus",
         "uid": "${ds_prometheus}"
       },
-      "description": "Reverse downstream: packets transmitted to clients",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -1256,12 +1763,12 @@
         "h": 3,
         "w": 6,
         "x": 6,
-        "y": 37
+        "y": 51
       },
       "id": 301,
       "options": {
         "colorMode": "value",
-        "graphMode": "area",
+        "graphMode": "none",
         "justifyMode": "auto",
         "orientation": "auto",
         "reduceOptions": {
@@ -1281,14 +1788,14 @@
             "uid": "${ds_prometheus}"
           },
           "editorMode": "code",
-          "expr": "sum(wg_relay_reverse_downstream_rq_tx_packets_total{reason=\"forwarded\", host=~\"$reverse_host\"})",
-          "instant": false,
+          "expr": "sum(increase(wg_relay_reverse_downstream_rq_tx_packets_total{reason=\"forwarded\", relay=~\"$relay\"}[$total_range]))",
+          "instant": true,
           "legendFormat": "TX Packets",
-          "range": true,
+          "range": false,
           "refId": "A"
         }
       ],
-      "title": "TX Packets",
+      "title": "TX Packets ($total_range)",
       "type": "stat"
     },
     {
@@ -1296,7 +1803,6 @@
         "type": "prometheus",
         "uid": "${ds_prometheus}"
       },
-      "description": "Reverse downstream: bytes received from clients",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -1320,12 +1826,12 @@
         "h": 3,
         "w": 6,
         "x": 12,
-        "y": 37
+        "y": 51
       },
       "id": 302,
       "options": {
         "colorMode": "value",
-        "graphMode": "area",
+        "graphMode": "none",
         "justifyMode": "auto",
         "orientation": "auto",
         "reduceOptions": {
@@ -1345,14 +1851,14 @@
             "uid": "${ds_prometheus}"
           },
           "editorMode": "code",
-          "expr": "sum(wg_relay_reverse_downstream_rq_rx_bytes_total{reason=\"forwarded\", host=~\"$reverse_host\"})",
-          "instant": false,
+          "expr": "sum(increase(wg_relay_reverse_downstream_rq_rx_bytes_total{reason=\"forwarded\", relay=~\"$relay\"}[$total_range]))",
+          "instant": true,
           "legendFormat": "RX Bytes",
-          "range": true,
+          "range": false,
           "refId": "A"
         }
       ],
-      "title": "RX Bytes",
+      "title": "RX Bytes ($total_range)",
       "type": "stat"
     },
     {
@@ -1360,7 +1866,6 @@
         "type": "prometheus",
         "uid": "${ds_prometheus}"
       },
-      "description": "Reverse downstream: bytes transmitted to clients",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -1384,12 +1889,12 @@
         "h": 3,
         "w": 6,
         "x": 18,
-        "y": 37
+        "y": 51
       },
       "id": 303,
       "options": {
         "colorMode": "value",
-        "graphMode": "area",
+        "graphMode": "none",
         "justifyMode": "auto",
         "orientation": "auto",
         "reduceOptions": {
@@ -1409,14 +1914,14 @@
             "uid": "${ds_prometheus}"
           },
           "editorMode": "code",
-          "expr": "sum(wg_relay_reverse_downstream_rq_tx_bytes_total{reason=\"forwarded\", host=~\"$reverse_host\"})",
-          "instant": false,
+          "expr": "sum(increase(wg_relay_reverse_downstream_rq_tx_bytes_total{reason=\"forwarded\", relay=~\"$relay\"}[$total_range]))",
+          "instant": true,
           "legendFormat": "TX Bytes",
-          "range": true,
+          "range": false,
           "refId": "A"
         }
       ],
-      "title": "TX Bytes",
+      "title": "TX Bytes ($total_range)",
       "type": "stat"
     },
     {
@@ -1424,7 +1929,6 @@
         "type": "prometheus",
         "uid": "${ds_prometheus}"
       },
-      "description": "Bidirectional traffic for Reverse downstream (Client → Proxy)",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -1478,7 +1982,7 @@
         "h": 8,
         "w": 24,
         "x": 0,
-        "y": 40
+        "y": 54
       },
       "id": 310,
       "options": {
@@ -1504,9 +2008,9 @@
             "uid": "${ds_prometheus}"
           },
           "editorMode": "code",
-          "expr": "sum(rate(wg_relay_reverse_downstream_rq_tx_bytes_total{reason=\"forwarded\", host=~\"$reverse_host\"}[$__rate_interval]))",
+          "expr": "sum by (relay) (rate(wg_relay_reverse_downstream_rq_tx_bytes_total{reason=\"forwarded\", relay=~\"$relay\"}[$__rate_interval]))",
           "instant": false,
-          "legendFormat": "TX",
+          "legendFormat": "{{relay}} - TX",
           "range": true,
           "refId": "A"
         },
@@ -1516,9 +2020,9 @@
             "uid": "${ds_prometheus}"
           },
           "editorMode": "code",
-          "expr": "-sum(rate(wg_relay_reverse_downstream_rq_rx_bytes_total{reason=\"forwarded\", host=~\"$reverse_host\"}[$__rate_interval]))",
+          "expr": "-sum by (relay) (rate(wg_relay_reverse_downstream_rq_rx_bytes_total{reason=\"forwarded\", relay=~\"$relay\"}[$__rate_interval]))",
           "instant": false,
-          "legendFormat": "RX",
+          "legendFormat": "{{relay}} - RX",
           "range": true,
           "refId": "B"
         }
@@ -1532,7 +2036,7 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 48
+        "y": 62
       },
       "id": 104,
       "panels": [],
@@ -1544,7 +2048,6 @@
         "type": "prometheus",
         "uid": "${ds_prometheus}"
       },
-      "description": "Reverse upstream: packets received from WireGuard",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -1568,12 +2071,12 @@
         "h": 3,
         "w": 6,
         "x": 0,
-        "y": 49
+        "y": 63
       },
       "id": 320,
       "options": {
         "colorMode": "value",
-        "graphMode": "area",
+        "graphMode": "none",
         "justifyMode": "auto",
         "orientation": "auto",
         "reduceOptions": {
@@ -1593,14 +2096,14 @@
             "uid": "${ds_prometheus}"
           },
           "editorMode": "code",
-          "expr": "sum(wg_relay_reverse_upstream_rq_rx_packets_total{reason=\"forwarded\", host=~\"$reverse_host\"})",
-          "instant": false,
+          "expr": "sum(increase(wg_relay_reverse_upstream_rq_rx_packets_total{reason=\"forwarded\", relay=~\"$relay\"}[$total_range]))",
+          "instant": true,
           "legendFormat": "RX Packets",
-          "range": true,
+          "range": false,
           "refId": "A"
         }
       ],
-      "title": "RX Packets",
+      "title": "RX Packets ($total_range)",
       "type": "stat"
     },
     {
@@ -1608,7 +2111,6 @@
         "type": "prometheus",
         "uid": "${ds_prometheus}"
       },
-      "description": "Reverse upstream: packets transmitted to WireGuard",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -1632,12 +2134,12 @@
         "h": 3,
         "w": 6,
         "x": 6,
-        "y": 49
+        "y": 63
       },
       "id": 321,
       "options": {
         "colorMode": "value",
-        "graphMode": "area",
+        "graphMode": "none",
         "justifyMode": "auto",
         "orientation": "auto",
         "reduceOptions": {
@@ -1657,14 +2159,14 @@
             "uid": "${ds_prometheus}"
           },
           "editorMode": "code",
-          "expr": "sum(wg_relay_reverse_upstream_rq_tx_packets_total{reason=\"forwarded\", host=~\"$reverse_host\"})",
-          "instant": false,
+          "expr": "sum(increase(wg_relay_reverse_upstream_rq_tx_packets_total{reason=\"forwarded\", relay=~\"$relay\"}[$total_range]))",
+          "instant": true,
           "legendFormat": "TX Packets",
-          "range": true,
+          "range": false,
           "refId": "A"
         }
       ],
-      "title": "TX Packets",
+      "title": "TX Packets ($total_range)",
       "type": "stat"
     },
     {
@@ -1672,7 +2174,6 @@
         "type": "prometheus",
         "uid": "${ds_prometheus}"
       },
-      "description": "Reverse upstream: bytes received from WireGuard",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -1696,12 +2197,12 @@
         "h": 3,
         "w": 6,
         "x": 12,
-        "y": 49
+        "y": 63
       },
       "id": 322,
       "options": {
         "colorMode": "value",
-        "graphMode": "area",
+        "graphMode": "none",
         "justifyMode": "auto",
         "orientation": "auto",
         "reduceOptions": {
@@ -1721,14 +2222,14 @@
             "uid": "${ds_prometheus}"
           },
           "editorMode": "code",
-          "expr": "sum(wg_relay_reverse_upstream_rq_rx_bytes_total{reason=\"forwarded\", host=~\"$reverse_host\"})",
-          "instant": false,
+          "expr": "sum(increase(wg_relay_reverse_upstream_rq_rx_bytes_total{reason=\"forwarded\", relay=~\"$relay\"}[$total_range]))",
+          "instant": true,
           "legendFormat": "RX Bytes",
-          "range": true,
+          "range": false,
           "refId": "A"
         }
       ],
-      "title": "RX Bytes",
+      "title": "RX Bytes ($total_range)",
       "type": "stat"
     },
     {
@@ -1736,7 +2237,6 @@
         "type": "prometheus",
         "uid": "${ds_prometheus}"
       },
-      "description": "Reverse upstream: bytes transmitted to WireGuard",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -1760,12 +2260,12 @@
         "h": 3,
         "w": 6,
         "x": 18,
-        "y": 49
+        "y": 63
       },
       "id": 323,
       "options": {
         "colorMode": "value",
-        "graphMode": "area",
+        "graphMode": "none",
         "justifyMode": "auto",
         "orientation": "auto",
         "reduceOptions": {
@@ -1785,14 +2285,14 @@
             "uid": "${ds_prometheus}"
           },
           "editorMode": "code",
-          "expr": "sum(wg_relay_reverse_upstream_rq_tx_bytes_total{reason=\"forwarded\", host=~\"$reverse_host\"})",
-          "instant": false,
+          "expr": "sum(increase(wg_relay_reverse_upstream_rq_tx_bytes_total{reason=\"forwarded\", relay=~\"$relay\"}[$total_range]))",
+          "instant": true,
           "legendFormat": "TX Bytes",
-          "range": true,
+          "range": false,
           "refId": "A"
         }
       ],
-      "title": "TX Bytes",
+      "title": "TX Bytes ($total_range)",
       "type": "stat"
     },
     {
@@ -1800,7 +2300,6 @@
         "type": "prometheus",
         "uid": "${ds_prometheus}"
       },
-      "description": "Bidirectional traffic for Reverse upstream (Proxy → WireGuard)",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -1854,7 +2353,7 @@
         "h": 8,
         "w": 24,
         "x": 0,
-        "y": 52
+        "y": 66
       },
       "id": 330,
       "options": {
@@ -1880,9 +2379,9 @@
             "uid": "${ds_prometheus}"
           },
           "editorMode": "code",
-          "expr": "sum(rate(wg_relay_reverse_upstream_rq_tx_bytes_total{reason=\"forwarded\", host=~\"$reverse_host\"}[$__rate_interval]))",
+          "expr": "sum by (relay) (rate(wg_relay_reverse_upstream_rq_tx_bytes_total{reason=\"forwarded\", relay=~\"$relay\"}[$__rate_interval]))",
           "instant": false,
-          "legendFormat": "TX",
+          "legendFormat": "{{relay}} - TX",
           "range": true,
           "refId": "A"
         },
@@ -1892,9 +2391,9 @@
             "uid": "${ds_prometheus}"
           },
           "editorMode": "code",
-          "expr": "-sum(rate(wg_relay_reverse_upstream_rq_rx_bytes_total{reason=\"forwarded\", host=~\"$reverse_host\"}[$__rate_interval]))",
+          "expr": "-sum by (relay) (rate(wg_relay_reverse_upstream_rq_rx_bytes_total{reason=\"forwarded\", relay=~\"$relay\"}[$__rate_interval]))",
           "instant": false,
-          "legendFormat": "RX",
+          "legendFormat": "{{relay}} - RX",
           "range": true,
           "refId": "B"
         }
@@ -1908,7 +2407,7 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 60
+        "y": 74
       },
       "id": 105,
       "panels": [],
@@ -1920,7 +2419,6 @@
         "type": "prometheus",
         "uid": "${ds_prometheus}"
       },
-      "description": "Reverse total: all packets received",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -1944,12 +2442,12 @@
         "h": 3,
         "w": 6,
         "x": 0,
-        "y": 61
+        "y": 75
       },
       "id": 340,
       "options": {
         "colorMode": "value",
-        "graphMode": "area",
+        "graphMode": "none",
         "justifyMode": "auto",
         "orientation": "auto",
         "reduceOptions": {
@@ -1969,14 +2467,14 @@
             "uid": "${ds_prometheus}"
           },
           "editorMode": "code",
-          "expr": "sum(wg_relay_reverse_downstream_rq_rx_packets_total{reason=\"forwarded\", host=~\"$reverse_host\"}) + sum(wg_relay_reverse_upstream_rq_rx_packets_total{reason=\"forwarded\", host=~\"$reverse_host\"})",
-          "instant": false,
+          "expr": "(sum(increase(wg_relay_reverse_downstream_rq_rx_packets_total{reason=\"forwarded\", relay=~\"$relay\"}[$total_range])) or vector(0)) + (sum(increase(wg_relay_reverse_upstream_rq_rx_packets_total{reason=\"forwarded\", relay=~\"$relay\"}[$total_range])) or vector(0))",
+          "instant": true,
           "legendFormat": "Total RX Packets",
-          "range": true,
+          "range": false,
           "refId": "A"
         }
       ],
-      "title": "Total RX Packets",
+      "title": "Total RX Packets ($total_range)",
       "type": "stat"
     },
     {
@@ -1984,7 +2482,6 @@
         "type": "prometheus",
         "uid": "${ds_prometheus}"
       },
-      "description": "Reverse total: all packets transmitted",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -2008,12 +2505,12 @@
         "h": 3,
         "w": 6,
         "x": 6,
-        "y": 61
+        "y": 75
       },
       "id": 341,
       "options": {
         "colorMode": "value",
-        "graphMode": "area",
+        "graphMode": "none",
         "justifyMode": "auto",
         "orientation": "auto",
         "reduceOptions": {
@@ -2033,14 +2530,14 @@
             "uid": "${ds_prometheus}"
           },
           "editorMode": "code",
-          "expr": "sum(wg_relay_reverse_downstream_rq_tx_packets_total{reason=\"forwarded\", host=~\"$reverse_host\"}) + sum(wg_relay_reverse_upstream_rq_tx_packets_total{reason=\"forwarded\", host=~\"$reverse_host\"})",
-          "instant": false,
+          "expr": "(sum(increase(wg_relay_reverse_downstream_rq_tx_packets_total{reason=\"forwarded\", relay=~\"$relay\"}[$total_range])) or vector(0)) + (sum(increase(wg_relay_reverse_upstream_rq_tx_packets_total{reason=\"forwarded\", relay=~\"$relay\"}[$total_range])) or vector(0))",
+          "instant": true,
           "legendFormat": "Total TX Packets",
-          "range": true,
+          "range": false,
           "refId": "A"
         }
       ],
-      "title": "Total TX Packets",
+      "title": "Total TX Packets ($total_range)",
       "type": "stat"
     },
     {
@@ -2048,7 +2545,6 @@
         "type": "prometheus",
         "uid": "${ds_prometheus}"
       },
-      "description": "Reverse total: all bytes received",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -2072,12 +2568,12 @@
         "h": 3,
         "w": 6,
         "x": 12,
-        "y": 61
+        "y": 75
       },
       "id": 342,
       "options": {
         "colorMode": "value",
-        "graphMode": "area",
+        "graphMode": "none",
         "justifyMode": "auto",
         "orientation": "auto",
         "reduceOptions": {
@@ -2097,14 +2593,14 @@
             "uid": "${ds_prometheus}"
           },
           "editorMode": "code",
-          "expr": "sum(wg_relay_reverse_downstream_rq_rx_bytes_total{reason=\"forwarded\", host=~\"$reverse_host\"}) + sum(wg_relay_reverse_upstream_rq_rx_bytes_total{reason=\"forwarded\", host=~\"$reverse_host\"})",
-          "instant": false,
+          "expr": "(sum(increase(wg_relay_reverse_downstream_rq_rx_bytes_total{reason=\"forwarded\", relay=~\"$relay\"}[$total_range])) or vector(0)) + (sum(increase(wg_relay_reverse_upstream_rq_rx_bytes_total{reason=\"forwarded\", relay=~\"$relay\"}[$total_range])) or vector(0))",
+          "instant": true,
           "legendFormat": "Total RX Bytes",
-          "range": true,
+          "range": false,
           "refId": "A"
         }
       ],
-      "title": "Total RX Bytes",
+      "title": "Total RX Bytes ($total_range)",
       "type": "stat"
     },
     {
@@ -2112,7 +2608,6 @@
         "type": "prometheus",
         "uid": "${ds_prometheus}"
       },
-      "description": "Reverse total: all bytes transmitted",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -2136,12 +2631,12 @@
         "h": 3,
         "w": 6,
         "x": 18,
-        "y": 61
+        "y": 75
       },
       "id": 343,
       "options": {
         "colorMode": "value",
-        "graphMode": "area",
+        "graphMode": "none",
         "justifyMode": "auto",
         "orientation": "auto",
         "reduceOptions": {
@@ -2161,14 +2656,14 @@
             "uid": "${ds_prometheus}"
           },
           "editorMode": "code",
-          "expr": "sum(wg_relay_reverse_downstream_rq_tx_bytes_total{reason=\"forwarded\", host=~\"$reverse_host\"}) + sum(wg_relay_reverse_upstream_rq_tx_bytes_total{reason=\"forwarded\", host=~\"$reverse_host\"})",
-          "instant": false,
+          "expr": "(sum(increase(wg_relay_reverse_downstream_rq_tx_bytes_total{reason=\"forwarded\", relay=~\"$relay\"}[$total_range])) or vector(0)) + (sum(increase(wg_relay_reverse_upstream_rq_tx_bytes_total{reason=\"forwarded\", relay=~\"$relay\"}[$total_range])) or vector(0))",
+          "instant": true,
           "legendFormat": "Total TX Bytes",
-          "range": true,
+          "range": false,
           "refId": "A"
         }
       ],
-      "title": "Total TX Bytes",
+      "title": "Total TX Bytes ($total_range)",
       "type": "stat"
     },
     {
@@ -2176,7 +2671,6 @@
         "type": "prometheus",
         "uid": "${ds_prometheus}"
       },
-      "description": "Combined bidirectional traffic for Reverse mode",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -2230,7 +2724,7 @@
         "h": 8,
         "w": 24,
         "x": 0,
-        "y": 64
+        "y": 78
       },
       "id": 350,
       "options": {
@@ -2256,9 +2750,9 @@
             "uid": "${ds_prometheus}"
           },
           "editorMode": "code",
-          "expr": "sum(rate(wg_relay_reverse_upstream_rq_tx_bytes_total{reason=\"forwarded\", host=~\"$reverse_host\"}[$__rate_interval]))",
+          "expr": "sum by (relay) (rate(wg_relay_reverse_downstream_rq_tx_bytes_total{reason=\"forwarded\", relay=~\"$relay\"}[$__rate_interval])) + sum by (relay) (rate(wg_relay_reverse_upstream_rq_tx_bytes_total{reason=\"forwarded\", relay=~\"$relay\"}[$__rate_interval]))",
           "instant": false,
-          "legendFormat": "TX",
+          "legendFormat": "{{relay}} - TX",
           "range": true,
           "refId": "A"
         },
@@ -2268,9 +2762,9 @@
             "uid": "${ds_prometheus}"
           },
           "editorMode": "code",
-          "expr": "-sum(rate(wg_relay_reverse_upstream_rq_rx_bytes_total{reason=\"forwarded\", host=~\"$reverse_host\"}[$__rate_interval]))",
+          "expr": "-(sum by (relay) (rate(wg_relay_reverse_downstream_rq_rx_bytes_total{reason=\"forwarded\", relay=~\"$relay\"}[$__rate_interval])) + sum by (relay) (rate(wg_relay_reverse_upstream_rq_rx_bytes_total{reason=\"forwarded\", relay=~\"$relay\"}[$__rate_interval])))",
           "instant": false,
-          "legendFormat": "RX",
+          "legendFormat": "{{relay}} - RX",
           "range": true,
           "refId": "B"
         }
@@ -2279,12 +2773,939 @@
       "type": "timeseries"
     },
     {
+      "collapsed": true,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 86
+      },
+      "id": 107,
+      "panels": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${ds_prometheus}"
+          },
+          "fieldConfig": {
+            "defaults": {
+              "color": {
+                "mode": "thresholds"
+              },
+              "mappings": [],
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "blue",
+                    "value": null
+                  }
+                ]
+              },
+              "unit": "bytes"
+            },
+            "overrides": []
+          },
+          "gridPos": {
+            "h": 3,
+            "w": 6,
+            "x": 0,
+            "y": 87
+          },
+          "id": 400,
+          "options": {
+            "colorMode": "value",
+            "graphMode": "none",
+            "justifyMode": "auto",
+            "orientation": "auto",
+            "reduceOptions": {
+              "calcs": [
+                "lastNotNull"
+              ],
+              "fields": "",
+              "values": false
+            },
+            "textMode": "auto"
+          },
+          "pluginVersion": "10.0.0",
+          "targets": [
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "${ds_prometheus}"
+              },
+              "editorMode": "code",
+              "expr": "(sum(wg_relay:forward_downstream_rx_bytes:lifetime{relay=~\"$relay\", backend=~\"$backend\"}) or vector(0)) + (sum(wg_relay:forward_upstream_rx_bytes:lifetime{relay=~\"$relay\", backend=~\"$backend\"}) or vector(0))",
+              "instant": true,
+              "legendFormat": "RX Bytes",
+              "range": false,
+              "refId": "A"
+            }
+          ],
+          "title": "Forward RX Bytes (all time)",
+          "type": "stat"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${ds_prometheus}"
+          },
+          "fieldConfig": {
+            "defaults": {
+              "color": {
+                "mode": "thresholds"
+              },
+              "mappings": [],
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "blue",
+                    "value": null
+                  }
+                ]
+              },
+              "unit": "bytes"
+            },
+            "overrides": []
+          },
+          "gridPos": {
+            "h": 3,
+            "w": 6,
+            "x": 6,
+            "y": 87
+          },
+          "id": 401,
+          "options": {
+            "colorMode": "value",
+            "graphMode": "none",
+            "justifyMode": "auto",
+            "orientation": "auto",
+            "reduceOptions": {
+              "calcs": [
+                "lastNotNull"
+              ],
+              "fields": "",
+              "values": false
+            },
+            "textMode": "auto"
+          },
+          "pluginVersion": "10.0.0",
+          "targets": [
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "${ds_prometheus}"
+              },
+              "editorMode": "code",
+              "expr": "(sum(wg_relay:forward_downstream_tx_bytes:lifetime{relay=~\"$relay\", backend=~\"$backend\"}) or vector(0)) + (sum(wg_relay:forward_upstream_tx_bytes:lifetime{relay=~\"$relay\", backend=~\"$backend\"}) or vector(0))",
+              "instant": true,
+              "legendFormat": "TX Bytes",
+              "range": false,
+              "refId": "A"
+            }
+          ],
+          "title": "Forward TX Bytes (all time)",
+          "type": "stat"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${ds_prometheus}"
+          },
+          "fieldConfig": {
+            "defaults": {
+              "color": {
+                "mode": "thresholds"
+              },
+              "mappings": [],
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "blue",
+                    "value": null
+                  }
+                ]
+              },
+              "unit": "bytes"
+            },
+            "overrides": []
+          },
+          "gridPos": {
+            "h": 3,
+            "w": 6,
+            "x": 12,
+            "y": 87
+          },
+          "id": 402,
+          "options": {
+            "colorMode": "value",
+            "graphMode": "none",
+            "justifyMode": "auto",
+            "orientation": "auto",
+            "reduceOptions": {
+              "calcs": [
+                "lastNotNull"
+              ],
+              "fields": "",
+              "values": false
+            },
+            "textMode": "auto"
+          },
+          "pluginVersion": "10.0.0",
+          "targets": [
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "${ds_prometheus}"
+              },
+              "editorMode": "code",
+              "expr": "(sum(wg_relay:reverse_downstream_rx_bytes:lifetime{relay=~\"$relay\"}) or vector(0)) + (sum(wg_relay:reverse_upstream_rx_bytes:lifetime{relay=~\"$relay\"}) or vector(0))",
+              "instant": true,
+              "legendFormat": "RX Bytes",
+              "range": false,
+              "refId": "A"
+            }
+          ],
+          "title": "Reverse RX Bytes (all time)",
+          "type": "stat"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${ds_prometheus}"
+          },
+          "fieldConfig": {
+            "defaults": {
+              "color": {
+                "mode": "thresholds"
+              },
+              "mappings": [],
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "blue",
+                    "value": null
+                  }
+                ]
+              },
+              "unit": "bytes"
+            },
+            "overrides": []
+          },
+          "gridPos": {
+            "h": 3,
+            "w": 6,
+            "x": 18,
+            "y": 87
+          },
+          "id": 403,
+          "options": {
+            "colorMode": "value",
+            "graphMode": "none",
+            "justifyMode": "auto",
+            "orientation": "auto",
+            "reduceOptions": {
+              "calcs": [
+                "lastNotNull"
+              ],
+              "fields": "",
+              "values": false
+            },
+            "textMode": "auto"
+          },
+          "pluginVersion": "10.0.0",
+          "targets": [
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "${ds_prometheus}"
+              },
+              "editorMode": "code",
+              "expr": "(sum(wg_relay:reverse_downstream_tx_bytes:lifetime{relay=~\"$relay\"}) or vector(0)) + (sum(wg_relay:reverse_upstream_tx_bytes:lifetime{relay=~\"$relay\"}) or vector(0))",
+              "instant": true,
+              "legendFormat": "TX Bytes",
+              "range": false,
+              "refId": "A"
+            }
+          ],
+          "title": "Reverse TX Bytes (all time)",
+          "type": "stat"
+        }
+      ],
+      "title": "All-time traffic",
+      "type": "row"
+    },
+    {
       "collapsed": false,
       "gridPos": {
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 72
+        "y": 87
+      },
+      "id": 108,
+      "panels": [],
+      "title": "Conntrack, padding, drops",
+      "type": "row"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${ds_prometheus}"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "drawStyle": "line",
+            "fillOpacity": 0,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "lineInterpolation": "linear",
+            "lineWidth": 1,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "auto",
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          },
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 88
+      },
+      "id": 500,
+      "options": {
+        "legend": {
+          "calcs": [
+            "last"
+          ],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "single",
+          "sort": "none"
+        }
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${ds_prometheus}"
+          },
+          "editorMode": "code",
+          "expr": "sum by (relay) (wg_relay_forward_ct_entries{relay=~\"$relay\"})",
+          "instant": false,
+          "legendFormat": "{{relay}}",
+          "range": true,
+          "refId": "A"
+        }
+      ],
+      "title": "Conntrack Entries",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${ds_prometheus}"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "drawStyle": "line",
+            "fillOpacity": 0,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "lineInterpolation": "linear",
+            "lineWidth": 1,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "auto",
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          },
+          "unit": "cps"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 88
+      },
+      "id": 501,
+      "options": {
+        "legend": {
+          "calcs": [
+            "last"
+          ],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "single",
+          "sort": "none"
+        }
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${ds_prometheus}"
+          },
+          "editorMode": "code",
+          "expr": "sum by (relay, reason) (rate(wg_relay_forward_ct_gc_deleted_total{relay=~\"$relay\"}[$__rate_interval]))",
+          "instant": false,
+          "legendFormat": "{{relay}} {{reason}}",
+          "range": true,
+          "refId": "A"
+        }
+      ],
+      "title": "Conntrack GC Deleted",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${ds_prometheus}"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "drawStyle": "line",
+            "fillOpacity": 0,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "lineInterpolation": "linear",
+            "lineWidth": 1,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "auto",
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          },
+          "unit": "cpm"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 96
+      },
+      "id": 502,
+      "options": {
+        "legend": {
+          "calcs": [
+            "last"
+          ],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "single",
+          "sort": "none"
+        }
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${ds_prometheus}"
+          },
+          "editorMode": "code",
+          "expr": "sum by (relay, status) (rate(wg_relay_forward_ct_gc_runs_total{relay=~\"$relay\"}[$__rate_interval])) * 60",
+          "instant": false,
+          "legendFormat": "{{relay}} {{status}}",
+          "range": true,
+          "refId": "A"
+        }
+      ],
+      "title": "Conntrack GC Runs",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${ds_prometheus}"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "drawStyle": "line",
+            "fillOpacity": 0,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "lineInterpolation": "linear",
+            "lineWidth": 1,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "auto",
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          },
+          "unit": "s"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 96
+      },
+      "id": 503,
+      "options": {
+        "legend": {
+          "calcs": [
+            "last"
+          ],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "single",
+          "sort": "none"
+        }
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${ds_prometheus}"
+          },
+          "editorMode": "code",
+          "expr": "histogram_quantile(0.5, sum by (relay, le) (rate(wg_relay_forward_ct_gc_duration_seconds_bucket{relay=~\"$relay\"}[5m])))",
+          "instant": false,
+          "legendFormat": "{{relay}} p50",
+          "range": true,
+          "refId": "A"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${ds_prometheus}"
+          },
+          "editorMode": "code",
+          "expr": "histogram_quantile(0.9, sum by (relay, le) (rate(wg_relay_forward_ct_gc_duration_seconds_bucket{relay=~\"$relay\"}[5m])))",
+          "instant": false,
+          "legendFormat": "{{relay}} p90",
+          "range": true,
+          "refId": "B"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${ds_prometheus}"
+          },
+          "editorMode": "code",
+          "expr": "histogram_quantile(0.99, sum by (relay, le) (rate(wg_relay_forward_ct_gc_duration_seconds_bucket{relay=~\"$relay\"}[5m])))",
+          "instant": false,
+          "legendFormat": "{{relay}} p99",
+          "range": true,
+          "refId": "C"
+        }
+      ],
+      "title": "Conntrack GC Duration",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${ds_prometheus}"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "drawStyle": "line",
+            "fillOpacity": 0,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "lineInterpolation": "linear",
+            "lineWidth": 1,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "auto",
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          },
+          "unit": "bytes"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 104
+      },
+      "id": 504,
+      "options": {
+        "legend": {
+          "calcs": [
+            "last"
+          ],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "single",
+          "sort": "none"
+        }
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${ds_prometheus}"
+          },
+          "editorMode": "code",
+          "expr": "avg by (relay, interface) (wg_relay_padding_size_bytes{relay=~\"$relay\"})",
+          "instant": false,
+          "legendFormat": "{{relay}} {{interface}} avg",
+          "range": true,
+          "refId": "A"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${ds_prometheus}"
+          },
+          "editorMode": "code",
+          "expr": "min by (relay, interface) (wg_relay_padding_size_bytes{relay=~\"$relay\"})",
+          "instant": false,
+          "legendFormat": "{{relay}} {{interface}} min",
+          "range": true,
+          "refId": "B"
+        }
+      ],
+      "title": "Padding Size",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${ds_prometheus}"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "drawStyle": "line",
+            "fillOpacity": 0,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "lineInterpolation": "linear",
+            "lineWidth": 1,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "auto",
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          },
+          "unit": "pps"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 104
+      },
+      "id": 505,
+      "options": {
+        "legend": {
+          "calcs": [
+            "last"
+          ],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "single",
+          "sort": "none"
+        }
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${ds_prometheus}"
+          },
+          "editorMode": "code",
+          "expr": "sum by (relay, reason) (rate(wg_relay_forward_downstream_rq_rx_packets_total{reason!=\"forwarded\", relay=~\"$relay\", backend=~\"$backend\"}[$__rate_interval]))",
+          "instant": false,
+          "legendFormat": "{{relay}} forward downstream {{reason}}",
+          "range": true,
+          "refId": "A"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${ds_prometheus}"
+          },
+          "editorMode": "code",
+          "expr": "sum by (relay, reason) (rate(wg_relay_forward_upstream_rq_rx_packets_total{reason!=\"forwarded\", relay=~\"$relay\", backend=~\"$backend\"}[$__rate_interval]))",
+          "instant": false,
+          "legendFormat": "{{relay}} forward upstream {{reason}}",
+          "range": true,
+          "refId": "B"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${ds_prometheus}"
+          },
+          "editorMode": "code",
+          "expr": "sum by (relay, reason) (rate(wg_relay_reverse_downstream_rq_rx_packets_total{reason!=\"forwarded\", relay=~\"$relay\"}[$__rate_interval]))",
+          "instant": false,
+          "legendFormat": "{{relay}} reverse downstream {{reason}}",
+          "range": true,
+          "refId": "C"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${ds_prometheus}"
+          },
+          "editorMode": "code",
+          "expr": "sum by (relay, reason) (rate(wg_relay_reverse_upstream_rq_rx_packets_total{reason!=\"forwarded\", relay=~\"$relay\"}[$__rate_interval]))",
+          "instant": false,
+          "legendFormat": "{{relay}} reverse upstream {{reason}}",
+          "range": true,
+          "refId": "D"
+        }
+      ],
+      "title": "Non-forwarded Packets",
+      "type": "timeseries"
+    },
+    {
+      "collapsed": false,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 112
       },
       "id": 106,
       "panels": [],
@@ -2296,7 +3717,88 @@
         "type": "prometheus",
         "uid": "${ds_prometheus}"
       },
-      "description": "Memory usage of the Go application",
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "align": "auto",
+            "cellOptions": {
+              "type": "auto"
+            },
+            "inspect": false
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 5,
+        "w": 24,
+        "x": 0,
+        "y": 113
+      },
+      "id": 58,
+      "options": {
+        "cellHeight": "sm",
+        "footer": {
+          "countRows": false,
+          "fields": "",
+          "reducer": [
+            "sum"
+          ],
+          "show": false
+        },
+        "showHeader": true
+      },
+      "pluginVersion": "10.0.0",
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${ds_prometheus}"
+          },
+          "editorMode": "code",
+          "expr": "max by (relay, mode, revision) (wg_relay_build_info{job=~\"$job\", relay=~\"$relay\"})",
+          "format": "table",
+          "instant": true,
+          "legendFormat": "",
+          "range": false,
+          "refId": "A"
+        }
+      ],
+      "title": "Build Info",
+      "transformations": [
+        {
+          "id": "organize",
+          "options": {
+            "excludeByName": {
+              "Time": true,
+              "Value": true
+            },
+            "indexByName": {
+              "mode": 1,
+              "relay": 0,
+              "revision": 2
+            },
+            "renameByName": {}
+          }
+        }
+      ],
+      "type": "table"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${ds_prometheus}"
+      },
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -2351,30 +3853,30 @@
         "overrides": [
           {
             "matcher": {
-              "id": "byName",
-              "options": "Heap In Use"
+              "id": "byFrameRefID",
+              "options": "A"
             },
             "properties": [
               {
                 "id": "color",
                 "value": {
-                  "mode": "fixed",
-                  "fixedColor": "blue"
+                  "fixedColor": "blue",
+                  "mode": "fixed"
                 }
               }
             ]
           },
           {
             "matcher": {
-              "id": "byName",
-              "options": "System Memory"
+              "id": "byFrameRefID",
+              "options": "B"
             },
             "properties": [
               {
                 "id": "color",
                 "value": {
-                  "mode": "fixed",
-                  "fixedColor": "orange"
+                  "fixedColor": "orange",
+                  "mode": "fixed"
                 }
               }
             ]
@@ -2385,7 +3887,7 @@
         "h": 8,
         "w": 12,
         "x": 0,
-        "y": 73
+        "y": 118
       },
       "id": 50,
       "options": {
@@ -2409,9 +3911,9 @@
             "uid": "${ds_prometheus}"
           },
           "editorMode": "code",
-          "expr": "go_memstats_heap_inuse_bytes{instance=~\"$instance\"}",
+          "expr": "go_memstats_heap_inuse_bytes{job=~\"$job\", relay=~\"$relay\"}",
           "instant": false,
-          "legendFormat": "Heap In Use - {{instance}}",
+          "legendFormat": "Heap In Use - {{relay}}",
           "range": true,
           "refId": "A"
         },
@@ -2421,9 +3923,9 @@
             "uid": "${ds_prometheus}"
           },
           "editorMode": "code",
-          "expr": "go_memstats_sys_bytes{instance=~\"$instance\"}",
+          "expr": "go_memstats_sys_bytes{job=~\"$job\", relay=~\"$relay\"}",
           "instant": false,
-          "legendFormat": "System Memory - {{instance}}",
+          "legendFormat": "System Memory - {{relay}}",
           "range": true,
           "refId": "B"
         },
@@ -2433,9 +3935,9 @@
             "uid": "${ds_prometheus}"
           },
           "editorMode": "code",
-          "expr": "process_resident_memory_bytes{instance=~\"$instance\"}",
+          "expr": "process_resident_memory_bytes{job=~\"$job\", relay=~\"$relay\"}",
           "instant": false,
-          "legendFormat": "Resident Memory - {{instance}}",
+          "legendFormat": "Resident Memory - {{relay}}",
           "range": true,
           "refId": "C"
         }
@@ -2448,7 +3950,6 @@
         "type": "prometheus",
         "uid": "${ds_prometheus}"
       },
-      "description": "Go runtime metrics including goroutines and threads",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -2506,7 +4007,7 @@
         "h": 8,
         "w": 12,
         "x": 12,
-        "y": 73
+        "y": 118
       },
       "id": 51,
       "options": {
@@ -2530,9 +4031,9 @@
             "uid": "${ds_prometheus}"
           },
           "editorMode": "code",
-          "expr": "go_goroutines{instance=~\"$instance\"}",
+          "expr": "go_goroutines{job=~\"$job\", relay=~\"$relay\"}",
           "instant": false,
-          "legendFormat": "Goroutines - {{instance}}",
+          "legendFormat": "Goroutines - {{relay}}",
           "range": true,
           "refId": "A"
         },
@@ -2542,9 +4043,9 @@
             "uid": "${ds_prometheus}"
           },
           "editorMode": "code",
-          "expr": "go_threads{instance=~\"$instance\"}",
+          "expr": "go_threads{job=~\"$job\", relay=~\"$relay\"}",
           "instant": false,
-          "legendFormat": "Threads - {{instance}}",
+          "legendFormat": "Threads - {{relay}}",
           "range": true,
           "refId": "B"
         }
@@ -2557,7 +4058,6 @@
         "type": "prometheus",
         "uid": "${ds_prometheus}"
       },
-      "description": "CPU usage and file descriptors",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -2612,8 +4112,8 @@
         "overrides": [
           {
             "matcher": {
-              "id": "byName",
-              "options": "CPU Rate"
+              "id": "byFrameRefID",
+              "options": "A"
             },
             "properties": [
               {
@@ -2632,7 +4132,7 @@
         "h": 8,
         "w": 12,
         "x": 0,
-        "y": 81
+        "y": 126
       },
       "id": 52,
       "options": {
@@ -2656,9 +4156,9 @@
             "uid": "${ds_prometheus}"
           },
           "editorMode": "code",
-          "expr": "rate(process_cpu_seconds_total{instance=~\"$instance\"}[$__rate_interval]) * 100",
+          "expr": "rate(process_cpu_seconds_total{job=~\"$job\", relay=~\"$relay\"}[$__rate_interval]) * 100",
           "instant": false,
-          "legendFormat": "CPU Rate - {{instance}}",
+          "legendFormat": "CPU Rate - {{relay}}",
           "range": true,
           "refId": "A"
         },
@@ -2668,9 +4168,9 @@
             "uid": "${ds_prometheus}"
           },
           "editorMode": "code",
-          "expr": "process_open_fds{instance=~\"$instance\"}",
+          "expr": "process_open_fds{job=~\"$job\", relay=~\"$relay\"}",
           "instant": false,
-          "legendFormat": "Open FDs - {{instance}}",
+          "legendFormat": "Open FDs - {{relay}}",
           "range": true,
           "refId": "B"
         }
@@ -2683,7 +4183,6 @@
         "type": "prometheus",
         "uid": "${ds_prometheus}"
       },
-      "description": "Garbage collection metrics",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -2738,8 +4237,8 @@
         "overrides": [
           {
             "matcher": {
-              "id": "byName",
-              "options": "GC Duration"
+              "id": "byFrameRefID",
+              "options": "A"
             },
             "properties": [
               {
@@ -2758,7 +4257,7 @@
         "h": 8,
         "w": 12,
         "x": 12,
-        "y": 81
+        "y": 126
       },
       "id": 53,
       "options": {
@@ -2782,9 +4281,9 @@
             "uid": "${ds_prometheus}"
           },
           "editorMode": "code",
-          "expr": "go_gc_duration_seconds{instance=~\"$instance\",quantile=\"0.5\"}",
+          "expr": "go_gc_duration_seconds{job=~\"$job\", relay=~\"$relay\", quantile=\"0.5\"}",
           "instant": false,
-          "legendFormat": "GC Duration (p50) - {{instance}}",
+          "legendFormat": "GC Duration (p50) - {{relay}}",
           "range": true,
           "refId": "A"
         },
@@ -2794,9 +4293,9 @@
             "uid": "${ds_prometheus}"
           },
           "editorMode": "code",
-          "expr": "rate(go_memstats_mallocs_total{instance=~\"$instance\"}[$__rate_interval])",
+          "expr": "rate(go_memstats_mallocs_total{job=~\"$job\", relay=~\"$relay\"}[$__rate_interval])",
           "instant": false,
-          "legendFormat": "Alloc Rate - {{instance}}",
+          "legendFormat": "Alloc Rate - {{relay}}",
           "range": true,
           "refId": "B"
         },
@@ -2806,9 +4305,9 @@
             "uid": "${ds_prometheus}"
           },
           "editorMode": "code",
-          "expr": "go_memstats_heap_objects{instance=~\"$instance\"}",
+          "expr": "go_memstats_heap_objects{job=~\"$job\", relay=~\"$relay\"}",
           "instant": false,
-          "legendFormat": "Heap Objects - {{instance}}",
+          "legendFormat": "Heap Objects - {{relay}}",
           "range": true,
           "refId": "C"
         }
@@ -2821,7 +4320,6 @@
         "type": "prometheus",
         "uid": "${ds_prometheus}"
       },
-      "description": "Network I/O statistics",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -2879,7 +4377,7 @@
         "h": 8,
         "w": 12,
         "x": 0,
-        "y": 89
+        "y": 134
       },
       "id": 54,
       "options": {
@@ -2903,9 +4401,9 @@
             "uid": "${ds_prometheus}"
           },
           "editorMode": "code",
-          "expr": "rate(process_network_receive_bytes_total{instance=~\"$instance\"}[$__rate_interval])",
+          "expr": "rate(process_network_receive_bytes_total{job=~\"$job\", relay=~\"$relay\"}[$__rate_interval])",
           "instant": false,
-          "legendFormat": "Network Received - {{instance}}",
+          "legendFormat": "Network Received - {{relay}}",
           "range": true,
           "refId": "A"
         },
@@ -2915,9 +4413,9 @@
             "uid": "${ds_prometheus}"
           },
           "editorMode": "code",
-          "expr": "rate(process_network_transmit_bytes_total{instance=~\"$instance\"}[$__rate_interval])",
+          "expr": "rate(process_network_transmit_bytes_total{job=~\"$job\", relay=~\"$relay\"}[$__rate_interval])",
           "instant": false,
-          "legendFormat": "Network Transmitted - {{instance}}",
+          "legendFormat": "Network Transmitted - {{relay}}",
           "range": true,
           "refId": "B"
         }
@@ -2930,7 +4428,6 @@
         "type": "prometheus",
         "uid": "${ds_prometheus}"
       },
-      "description": "Prometheus HTTP metrics for the /metrics endpoint",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -2988,7 +4485,7 @@
         "h": 8,
         "w": 12,
         "x": 12,
-        "y": 89
+        "y": 134
       },
       "id": 55,
       "options": {
@@ -3012,9 +4509,9 @@
             "uid": "${ds_prometheus}"
           },
           "editorMode": "code",
-          "expr": "rate(promhttp_metric_handler_requests_total{instance=~\"$instance\"}[$__rate_interval])",
+          "expr": "rate(promhttp_metric_handler_requests_total{job=~\"$job\", relay=~\"$relay\"}[$__rate_interval])",
           "instant": false,
-          "legendFormat": "HTTP {{code}} - {{instance}}",
+          "legendFormat": "HTTP {{code}} - {{relay}}",
           "range": true,
           "refId": "A"
         },
@@ -3024,18 +4521,258 @@
             "uid": "${ds_prometheus}"
           },
           "editorMode": "code",
-          "expr": "promhttp_metric_handler_requests_in_flight{instance=~\"$instance\"}",
+          "expr": "promhttp_metric_handler_requests_in_flight{job=~\"$job\", relay=~\"$relay\"}",
           "instant": false,
-          "legendFormat": "In Flight - {{instance}}",
+          "legendFormat": "In Flight - {{relay}}",
           "range": true,
           "refId": "B"
         }
       ],
       "title": "HTTP Metrics",
       "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${ds_prometheus}"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "drawStyle": "line",
+            "fillOpacity": 0,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "lineInterpolation": "linear",
+            "lineWidth": 1,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "auto",
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          },
+          "unit": "s"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 142
+      },
+      "id": 56,
+      "options": {
+        "legend": {
+          "calcs": [
+            "last"
+          ],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "single",
+          "sort": "none"
+        }
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${ds_prometheus}"
+          },
+          "editorMode": "code",
+          "expr": "histogram_quantile(0.5, sum by (relay, le) (rate(go_sched_latencies_seconds_bucket{job=~\"$job\", relay=~\"$relay\"}[$__rate_interval])))",
+          "instant": false,
+          "legendFormat": "p50 - {{relay}}",
+          "range": true,
+          "refId": "A"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${ds_prometheus}"
+          },
+          "editorMode": "code",
+          "expr": "histogram_quantile(0.9, sum by (relay, le) (rate(go_sched_latencies_seconds_bucket{job=~\"$job\", relay=~\"$relay\"}[$__rate_interval])))",
+          "instant": false,
+          "legendFormat": "p90 - {{relay}}",
+          "range": true,
+          "refId": "B"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${ds_prometheus}"
+          },
+          "editorMode": "code",
+          "expr": "histogram_quantile(0.99, sum by (relay, le) (rate(go_sched_latencies_seconds_bucket{job=~\"$job\", relay=~\"$relay\"}[$__rate_interval])))",
+          "instant": false,
+          "legendFormat": "p99 - {{relay}}",
+          "range": true,
+          "refId": "C"
+        }
+      ],
+      "title": "Scheduler Latency",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${ds_prometheus}"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "drawStyle": "line",
+            "fillOpacity": 0,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "lineInterpolation": "linear",
+            "lineWidth": 1,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "auto",
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          },
+          "unit": "s"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 142
+      },
+      "id": 57,
+      "options": {
+        "legend": {
+          "calcs": [
+            "last"
+          ],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "single",
+          "sort": "none"
+        }
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${ds_prometheus}"
+          },
+          "editorMode": "code",
+          "expr": "histogram_quantile(0.5, sum by (relay, le) (rate(go_sched_pauses_total_gc_seconds_bucket{job=~\"$job\", relay=~\"$relay\"}[5m])))",
+          "instant": false,
+          "legendFormat": "p50 - {{relay}}",
+          "range": true,
+          "refId": "A"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${ds_prometheus}"
+          },
+          "editorMode": "code",
+          "expr": "histogram_quantile(0.9, sum by (relay, le) (rate(go_sched_pauses_total_gc_seconds_bucket{job=~\"$job\", relay=~\"$relay\"}[5m])))",
+          "instant": false,
+          "legendFormat": "p90 - {{relay}}",
+          "range": true,
+          "refId": "B"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${ds_prometheus}"
+          },
+          "editorMode": "code",
+          "expr": "histogram_quantile(0.99, sum by (relay, le) (rate(go_sched_pauses_total_gc_seconds_bucket{job=~\"$job\", relay=~\"$relay\"}[5m])))",
+          "instant": false,
+          "legendFormat": "p99 - {{relay}}",
+          "range": true,
+          "refId": "C"
+        }
+      ],
+      "title": "GC Pauses",
+      "type": "timeseries"
     }
   ],
-  "refresh": "5s",
+  "refresh": "30s",
   "schemaVersion": 37,
   "style": "dark",
   "tags": [
@@ -3066,6 +4803,7 @@
         "type": "datasource"
       },
       {
+        "allValue": ".*",
         "current": {
           "selected": true,
           "text": "All",
@@ -3075,24 +4813,25 @@
           "type": "prometheus",
           "uid": "${ds_prometheus}"
         },
-        "definition": "label_values(wg_relay_forward_upstream_rq_tx_bytes_total, host)",
+        "definition": "label_values(wg_relay_build_info, relay)",
         "hide": 0,
         "includeAll": true,
-        "label": "Forward Host",
+        "label": "Relay",
         "multi": true,
-        "name": "forward_host",
+        "name": "relay",
         "options": [],
         "query": {
-          "query": "label_values(wg_relay_forward_upstream_rq_tx_bytes_total, host)",
+          "query": "label_values(wg_relay_build_info, relay)",
           "refId": "PrometheusVariableQueryEditor-VariableQuery"
         },
-        "refresh": 1,
+        "refresh": 2,
         "regex": "",
         "skipUrlSync": false,
         "sort": 1,
         "type": "query"
       },
       {
+        "allValue": ".*",
         "current": {
           "selected": true,
           "text": "All",
@@ -3102,34 +4841,7 @@
           "type": "prometheus",
           "uid": "${ds_prometheus}"
         },
-        "definition": "label_values(wg_relay_reverse_upstream_rq_tx_bytes_total, host)",
-        "hide": 0,
-        "includeAll": true,
-        "label": "Reverse Host",
-        "multi": true,
-        "name": "reverse_host",
-        "options": [],
-        "query": {
-          "query": "label_values(wg_relay_reverse_upstream_rq_tx_bytes_total, host)",
-          "refId": "PrometheusVariableQueryEditor-VariableQuery"
-        },
-        "refresh": 1,
-        "regex": "",
-        "skipUrlSync": false,
-        "sort": 1,
-        "type": "query"
-      },
-      {
-        "current": {
-          "selected": true,
-          "text": "All",
-          "value": "$__all"
-        },
-        "datasource": {
-          "type": "prometheus",
-          "uid": "${ds_prometheus}"
-        },
-        "definition": "label_values(wg_relay_forward_upstream_rq_tx_bytes_total, backend)",
+        "definition": "label_values(wg_relay_forward_downstream_rq_rx_bytes_total{relay=~\"$relay\"}, backend)",
         "hide": 0,
         "includeAll": true,
         "label": "Backend",
@@ -3137,10 +4849,10 @@
         "name": "backend",
         "options": [],
         "query": {
-          "query": "label_values(wg_relay_forward_upstream_rq_tx_bytes_total, backend)",
+          "query": "label_values(wg_relay_forward_downstream_rq_rx_bytes_total{relay=~\"$relay\"}, backend)",
           "refId": "PrometheusVariableQueryEditor-VariableQuery"
         },
-        "refresh": 1,
+        "refresh": 2,
         "regex": "",
         "skipUrlSync": false,
         "sort": 1,
@@ -3149,29 +4861,76 @@
       {
         "current": {
           "selected": true,
-          "text": "All",
-          "value": "$__all"
+          "text": "30d",
+          "value": "30d"
         },
-        "datasource": {
-          "type": "prometheus",
-          "uid": "${ds_prometheus}"
-        },
-        "definition": "label_values(go_info, instance)",
         "hide": 0,
-        "includeAll": true,
-        "label": "Instance",
-        "multi": true,
-        "name": "instance",
-        "options": [],
-        "query": {
-          "query": "label_values(go_info, instance)",
-          "refId": "PrometheusVariableQueryEditor-VariableQuery"
-        },
-        "refresh": 1,
-        "regex": "",
+        "includeAll": false,
+        "label": "Total range",
+        "multi": false,
+        "name": "total_range",
+        "options": [
+          {
+            "selected": false,
+            "text": "1d",
+            "value": "1d"
+          },
+          {
+            "selected": false,
+            "text": "2d",
+            "value": "2d"
+          },
+          {
+            "selected": false,
+            "text": "7d",
+            "value": "7d"
+          },
+          {
+            "selected": true,
+            "text": "30d",
+            "value": "30d"
+          },
+          {
+            "selected": false,
+            "text": "60d",
+            "value": "60d"
+          },
+          {
+            "selected": false,
+            "text": "90d",
+            "value": "90d"
+          },
+          {
+            "selected": false,
+            "text": "180d",
+            "value": "180d"
+          }
+        ],
+        "query": "1d,2d,7d,30d,60d,90d,180d",
         "skipUrlSync": false,
-        "sort": 1,
-        "type": "query"
+        "type": "custom"
+      },
+      {
+        "current": {
+          "selected": true,
+          "text": "wg-relay",
+          "value": "wg-relay"
+        },
+        "hide": 2,
+        "includeAll": false,
+        "label": "Job",
+        "multi": false,
+        "name": "job",
+        "options": [
+          {
+            "selected": true,
+            "text": "wg-relay",
+            "value": "wg-relay"
+          }
+        ],
+        "query": "wg-relay",
+        "skipUrlSync": false,
+        "type": "custom"
       }
     ]
   },

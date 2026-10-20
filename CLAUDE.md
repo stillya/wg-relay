@@ -80,6 +80,7 @@ Client → Obfuscator Proxy → WireGuard Server
   - Reverse mode: No labels (aggregated by direction only)
 - **Backend Labels**: Map from backend index (uint8) to human-readable name, passed from loader to collector/monitor
 - **Conntrack GC Metrics**: Forward mode only, no labels except `reason` (expired|orphan) on deleted_total and `status` (success|error) on runs_total: `wg_relay_forward_ct_entries`, `wg_relay_forward_ct_gc_deleted_total`, `wg_relay_forward_ct_gc_runs_total`, `wg_relay_forward_ct_gc_duration_seconds`
+- **Recorded Series** (`.prometheus/rules/wg-relay.yml`, vmalert): `wg_relay:traffic_bytes:{rate5m,ratio5m,ratio30m,ratio1h,ratio6h}`, `wg_relay:traffic:health` (0 normal, 1 sustained drop, 2 critical drop, 3 spike), `wg_relay:{forward|reverse}_{downstream|upstream}_{rx|tx}_bytes:lifetime`; all by `relay`
 
 ## Key Constraints
 
