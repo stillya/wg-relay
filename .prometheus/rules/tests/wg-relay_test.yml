@@ -1,0 +1,264 @@
+# vmalert-tool unittest for ../wg-relay.yml. It lives in a subdirectory because vmalert refuses to
+# start when its `-rule=/etc/rules/*.yml` glob matches a test file.
+#
+#   docker run --rm -v "$PWD/.prometheus/rules:/rules" victoriametrics/vmalert-tool:v1.153.0 \
+#     unittest --files=/rules/tests/wg-relay_test.yml
+rule_files:
+  - ../wg-relay.yml
+
+evaluation_interval: 1m
+
+tests:
+  # Two days of history at 100 kB/s (6e6 bytes per minute) unless stated otherwise; every scenario
+  # happens on day 3, after 2d.
+  #
+  # How to read `values` (one sample per `interval` = 1 minute, the first sample is at time 0):
+  #   a+bxn   n+1 samples a, a+b, ..., a+n*b: a counter that grows by b bytes every minute
+  #   axn     a repeated n+1 times: a counter that stands still
+  #   _xn     n missing samples: no data at all
+  # Space-separated segments follow one another. A segment that starts at the previous segment's
+  # last value plus one step keeps the counter going and only changes its rate; a segment that
+  # starts lower is a counter reset (a relay restart). The big start numbers are just that
+  # continuation, e.g. 17641800000 = 2940 min * 6000000 + 1800000.
+  # Rate = bytes per minute / 60, so 6000000 = 100 kB/s.
+  # Minutes: 2880 = 2d, 2940 = 2d1h, 3000 = 2d2h, 3060 = 2d3h, 3120 = 2d4h, 3540 = 2d11h.
+  - name: traffic health
+    interval: 1m
+    input_series:
+      # rx+tx summed: 60 kB/s + 40 kB/s.
+      - series: 'wg_relay_forward_downstream_rq_rx_bytes_total{relay="steady",backend="b1",reason="forwarded"}'
+        # 0 → 2d11h: +3600000/min = 60 kB/s
+        values: '0+3600000x3540'
+      - series: 'wg_relay_forward_downstream_rq_tx_bytes_total{relay="steady",backend="b1",reason="forwarded"}'
+        # 0 → 2d11h: +2400000/min = 40 kB/s
+        values: '0+2400000x3540'
+      # Not forwarded and not downstream: must not count.
+      - series: 'wg_relay_forward_downstream_rq_rx_bytes_total{relay="steady",backend="b1",reason="dropped"}'
+        # 0+6000000x2940   0 → 2d1h: 100 kB/s
+        # 0x600            2d1h → 2d11h: reset to 0, then stands still
+        values: '0+6000000x2940 0x600'
+      - series: 'wg_relay_forward_upstream_rq_rx_bytes_total{relay="steady",backend="b1",reason="forwarded"}'
+        # same shape as the dropped series above
+        values: '0+6000000x2940 0x600'
+      # 70% drop from 2d1h to 2d3h, then back to normal.
+      - series: 'wg_relay_reverse_downstream_rq_rx_bytes_total{relay="drop",reason="forwarded"}'
+        # 0+6000000x2940            0 → 2d1h: 100 kB/s
+        # 17641800000+1800000x119   2d1h → 2d3h: 30 kB/s
+        # 17862000000+6000000x479   2d3h → 2d11h: 100 kB/s again
+        values: '0+6000000x2940 17641800000+1800000x119 17862000000+6000000x479'
+      # 90% at 2d2h, 80% at 2d3h, 70% from 2d4h on.
+      - series: 'wg_relay_forward_downstream_rq_rx_bytes_total{relay="sag",backend="b1",reason="forwarded"}'
+        # 0+6000000x3000            0 → 2d2h: 100 kB/s
+        # 18005400000+5400000x59    2d2h → 2d3h: 90 kB/s
+        # 18328800000+4800000x59    2d3h → 2d4h: 80 kB/s
+        # 18616200000+4200000x419   2d4h → 2d11h: 70 kB/s
+        values: '0+6000000x3000 18005400000+5400000x59 18328800000+4800000x59 18616200000+4200000x419'
+      # 3x from 2d1h to 2d2h.
+      - series: 'wg_relay_reverse_downstream_rq_tx_bytes_total{relay="spike",reason="forwarded"}'
+        # 0+6000000x2940            0 → 2d1h: 100 kB/s
+        # 17658000000+18000000x59   2d1h → 2d2h: 300 kB/s
+        # 18726000000+6000000x539   2d2h → 2d11h: 100 kB/s again
+        values: '0+6000000x2940 17658000000+18000000x59 18726000000+6000000x539'
+      # No traffic from 2d1h to 2d1h5m, 5x from 2d3h to 2d3h5m.
+      - series: 'wg_relay_forward_downstream_rq_rx_bytes_total{relay="blip",backend="b1",reason="forwarded"}'
+        # 0+6000000x2940            0 → 2d1h: 100 kB/s
+        # 17640000000+0x4           2d1h → 2d1h5m: counter stands still, no traffic
+        # 17646000000+6000000x114   2d1h5m → 2d3h: 100 kB/s
+        # 18360000000+30000000x4    2d3h → 2d3h5m: 500 kB/s
+        # 18486000000+6000000x474   2d3h5m → 2d11h: 100 kB/s
+        values: '0+6000000x2940 17640000000+0x4 17646000000+6000000x114 18360000000+30000000x4 18486000000+6000000x474'
+      # 1 kB/s, falling to 100 B/s at 2d1h: both below the 10 KiB/s floor.
+      - series: 'wg_relay_reverse_downstream_rq_rx_bytes_total{relay="quiet",reason="forwarded"}'
+        # 0+60000x2940         0 → 2d1h: +60000/min = 1 kB/s
+        # 176406000+6000x599   2d1h → 2d11h: +6000/min = 100 B/s
+        values: '0+60000x2940 176406000+6000x599'
+      # First seen at 2d: no same-time-of-day history yet.
+      - series: 'wg_relay_forward_downstream_rq_rx_bytes_total{relay="fresh",backend="b1",reason="forwarded"}'
+        # _x2880          0 → 2d: no samples, the relay does not exist yet
+        # 0+6000000x660   2d → 2d11h: 100 kB/s
+        values: '_x2880 0+6000000x660'
+
+    metricsql_expr_test:
+      - expr: wg_relay:traffic_bytes:rate5m{relay="steady"}
+        eval_time: 2d1h
+        exp_samples:
+          - labels: 'wg_relay:traffic_bytes:rate5m{relay="steady"}'
+            value: 100000
+      - expr: wg_relay:traffic_bytes:ratio6h{relay="steady"}
+        eval_time: 2d1h
+        exp_samples:
+          - labels: 'wg_relay:traffic_bytes:ratio6h{relay="steady"}'
+            value: 1
+      - expr: wg_relay:traffic:health{relay="steady"}
+        eval_time: 2d1h
+        exp_samples:
+          - labels: 'wg_relay:traffic:health{relay="steady"}'
+            value: 0
+      - expr: wg_relay:traffic:health{relay="steady"}
+        eval_time: 2d10h
+        exp_samples:
+          - labels: 'wg_relay:traffic:health{relay="steady"}'
+            value: 0
+
+      # Drop: the short window falls at once, but the state waits for the long window.
+      - expr: wg_relay:traffic:health{relay="drop"}
+        eval_time: 2d1h20m
+        exp_samples:
+          - labels: 'wg_relay:traffic:health{relay="drop"}'
+            value: 0
+      - expr: wg_relay:traffic_bytes:ratio1h{relay="drop"}
+        eval_time: 2d2h
+        exp_samples:
+          - labels: 'wg_relay:traffic_bytes:ratio1h{relay="drop"}'
+            value: 0.3
+      - expr: wg_relay:traffic:health{relay="drop"}
+        eval_time: 2d2h
+        exp_samples:
+          - labels: 'wg_relay:traffic:health{relay="drop"}'
+            value: 2
+      - expr: wg_relay:traffic:health{relay="drop"}
+        eval_time: 2d3h
+        exp_samples:
+          - labels: 'wg_relay:traffic:health{relay="drop"}'
+            value: 2
+      # Recovery: the 1h window is still low, but the 5m one is back, so the state clears.
+      - expr: wg_relay:traffic_bytes:ratio1h{relay="drop"} < bool 0.5
+        eval_time: 2d3h10m
+        exp_samples:
+          - labels: '{relay="drop"}'
+            value: 1
+      - expr: wg_relay:traffic:health{relay="drop"}
+        eval_time: 2d3h10m
+        exp_samples:
+          - labels: 'wg_relay:traffic:health{relay="drop"}'
+            value: 0
+
+      # Slow sag: the 30m window is below 0.75 at 2d6h, the 6h window only later.
+      - expr: wg_relay:traffic:health{relay="sag"}
+        eval_time: 2d6h
+        exp_samples:
+          - labels: 'wg_relay:traffic:health{relay="sag"}'
+            value: 0
+      - expr: wg_relay:traffic_bytes:ratio6h{relay="sag"}
+        eval_time: 2d10h30m
+        exp_samples:
+          - labels: 'wg_relay:traffic_bytes:ratio6h{relay="sag"}'
+            value: 0.7
+      - expr: wg_relay:traffic:health{relay="sag"}
+        eval_time: 2d10h30m
+        exp_samples:
+          - labels: 'wg_relay:traffic:health{relay="sag"}'
+            value: 1
+
+      - expr: wg_relay:traffic:health{relay="spike"}
+        eval_time: 2d2h
+        exp_samples:
+          - labels: 'wg_relay:traffic:health{relay="spike"}'
+            value: 3
+      - expr: wg_relay:traffic:health{relay="spike"}
+        eval_time: 2d2h30m
+        exp_samples:
+          - labels: 'wg_relay:traffic:health{relay="spike"}'
+            value: 0
+
+      # 5-minute blips move the 5m ratio only.
+      - expr: wg_relay:traffic_bytes:ratio5m{relay="blip"} < bool 0.5
+        eval_time: 2d1h5m
+        exp_samples:
+          - labels: '{relay="blip"}'
+            value: 1
+      - expr: wg_relay:traffic:health{relay="blip"}
+        eval_time: 2d1h6m
+        exp_samples:
+          - labels: 'wg_relay:traffic:health{relay="blip"}'
+            value: 0
+      - expr: wg_relay:traffic_bytes:ratio5m{relay="blip"} > bool 2
+        eval_time: 2d3h5m
+        exp_samples:
+          - labels: '{relay="blip"}'
+            value: 1
+      - expr: wg_relay:traffic:health{relay="blip"}
+        eval_time: 2d3h6m
+        exp_samples:
+          - labels: 'wg_relay:traffic:health{relay="blip"}'
+            value: 0
+
+      - expr: wg_relay:traffic_bytes:ratio1h{relay="quiet"}
+        eval_time: 2d3h
+        exp_samples:
+          - labels: 'wg_relay:traffic_bytes:ratio1h{relay="quiet"}'
+            value: 1
+      - expr: wg_relay:traffic:health{relay="quiet"}
+        eval_time: 2d3h
+        exp_samples:
+          - labels: 'wg_relay:traffic:health{relay="quiet"}'
+            value: 0
+
+      # No history: a rate, but no health series at all (not 0).
+      - expr: wg_relay:traffic_bytes:rate5m{relay="fresh"}
+        eval_time: 2d2h
+        exp_samples:
+          - labels: 'wg_relay:traffic_bytes:rate5m{relay="fresh"}'
+            value: 100000
+      - expr: wg_relay:traffic:health{relay="fresh"}
+        eval_time: 2d2h
+        exp_samples: []
+
+  - name: lifetime accumulator
+    interval: 1m
+    input_series:
+      # Same notation as above; here the numbers are plain bytes per minute.
+      # +1000 per minute, relay restart at 11m: the counter comes back at 500.
+      - series: 'wg_relay_forward_downstream_rq_rx_bytes_total{relay="lt-fwd",backend="b1",reason="forwarded"}'
+        # 0+1000x10     0 → 10m: +1000/min, reaches 10000
+        # 500+1000x19   11m → 30m: restarted counter starts at 500, reaches 19500
+        values: '0+1000x10 500+1000x19'
+      - series: 'wg_relay_forward_downstream_rq_rx_bytes_total{relay="lt-fwd",backend="b1",reason="dropped"}'
+        # 0 → 30m: +700/min, reason="dropped", must not count
+        values: '0+700x30'
+      - series: 'wg_relay_forward_downstream_rq_rx_bytes_total{relay="lt-fwd",backend="b2",reason="forwarded"}'
+        # 0 → 30m: +100/min, a second backend of the same relay
+        values: '0+100x30'
+      # The relay is retired after 10m.
+      - series: 'wg_relay_reverse_upstream_rq_tx_bytes_total{relay="lt-rev",reason="forwarded"}'
+        # 0 → 10m: +2000/min, then the series ends
+        values: '0+2000x10'
+
+    metricsql_expr_test:
+      - expr: wg_relay:forward_downstream_rx_bytes:lifetime
+        eval_time: 10m
+        exp_samples:
+          - labels: 'wg_relay:forward_downstream_rx_bytes:lifetime{relay="lt-fwd",backend="b1"}'
+            value: 10000
+          - labels: 'wg_relay:forward_downstream_rx_bytes:lifetime{relay="lt-fwd",backend="b2"}'
+            value: 1000
+      # The reset adds what was sent since the restart instead of going down.
+      - expr: wg_relay:forward_downstream_rx_bytes:lifetime{backend="b1"}
+        eval_time: 11m
+        exp_samples:
+          - labels: 'wg_relay:forward_downstream_rx_bytes:lifetime{relay="lt-fwd",backend="b1"}'
+            value: 10500
+      - expr: wg_relay:forward_downstream_rx_bytes:lifetime{backend="b1"}
+        eval_time: 30m
+        exp_samples:
+          - labels: 'wg_relay:forward_downstream_rx_bytes:lifetime{relay="lt-fwd",backend="b1"}'
+            value: 29500
+      - expr: wg_relay:reverse_upstream_tx_bytes:lifetime
+        eval_time: 10m
+        exp_samples:
+          - labels: 'wg_relay:reverse_upstream_tx_bytes:lifetime{relay="lt-rev"}'
+            value: 20000
+      # The source series is gone: the value is kept, and still recorded.
+      - expr: wg_relay:reverse_upstream_tx_bytes:lifetime
+        eval_time: 30m
+        exp_samples:
+          - labels: 'wg_relay:reverse_upstream_tx_bytes:lifetime{relay="lt-rev"}'
+            value: 20000
+      - expr: count_over_time(wg_relay:reverse_upstream_tx_bytes:lifetime[10m])
+        eval_time: 30m
+        exp_samples:
+          - labels: '{relay="lt-rev"}'
+            value: 10
+      - expr: wg_relay:reverse_downstream_rx_bytes:lifetime
+        eval_time: 30m
+        exp_samples: []

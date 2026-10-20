@@ -1,27 +1,47 @@
 services:
-  prometheus:
-    image: prom/prometheus:latest
-    container_name: wg-relay-prometheus
+  victoriametrics:
+    image: victoriametrics/victoria-metrics:v1.153.0
+    container_name: wg-relay-victoriametrics
     command:
-      - '--config.file=/etc/prometheus/prometheus.yml'
-      - '--storage.tsdb.path=/prometheus'
-      - '--web.console.libraries=/etc/prometheus/console_libraries'
-      - '--web.console.templates=/etc/prometheus/consoles'
-      - '--storage.tsdb.retention.time=200h'
-      - '--web.enable-lifecycle'
+      - '-storageDataPath=/victoria-metrics-data'
+      - '-retentionPeriod=180d'
+      - '-promscrape.config=/etc/scrape.yml'
+      - '-httpListenAddr=:8428'
     restart: unless-stopped
     ports:
-      - "9090:9090"
+      - "127.0.0.1:8428:8428"
     volumes:
-      - ./prometheus.yml:/etc/prometheus/prometheus.yml
-      - prometheus_data:/prometheus
+      - ./scrape.yml:/etc/scrape.yml:ro
+      - victoriametrics_data:/victoria-metrics-data
+    networks:
+      - monitoring
+
+  vmalert:
+    image: victoriametrics/vmalert:v1.153.0
+    container_name: wg-relay-vmalert
+    command:
+      - '-rule=/etc/rules/*.yml'
+      - '-datasource.url=http://victoriametrics:8428'
+      - '-remoteWrite.url=http://victoriametrics:8428'
+      - '-remoteRead.url=http://victoriametrics:8428'
+      - '-evaluationInterval=1m'
+      - '-httpListenAddr=:8880'
+    restart: unless-stopped
+    depends_on:
+      - victoriametrics
+    ports:
+      - "127.0.0.1:8880:8880"
+    volumes:
+      - ./rules:/etc/rules:ro
     networks:
       - monitoring
 
   grafana:
-    image: grafana/grafana:latest
+    image: grafana/grafana:13.2.3
     container_name: wg-relay-grafana
     restart: unless-stopped
+    depends_on:
+      - victoriametrics
     ports:
       - "3000:3000"
     environment:
@@ -36,7 +56,7 @@ services:
       - monitoring
 
 volumes:
-  prometheus_data:
+  victoriametrics_data:
   grafana_data:
 
 networks:
