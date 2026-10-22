@@ -5,6 +5,7 @@ import (
 	"fmt"
 	log "log/slog"
 	"net/http"
+	_ "net/http/pprof" //nolint:gosec // G108: served on localhost only
 	"os"
 	"os/signal"
 	"runtime"
@@ -115,6 +116,18 @@ func main() {
 		os.Exit(1)
 	}
 	defer dataplaneManager.Stop()
+
+	go func() {
+		server := &http.Server{
+			Addr:              "127.0.0.1:6060",
+			ReadHeaderTimeout: 10 * time.Second,
+		}
+
+		log.Info("Starting pprof server", "listen", server.Addr)
+		if err := server.ListenAndServe(); err != nil {
+			log.Error("pprof server failed", "error", err)
+		}
+	}()
 
 	var metricsSource *metricsmap.BPFMapSource
 	var bpfCollector *metrics.BpfCollector
